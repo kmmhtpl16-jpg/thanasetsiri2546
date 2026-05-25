@@ -481,6 +481,7 @@ var pinBuf   = '';
 ================================================================ */
 try {
   firebase.initializeApp(FB_CFG);
+firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
   db   = firebase.firestore();
   auth = firebase.auth();
 } catch(e) {
@@ -488,9 +489,9 @@ try {
 }
 
 firebase.auth().onAuthStateChanged(function(user) {
-  if (user) {
-    curEmail = user.email;
-    showApp();
+  // Always require PIN - sign out any persisted session on page load
+  if (user) { firebase.auth().signOut(); }
+});
   } else {
     showPin();
   }
