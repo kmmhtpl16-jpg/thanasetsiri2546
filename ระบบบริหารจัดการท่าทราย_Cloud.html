@@ -428,12 +428,12 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
    คัดลอกจาก Firebase Console > Project Settings > SDK snippet
 ================================================================ */
 var FB_CFG = {
-  apiKey:            "AIzaSyDjeec1gYypCCHPXJKWwX_FEnb9J8RffuE",
-  authDomain:        "thanasetsiri2546.firebaseapp.com",
-  projectId:         "thanasetsiri2546",
-  storageBucket:     "thanasetsiri2546.firebasestorage.app",
-  messagingSenderId: "583880441495",
-  appId:             "1:583880441495:web:30da4fbb276a3f289d33d2"
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 
 /* ================================================================
@@ -610,66 +610,138 @@ function importFile(evt) {
     var wb;
     try { wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}); }
     catch(ex){ setMsg('s1','❌ อ่านไฟล์ไม่ได้','err'); return; }
-    var rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
-    parseAndSave(rows, file.name);
+    parseAndSave(wb, file.name);
   };
   reader.readAsArrayBuffer(file);
   evt.target.value='';
 }
 
-function parseAndSave(rows, fname) {
-  // หา header row
-  var hr=-1;
-  for(var i=0;i<rows.length;i++){
-    var rs=rows[i].map(function(c){return String(c).trim();});
-    if(rs.some(function(c){return c.includes('ทะเบียน')||c.includes('เลขที่');})){hr=i;break;}
+// แปลงชื่อ Sheet เช่น "02-05-69" → "2026-05-02"
+function sheetNameToDate(name) {
+  var m = name.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{2,4})$/);
+  if (!m) return null;
+  var d=parseInt(m[1]), mo=parseInt(m[2]), y=parseInt(m[3]);
+  if (y < 100) y += 2500;
+  if (y > 2400) y -= 543;
+  return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+
+// ดึงวันที่จากแถวสุดท้ายที่มีข้อมูล เช่น "24/05/2569" หรือ Excel serial
+function extractDateFromLastRow(rows) {
+  // วนจากแถวสุดท้ายขึ้นมา
+  for (var i=rows.length-1; i>=0; i--) {
+    var r = rows[i];
+    for (var j=0; j<r.length; j++) {
+      var v = r[j];
+      if (!v && v !== 0) continue;
+      var s = String(v).trim();
+      // รูปแบบ DD/MM/YYYY หรือ DD-MM-YYYY (รวม พ.ศ.)
+      var m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+      if (m) {
+        var d=parseInt(m[1]), mo=parseInt(m[2]), y=parseInt(m[3]);
+        if (y > 2400) y -= 543;
+        if (y >= 2000 && y <= 2100 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+          return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+        }
+      }
+      // Excel date serial (เช่น 46165)
+      if (typeof v === 'number' && v > 40000 && v < 60000) {
+        var epoch = new Date(1899,11,30);
+        epoch.setDate(epoch.getDate() + Math.floor(v));
+        var y2=epoch.getFullYear(), mo2=epoch.getMonth()+1, d2=epoch.getDate();
+        if (y2 >= 2000 && y2 <= 2100) {
+          return y2+'-'+String(mo2).padStart(2,'0')+'-'+String(d2).padStart(2,'0');
+        }
+      }
+    }
   }
-  if(hr<0){ setMsg('s1','❌ ไม่พบโครงสร้างไฟล์ตาชั่ง','err'); return; }
+  return null;
+}
 
-  var H=rows[hr].map(function(c){return String(c).trim();});
-  function ci(kw){ return H.findIndex(function(x){return x.includes(kw);}); }
-  var iSeq=ci('เลขที่'), iPlate=ci('ทะเบียน'), iDate=ci('วันที่'),
-      iTime=ci('เวลา'),  iCust=ci('ลูกค้า'),   iProd=ci('สินค้า');
-  var iNet=ci('สุทธิ')>=0?ci('สุทธิ'):ci('นน.สุทธิ');
-
-  var existIds=new Set(wData.map(function(w){return w._id;}));
-  var batch=db.batch();
+// parse 1 sheet — ใช้ร่วมกันทั้ง 2 รูปแบบ
+function parseSheet(rows, dateStr, existIds, batch) {
   var imp=0, skip=0;
 
-  for(var i=hr+2;i<rows.length-2;i++){
-    var r=rows[i];
-    var seq=String(r[iSeq]||'').trim();
-    if(!seq||/รวม|ผล/.test(seq)||!/^\d/.test(seq)) continue;
+  // หา header row ที่มี "ทะเบียนรถ"
+  var hr = -1;
+  for (var i=0; i<rows.length; i++) {
+    var rs = rows[i].map(function(c){ return String(c).trim(); });
+    if (rs.indexOf('ทะเบียนรถ') >= 0 || rs.indexOf('ทะเบียน') >= 0) { hr=i; break; }
+  }
+  if (hr < 0) return {imp:0, skip:0, found:false};
 
-    var raw=String(r[iDate]||'').trim();
-    var dm=raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-    if(!dm) continue;
-    var y=parseInt(dm[3]); if(y>2400) y-=543;
-    var dateStr=y+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
+  var H = rows[hr].map(function(c){ return String(c).trim(); });
+  function ci(kw){ return H.findIndex(function(x){ return x===kw||x.includes(kw); }); }
+  var iSeq   = ci('เลขที่');
+  var iPlate = ci('ทะเบียนรถ') >= 0 ? ci('ทะเบียนรถ') : ci('ทะเบียน');
+  var iCust  = ci('ลูกค้า');
+  var iProd  = ci('สินค้า');
+  var iIn    = ci('นน.เข้า');
+  var iOut   = ci('นน.ออก');
+  var iNet   = ci('นน.สุทธิ') >= 0 ? ci('นน.สุทธิ') : ci('สุทธิ');
 
-    var rt=String(r[iTime]||'').trim();
-    var timeStr=/^\d{1,2}:\d{2}(:\d{2})?$/.test(rt)?rt:'';
-    var kg=parseFloat(String(r[iNet]||'0').replace(/,/g,''))||0;
-    if(kg<=0) continue;
+  for (var i=hr+1; i<rows.length; i++) {
+    var r = rows[i];
+    var seq = String(r[iSeq]||'').trim();
+    if (!seq || !/^\d+$/.test(seq)) continue;
 
-    var id=dateStr+'_'+seq;
-    if(existIds.has(id)){skip++;continue;}
+    var kgNet = parseFloat(String(r[iNet]||'0').replace(/,/g,'')) || 0;
+    if (kgNet <= 0) continue;
 
-    batch.set(db.collection('weighings').doc(id),{
-      seq:seq, date:dateStr, time:timeStr,
-      plate:   String(r[iPlate]||'').trim(),
-      customer:String(r[iCust] ||'').trim()||'ลูกค้า (ทั่วไป)',
-      product: String(r[iProd] ||'').trim()||'ทราย',
-      kg:kg,
-      importedAt:new Date().toISOString(),
-      importedBy:curEmail
+    var id = dateStr+'_'+seq;
+    if (existIds.has(id)) { skip++; continue; }
+
+    batch.set(db.collection('weighings').doc(id), {
+      seq:      seq,
+      date:     dateStr,
+      plate:    String(r[iPlate]||'').trim(),
+      customer: String(r[iCust] ||'').trim() || 'ทั่วไป',
+      product:  String(r[iProd] ||'').trim() || 'ทราย',
+      kgIn:     Math.round(parseFloat(String(r[iIn] ||'0').replace(/,/g,''))||0),
+      kgOut:    Math.round(parseFloat(String(r[iOut]||'0').replace(/,/g,''))||0),
+      kg:       Math.round(kgNet),
+      importedAt: new Date().toISOString(),
+      importedBy: curEmail
     });
+    existIds.add(id);
     imp++;
   }
+  return {imp:imp, skip:skip, found:true};
+}
 
-  if(imp>0){
+function parseAndSave(wb, fname) {
+  var existIds = new Set(wData.map(function(w){ return w._id; }));
+  var batch = db.batch();
+  var imp=0, skip=0, sheetsDone=0;
+
+  for (var si=0; si<wb.SheetNames.length; si++) {
+    var sName = wb.SheetNames[si];
+    var rows = XLSX.utils.sheet_to_json(wb.Sheets[sName], {header:1, defval:''});
+
+    // วิธีที่ 1: ดึงวันที่จากชื่อ Sheet เช่น "02-05-69"
+    var dateStr = sheetNameToDate(sName);
+
+    // วิธีที่ 2: ถ้าชื่อ Sheet ไม่มีวันที่ (เช่น "Sheet1") → ดึงจากแถวสุดท้าย
+    if (!dateStr) dateStr = extractDateFromLastRow(rows);
+
+    // ถ้ายังหาวันที่ไม่ได้เลย ข้าม Sheet นี้
+    if (!dateStr) continue;
+
+    var result = parseSheet(rows, dateStr, existIds, batch);
+    if (!result.found) continue;
+
+    sheetsDone++;
+    imp  += result.imp;
+    skip += result.skip;
+  }
+
+  if (sheetsDone === 0) {
+    setMsg('s1','❌ ไม่พบข้อมูลหรือหาวันที่ไม่ได้ในไฟล์นี้','err');
+    return;
+  }
+  if (imp > 0) {
     batch.commit()
-      .then(function(){ setMsg('s1','✅ นำเข้า '+imp+' รายการ (ซ้ำ '+skip+')','ok'); vMode='latest'; updVBtn(); })
+      .then(function(){ setMsg('s1','✅ นำเข้า '+imp+' รายการ จาก '+sheetsDone+' วัน (ซ้ำ '+skip+')','ok'); vMode='latest'; updVBtn(); })
       .catch(function(e){ setMsg('s1','❌ Firestore: '+e.message,'err'); });
   } else {
     setMsg('s1','⚠️ ไม่มีรายการใหม่ (ซ้ำ '+skip+')','warn');
