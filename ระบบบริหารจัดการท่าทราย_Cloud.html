@@ -486,9 +486,11 @@ try {
   auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
 } catch(e) { setErr('Firebase init error: ' + e.message); }
 
+var _pinLoginInProgress = false;
 firebase.auth().onAuthStateChanged(function(user) {
-  if (user) { firebase.auth().signOut(); }
-  else { showPin(); }
+  if (user && _pinLoginInProgress) { showApp(user); }
+  else if (!user && !_pinLoginInProgress) { showPin(); }
+  else if (user && !_pinLoginInProgress) { firebase.auth().signOut(); }
 });
 
 window.addEventListener('online',  function(){ document.getElementById('offlineBanner').style.display='none'; });
@@ -540,6 +542,7 @@ function tryPin() {
   curRole = acc.role;
   document.getElementById('pinBox').classList.add('ok');
   setErr('');
+  _pinLoginInProgress = true;
   firebase.auth().signInWithEmailAndPassword(acc.email, acc.pw)
     .catch(function(e) {
       document.getElementById('pinBox').classList.remove('ok');
