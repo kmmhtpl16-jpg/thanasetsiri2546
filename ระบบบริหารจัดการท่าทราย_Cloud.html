@@ -481,20 +481,14 @@ var pinBuf   = '';
 ================================================================ */
 try {
   firebase.initializeApp(FB_CFG);
-firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
   db   = firebase.firestore();
   auth = firebase.auth();
-} catch(e) {
-  alert('Firebase init error: ' + e.message);
-}
+  auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
+} catch(e) { setErr('Firebase init error: ' + e.message); }
 
 firebase.auth().onAuthStateChanged(function(user) {
-  // Always require PIN - sign out any persisted session on page load
   if (user) { firebase.auth().signOut(); }
-});
-  } else {
-    showPin();
-  }
+  else { showPin(); }
 });
 
 window.addEventListener('online',  function(){ document.getElementById('offlineBanner').style.display='none'; });
