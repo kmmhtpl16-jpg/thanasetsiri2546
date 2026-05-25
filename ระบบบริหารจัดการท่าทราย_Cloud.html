@@ -489,7 +489,7 @@ try {
 var _pinLoginInProgress = false;
 firebase.auth().onAuthStateChanged(function(user) {
   if (user && _pinLoginInProgress) { showApp(user); }
-  else if (!user && !_pinLoginInProgress) { showPin(); }
+  else if (!user) { _pinLoginInProgress = false; showPin(); }
   else if (user && !_pinLoginInProgress) { firebase.auth().signOut(); }
 });
 
