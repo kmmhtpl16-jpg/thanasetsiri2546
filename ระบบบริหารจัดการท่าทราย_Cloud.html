@@ -624,6 +624,21 @@ function importFile(evt) {
 }
 
 // แปลงชื่อ Sheet เช่น "02-05-69" → "2026-05-02"
+// แสดงวันที่เป็น วว/ดด/ปปปป พ.ศ.
+function fmtDate(s) {
+  if (!s) return s;
+  var p = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!p) return s;
+  return p[3]+'/'+p[2]+'/'+(parseInt(p[1])+543);
+}
+// แสดงเดือนเป็น ดด/ปปปป พ.ศ.
+function fmtMonth(s) {
+  if (!s) return s;
+  var p = s.match(/^(\d{4})-(\d{2})$/);
+  if (!p) return s;
+  return p[2]+'/'+(parseInt(p[1])+543);
+}
+
 function sheetNameToDate(name) {
   var m = name.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{2,4})$/);
   if (!m) return null;
@@ -778,7 +793,7 @@ function draw1() {
     ? '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
     : paged.map(function(r,i){
         var c=(r.kg/KPC).toFixed(3);
-        return '<tr><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
+        return '<tr><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+fmtDate(r.date)+'</td>'
           +'<td style="color:var(--muted)">'+(r.time||'–')+'</td>'
           +'<td>'+r.customer+'</td><td style="color:var(--muted)">'+r.product+'</td>'
           +'<td class="r">'+r.kg.toLocaleString('th-TH')+'</td>'
@@ -798,7 +813,7 @@ function draw2() {
     ? '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
     : wData.map(function(r){
         var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d), has=d>0;
-        return '<tr class="'+(has?'ded':'')+'"><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
+        return '<tr class="'+(has?'ded':'')+'"><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+fmtDate(r.date)+'</td>'
           +'<td class="r">'+(g*f).toFixed(3)+' '+u+'</td>'
           +'<td><input type="number" class="ded-in" step="0.001" min="0"'
           +' data-id="'+r._id+'" value="'+(has?d.toFixed(3):'')+'" placeholder="0.000"></td>'
@@ -862,7 +877,7 @@ function draw3() {
   document.getElementById('t3b').innerHTML=rows.map(function(r){
     var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d);
     sg+=g; sd+=d;
-    return '<tr class="'+(d>0?'ded':'')+'"><td>'+r.date+'</td><td>'+r.seq+'</td>'
+    return '<tr class="'+(d>0?'ded':'')+'"><td>'+fmtDate(r.date)+'</td><td>'+r.seq+'</td>'
       +'<td><b>'+r.plate+'</b></td><td>'+r.customer+'</td>'
       +'<td class="r">'+g.toFixed(3)+'</td>'
       +'<td class="r">'+(d>0?'−'+d.toFixed(3):'–')+'</td>'
@@ -879,7 +894,7 @@ function doExport() {
   var b=wData.map(function(r){
     var g=(r.kg/KPC).toFixed(3), d=(dData[r._id]||0).toFixed(3);
     var n=Math.max(0,r.kg/KPC-(dData[r._id]||0)).toFixed(3);
-    return r.date+','+r.seq+','+r.plate+',"'+r.customer+'","'+r.product+'",'+r.kg+','+g+','+d+','+n;
+    return fmtDate(r.date)+','+r.seq+','+r.plate+',"'+r.customer+'","'+r.product+'",'+r.kg+','+g+','+d+','+n;
   }).join('\n');
   var blob=new Blob([bom+h+b],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a');
@@ -902,7 +917,7 @@ function draw4() {
   document.getElementById('t4b').innerHTML=ms.length===0
     ?'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
     :ms.map(function(m){
-        return '<tr><td>'+m+'</td><td class="r">'+bm[m].t+'</td>'
+        return '<tr><td>'+fmtMonth(m)+'</td><td class="r">'+bm[m].t+'</td>'
           +'<td class="r gold">'+bm[m].c.toFixed(3)+'</td>'
           +'<td class="r">'+( bm[m].c*1.5).toFixed(3)+'</td></tr>';
       }).join('');
@@ -913,7 +928,7 @@ function draw4() {
     bd[r.date]+=Math.max(0,r.kg/KPC-(dData[r._id]||0));
   });
   var days=Object.keys(bd).sort().slice(-7);
-  drawBar('c4', days.map(function(d){return d.slice(5);}), days.map(function(d){return bd[d];}));
+  drawBar('c4', days.map(function(d){return fmtDate(d).slice(0,5);}), days.map(function(d){return bd[d];}));
 
   var bc={};
   wData.forEach(function(r){
