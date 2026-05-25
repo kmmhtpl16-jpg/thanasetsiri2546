@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ท่าทราย ธนเศรษฐ์ศิริ</title>
+
+<!-- Firebase Compat SDK (ทำงานได้ทุก browser / iOS Safari) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<!-- SheetJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+/* ============================================================
+   DESIGN TOKENS
+============================================================ */
+:root {
+  --bg:     #070e18;
+  --bg2:    #0d1b2a;
+  --bg3:    #132439;
+  --border: #1a3050;
+  --gold:   #f0a500;
+  --gold2:  #c47800;
+  --text:   #e2eaf4;
+  --muted:  #5a7a9a;
+  --ok:     #27ae60;
+  --err:    #e74c3c;
+  --warn:   #f39c12;
+  --info:   #3498db;
+  --r:      10px;
+  --font:   'Sarabun','Noto Sans Thai',sans-serif;
+}
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-text-size-adjust:100%;}
+
+/* ============================================================
+   PIN SCREEN
+============================================================ */
+#pinScreen{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;
+  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(240,165,0,.07) 0%,transparent 70%),var(--bg);
+}
+#pinBox{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:20px;padding:36px 32px 28px;
+  width:min(320px,88vw);
+  box-shadow:0 32px 80px rgba(0,0,0,.65),0 0 0 1px rgba(240,165,0,.07);
+  position:relative;overflow:hidden;
+}
+#pinBox::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+}
+#pinBox.shake{animation:shake .45s ease;}
+#pinBox.ok{box-shadow:0 0 0 3px var(--ok),0 32px 80px rgba(0,0,0,.65);}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
+
+.pin-logo{text-align:center;margin-bottom:24px;}
+.pin-logo .ico{font-size:48px;display:block;margin-bottom:8px;filter:drop-shadow(0 0 18px rgba(240,165,0,.4));}
+.pin-logo h1{font-size:20px;font-weight:800;color:var(--gold);}
+.pin-logo p{font-size:12px;color:var(--muted);margin-top:3px;}
+
+.pin-hint{text-align:center;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px;}
+
+.pin-dots{display:flex;justify-content:center;gap:16px;margin-bottom:10px;}
+.pin-dot{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid var(--border);background:transparent;
+  transition:all .15s;
+}
+.pin-dot.on {background:var(--gold);border-color:var(--gold);box-shadow:0 0 10px rgba(240,165,0,.5);}
+.pin-dot.err{background:var(--err);border-color:var(--err);}
+
+#pinErr{text-align:center;font-size:12px;color:var(--err);font-weight:700;min-height:18px;margin-bottom:14px;}
+
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.nk{
+  background:var(--bg3);border:1px solid var(--border);border-radius:12px;
+  color:var(--text);font-family:var(--font);font-size:22px;font-weight:700;
+  padding:17px 8px;cursor:pointer;
+  transition:background .12s,transform .08s,border-color .12s;
+  user-select:none;-webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+.nk:hover {background:#1a2f48;border-color:#2a4060;}
+.nk:active{background:rgba(240,165,0,.15);border-color:var(--gold);transform:scale(.93);}
+.nk.del  {color:var(--muted);font-size:18px;}
+.nk.clr  {color:var(--err);font-size:16px;}
+
+/* ============================================================
+   APP SCREEN
+============================================================ */
+#appScreen{display:none;flex-direction:column;height:100vh;overflow:hidden;}
+
+.topbar{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:0 16px;display:flex;align-items:center;gap:12px;
+  height:52px;flex-shrink:0;position:relative;
+}
+.topbar::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--gold2) 70%,transparent);
+}
+.topbar-ico{font-size:22px;filter:drop-shadow(0 0 8px rgba(240,165,0,.4));}
+.topbar-title{font-size:15px;font-weight:800;color:var(--gold);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#topbarRole{font-size:12px;font-weight:700;white-space:nowrap;}
+.out-btn{
+  background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);
+  color:var(--err);padding:6px 12px;border-radius:6px;
+  cursor:pointer;font-size:12px;font-family:var(--font);
+  transition:background .2s;white-space:nowrap;-webkit-tap-highlight-color:transparent;
+}
+.out-btn:hover{background:rgba(231,76,60,.22);}
+
+.tab-bar{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;padding:6px 12px 0;flex-shrink:0;overflow-x:auto;gap:2px;
+}
+.tab-btn{
+  display:flex;align-items:center;gap:5px;
+  padding:8px 14px;background:transparent;border:none;
+  border-radius:8px 8px 0 0;color:var(--muted);
+  font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);
+  transition:color .2s,background .2s;position:relative;white-space:nowrap;
+  -webkit-tap-highlight-color:transparent;
+}
+.tab-btn:hover{color:var(--text);background:rgba(255,255,255,.03);}
+.tab-btn.active{color:var(--gold);background:var(--bg3);}
+.tab-btn.active::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:var(--gold);border-radius:2px 2px 0 0;
+}
+
+.main-content{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.tab-pane{display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:14px;}
+.tab-pane.active{display:flex;}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;}
+.card-title{
+  font-size:11px;font-weight:800;color:var(--gold);
+  text-transform:uppercase;letter-spacing:1.2px;
+  margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+
+.kpi-row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+@media(min-width:600px){.kpi-row{grid-template-columns:repeat(4,1fr);}}
+.kpi-card{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px 12px;text-align:center;
+}
+.kpi-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;}
+.kpi-val {font-size:20px;font-weight:800;color:var(--gold);}
+.kpi-unit{font-size:11px;color:var(--muted);}
+
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead tr{background:var(--bg3);}
+thead th{
+  padding:8px 10px;text-align:left;color:var(--muted);
+  font-size:10px;text-transform:uppercase;letter-spacing:.8px;
+  white-space:nowrap;border-bottom:1px solid var(--border);
+}
+tbody tr{border-bottom:1px solid rgba(26,48,80,.4);transition:background .12s;}
+tbody tr:hover{background:rgba(240,165,0,.04);}
+tbody td{padding:8px 10px;white-space:nowrap;vertical-align:middle;}
+td.r{text-align:right;font-variant-numeric:tabular-nums;}
+td.gold{color:var(--gold);font-weight:700;}
+tr.ded{background:rgba(243,156,18,.05)!important;border-left:3px solid var(--warn);}
+
+.ded-in{
+  width:82px;padding:5px 7px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);font-size:12px;
+  font-family:var(--font);text-align:right;transition:border-color .2s;
+}
+.ded-in:focus{outline:none;border-color:var(--warn);}
+
+.b-audit{
+  display:inline-flex;align-items:center;gap:3px;
+  background:rgba(243,156,18,.12);color:var(--warn);
+  border:1px solid rgba(243,156,18,.3);border-radius:4px;
+  padding:2px 7px;font-size:10px;font-weight:700;
+}
+
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px;border:none;border-radius:6px;
+  font-size:12px;font-weight:700;font-family:var(--font);
+  cursor:pointer;transition:opacity .15s,transform .1s;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.btn:hover{opacity:.85;transform:translateY(-1px);}
+.btn-gold {background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);}
+.btn-green{background:var(--ok);color:#fff;}
+.brow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+
+.drop-zone{
+  border:2px dashed var(--border);border-radius:var(--r);
+  padding:28px 20px;text-align:center;cursor:pointer;
+  transition:border-color .2s,background .2s;position:relative;
+}
+.drop-zone:hover{border-color:var(--gold);background:rgba(240,165,0,.03);}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.drop-zone .dico{font-size:36px;margin-bottom:8px;opacity:.7;}
+.drop-zone p{color:var(--muted);font-size:12px;line-height:1.7;}
+.drop-zone strong{color:var(--gold);}
+
+.smsg{padding:9px 12px;border-radius:6px;font-size:12px;font-weight:600;min-height:34px;}
+.smsg.ok  {background:rgba(39,174,96,.13);color:var(--ok);  border:1px solid rgba(39,174,96,.3);}
+.smsg.err {background:rgba(231,76,60,.13);color:var(--err); border:1px solid rgba(231,76,60,.3);}
+.smsg.warn{background:rgba(243,156,18,.13);color:var(--warn);border:1px solid rgba(243,156,18,.3);}
+.smsg.info{background:rgba(52,152,219,.13);color:var(--info);border:1px solid rgba(52,152,219,.3);}
+
+.frow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+.frow label{display:flex;flex-direction:column;gap:4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;}
+.frow input{
+  padding:7px 9px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);min-width:110px;
+}
+.frow input:focus{outline:none;border-color:var(--gold);}
+input[type=date]{color-scheme:dark;}
+
+.pager{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;}
+.pbtn{
+  padding:4px 9px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:4px;color:var(--muted);cursor:pointer;font-size:11px;
+}
+.pbtn.on{background:var(--gold);color:#000;border-color:var(--gold);}
+
+.chart-row{display:grid;grid-template-columns:1fr;gap:14px;}
+@media(min-width:700px){.chart-row{grid-template-columns:1fr 1fr;}}
+canvas{border-radius:var(--r);display:block;width:100%!important;}
+
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+/* offline banner */
+#offlineBanner{
+  display:none;background:rgba(231,76,60,.15);border-bottom:1px solid rgba(231,76,60,.3);
+  color:var(--err);padding:6px 16px;font-size:12px;font-weight:700;text-align:center;
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     PIN SCREEN
+============================================================ -->
+<div id="pinScreen">
+  <div id="pinBox">
+    <div class="pin-logo">
+      <span class="ico">⛏️</span>
+      <h1>ท่าทราย ธนเศรษฐ์ศิริ</h1>
+      <p>ระบบบริหารจัดการ v2.0 Cloud</p>
+    </div>
+
+    <div class="pin-hint">กรอกรหัส 4 หลัก</div>
+
+    <div class="pin-dots">
+      <span class="pin-dot" id="d0"></span>
+      <span class="pin-dot" id="d1"></span>
+      <span class="pin-dot" id="d2"></span>
+      <span class="pin-dot" id="d3"></span>
+    </div>
+
+    <div id="pinErr"></div>
+
+    <div class="numpad">
+      <button class="nk" onclick="np('1')">1</button>
+      <button class="nk" onclick="np('2')">2</button>
+      <button class="nk" onclick="np('3')">3</button>
+      <button class="nk" onclick="np('4')">4</button>
+      <button class="nk" onclick="np('5')">5</button>
+      <button class="nk" onclick="np('6')">6</button>
+      <button class="nk" onclick="np('7')">7</button>
+      <button class="nk" onclick="np('8')">8</button>
+      <button class="nk" onclick="np('9')">9</button>
+      <button class="nk clr" onclick="nc()">✕</button>
+      <button class="nk" onclick="np('0')">0</button>
+      <button class="nk del" onclick="nd()">⌫</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     APP SCREEN
+============================================================ -->
+<div id="appScreen">
+  <div id="offlineBanner">⚠️ ไม่มีการเชื่อมต่ออินเทอร์เน็ต — ข้อมูลอาจไม่อัปเดต</div>
+
+  <header class="topbar">
+    <span class="topbar-ico">⛏️</span>
+    <div class="topbar-title">ท่าทราย ธนเศรษฐ์ศิริ</div>
+    <span id="topbarRole"></span>
+    <button class="out-btn" onclick="doLogout()">🔒 ออก</button>
+  </header>
+
+  <nav class="tab-bar">
+    <button class="tab-btn" onclick="goTab(1)">📥 นำเข้า</button>
+    <button class="tab-btn" onclick="goTab(2)">⚖️ หักน้ำหนัก</button>
+    <button class="tab-btn ta" onclick="goTab(3)" style="display:none">📊 รายงาน</button>
+    <button class="tab-btn ta" onclick="goTab(4)" style="display:none">👑 สรุปผู้บริหาร</button>
+  </nav>
+
+  <main class="main-content">
+
+    <!-- TAB 1 -->
+    <section class="tab-pane" id="tp1">
+      <div class="card">
+        <div class="card-title">📥 นำเข้าไฟล์ตาชั่ง</div>
+        <div class="drop-zone">
+          <input type="file" accept=".xls,.xlsx" onchange="importFile(event)">
+          <div class="dico">📂</div>
+          <p><strong>แตะหรือลากไฟล์มาวางที่นี่</strong></p>
+          <p>รองรับ .xls / .xlsx จากตาชั่ง หจก.ธนเศรษฐ์ศิริ</p>
+        </div>
+        <div id="s1" class="smsg" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">
+          📋 รายการ
+          <span id="t1cnt" style="font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"></span>
+          <button class="btn btn-ghost" id="vBtn" onclick="toggleView()" style="margin-left:auto;padding:5px 10px">📋 ทั้งหมด</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>เลขที่</th><th>ทะเบียน</th><th>วันที่</th><th>เวลา</th>
+              <th>ลูกค้า</th><th>สินค้า</th><th>นน.(kg)</th><th>คิว</th>
+            </tr></thead>
+            <tbody id="t1b"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px">กำลังเชื่อมต่อ…</td></tr></tbody>
+          </table>
+        </div>
+        <div id="t1pg" class="pager"></div>
+      </div>
+    </section>
+
+    <!-- TAB 2 -->
+    <section class="tab-pane" id="tp2">
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">📦 ปริมาตรรวม</div><div id="kT">–</div></div>
+        <div class="kpi-card"><div class="kpi-label">💧 หักทรายเปียก</div><div id="kD">–</div></div>
+        <div class="kpi-card"><div class="kpi-label">✅ ยอดสุทธิ</div><div id="kN">–</div></div>
+        <div class="kpi-card"><div class="kpi-label">🚛 จำนวนเที่ยว</div><div id="kC">–</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">
+          ⚖️ หักทรายเปียก
+          <div class="brow" style="margin-left:auto">
+            <button class="btn btn-ghost" id="uBtn" onclick="togUnit()" style="padding:5px 10px">⚖️ ตัน</button>
+            <button class="btn btn-gold"  onclick="saveDed()">💾 บันทึก</button>
+          </div>
+        </div>
+        <div id="s2" class="smsg" style="margin-bottom:8px"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>เลขที่</th><th>ทะเบียน</th><th>วันที่</th>
+              <th>ปริมาตร</th><th>หัก (คิว)</th><th>สุทธิ</th><th>สถานะ</th>
+            </tr></thead>
+            <tbody id="t2b"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3 -->
+    <section class="tab-pane" id="tp3">
+      <div class="card">
+        <div class="card-title">🔍 ตัวกรอง</div>
+        <div class="frow">
+          <label>ลูกค้า <input type="text" id="f3c" placeholder="ค้นหา…"></label>
+          <label>ทะเบียน <input type="text" id="f3p" placeholder="เช่น 81-7725"></label>
+          <label>ตั้งแต่ <input type="date" id="f3a"></label>
+          <label>ถึง <input type="date" id="f3b"></label>
+          <button class="btn btn-gold"  onclick="doFilter()">🔍 กรอง</button>
+          <button class="btn btn-green" onclick="doExport()">📥 CSV</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">
+          📊 รายการ
+          <span id="t3sum" style="margin-left:auto;font-size:11px;color:var(--gold);font-weight:700;text-transform:none;letter-spacing:0"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>วันที่</th><th>เลขที่</th><th>ทะเบียน</th><th>ลูกค้า</th>
+              <th>คิว</th><th>หัก</th><th>สุทธิ</th><th></th>
+            </tr></thead>
+            <tbody id="t3b"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4 -->
+    <section class="tab-pane" id="tp4">
+      <div class="card">
+        <div class="card-title">📅 สรุปรายเดือน</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>เดือน</th><th>เที่ยว</th><th>สุทธิ (คิว)</th><th>สุทธิ (ตัน)</th>
+            </tr></thead>
+            <tbody id="t4b"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="chart-row">
+        <div class="card"><div class="card-title">📈 7 วันล่าสุด</div><canvas id="c4" width="460" height="220"></canvas></div>
+        <div class="card"><div class="card-title">🥧 สัดส่วนลูกค้า</div><canvas id="p4" width="460" height="220"></canvas></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ================================================================
+   🔧 STEP 1 — Firebase Config
+   คัดลอกจาก Firebase Console > Project Settings > SDK snippet
+================================================================ */
+var FB_CFG = {
+  apiKey:            "AIzaSyDjeec1gYypCCHPXJKWwX_FEnb9J8RffuE",
+  authDomain:        "thanasetsiri2546.firebaseapp.com",
+  projectId:         "thanasetsiri2546",
+  storageBucket:     "thanasetsiri2546.firebasestorage.app",
+  messagingSenderId: "583880441495",
+  appId:             "1:583880441495:web:30da4fbb276a3f289d33d2"
+};
+
+/* ================================================================
+   🔧 STEP 2 — PIN ↔ Firebase Account
+   สร้าง email/password คู่นี้ใน Firebase Authentication Console
+================================================================ */
+var PINS = {
+  "1111": { email:"staff@sand.local",  pw:"StaffSand2025!",  role:"staff", label:"👷 พนักงาน" },
+  "8881": { email:"admin@sand.local",  pw:"AdminSand2025!",  role:"admin", label:"👑 เจ้าของ/CFO" }
+  // เพิ่มพนักงานคนอื่น:
+  // "2222": { email:"staff2@sand.local", pw:"Staff2Sand2025!", role:"staff", label:"👷 พนักงาน 2" }
+};
+
+/* ================================================================
+   CONSTANTS
+================================================================ */
+var KPC   = 1500;   // 1 คิว = 1,500 กก.
+var PAGE  = 30;     // แถวต่อหน้า
+
+/* ================================================================
+   STATE
+================================================================ */
+var db, auth;
+var curRole  = '';
+var curEmail = '';
+var wData    = [];   // weighings
+var dData    = {};   // deductions { id: cubic }
+var unit     = 'cubic';
+var vMode    = 'latest';
+var page1    = 1;
+var unW = null, unD = null;
+var pinBuf   = '';
+
+/* ================================================================
+   INIT
+================================================================ */
+try {
+  firebase.initializeApp(FB_CFG);
+  db   = firebase.firestore();
+  auth = firebase.auth();
+} catch(e) {
+  alert('Firebase init error: ' + e.message);
+}
+
+firebase.auth().onAuthStateChanged(function(user) {
+  if (user) {
+    curEmail = user.email;
+    showApp();
+  } else {
+    showPin();
+  }
+});
+
+window.addEventListener('online',  function(){ document.getElementById('offlineBanner').style.display='none'; });
+window.addEventListener('offline', function(){ document.getElementById('offlineBanner').style.display='block'; });
+document.addEventListener('keydown', function(e) {
+  if (document.getElementById('pinScreen').style.display==='none') return;
+  if (e.key>='0'&&e.key<='9') np(e.key);
+  if (e.key==='Backspace') nd();
+  if (e.key==='Escape') nc();
+});
+
+/* ================================================================
+   PIN FUNCTIONS
+================================================================ */
+function showPin() {
+  pinBuf=''; updDots(); setErr('');
+  document.getElementById('pinBox').classList.remove('shake','ok');
+  document.getElementById('pinScreen').style.display='flex';
+  document.getElementById('appScreen').style.display='none';
+}
+
+function np(d) {   // numpad press
+  if (pinBuf.length>=4) return;
+  pinBuf+=d; updDots();
+  if (pinBuf.length===4) setTimeout(tryPin, 150);
+}
+function nd() { pinBuf=pinBuf.slice(0,-1); updDots(); setErr(''); }  // del
+function nc() { pinBuf=''; updDots(); setErr(''); }                  // clear
+
+function updDots() {
+  for (var i=0;i<4;i++) {
+    var el=document.getElementById('d'+i);
+    el.className='pin-dot';
+    if (i<pinBuf.length) el.classList.add('on');
+  }
+}
+function setErr(m) { document.getElementById('pinErr').textContent=m; }
+
+function tryPin() {
+  var acc=PINS[pinBuf];
+  if (!acc) {
+    for (var i=0;i<4;i++) { var el=document.getElementById('d'+i); el.className='pin-dot err'; }
+    setErr('รหัสไม่ถูกต้อง');
+    var box=document.getElementById('pinBox');
+    box.classList.add('shake');
+    setTimeout(function(){ pinBuf=''; updDots(); box.classList.remove('shake'); }, 600);
+    return;
+  }
+  curRole = acc.role;
+  document.getElementById('pinBox').classList.add('ok');
+  setErr('');
+  firebase.auth().signInWithEmailAndPassword(acc.email, acc.pw)
+    .catch(function(e) {
+      document.getElementById('pinBox').classList.remove('ok');
+      setErr('Firebase Error: ' + e.code);
+      pinBuf=''; updDots();
+    });
+}
+
+/* ================================================================
+   APP
+================================================================ */
+function showApp() {
+  document.getElementById('pinScreen').style.display='none';
+  document.getElementById('appScreen').style.display='flex';
+  // ค้นหา role จาก PINS ตาม email
+  Object.values(PINS).forEach(function(a){
+    if (a.email===curEmail) { curRole=a.role; document.getElementById('topbarRole').textContent=a.label; }
+  });
+  applyRole();
+  goTab(1);
+  listenFS();
+}
+
+function applyRole() {
+  var show = curRole==='admin' ? 'flex' : 'none';
+  document.querySelectorAll('.ta').forEach(function(el){ el.style.display=show; });
+}
+
+function doLogout() {
+  if(unW){ unW(); unW=null; }
+  if(unD){ unD(); unD=null; }
+  wData=[]; dData={};
+  firebase.auth().signOut();
+}
+
+/* ================================================================
+   FIRESTORE LISTEN
+================================================================ */
+function listenFS() {
+  var wRef = db.collection('weighings').orderBy('date','desc').orderBy('seq','asc');
+  unW = wRef.onSnapshot(function(snap) {
+    wData = snap.docs.map(function(d){ return Object.assign({_id:d.id}, d.data()); });
+    draw1(); draw2(); kpi();
+  }, function(e){ setMsg('s1','❌ Firestore: '+e.message,'err'); });
+
+  unD = db.collection('deductions').onSnapshot(function(snap){
+    dData={};
+    snap.docs.forEach(function(d){ dData[d.id]=d.data().cubic; });
+    draw2(); kpi();
+  });
+}
+
+/* ================================================================
+   TAB SWITCHING
+================================================================ */
+function goTab(n) {
+  if(n>=3 && curRole!=='admin') return;
+  document.querySelectorAll('.tab-btn').forEach(function(b,i){ b.classList.toggle('active',i+1===n); });
+  document.querySelectorAll('.tab-pane').forEach(function(p,i){ p.classList.toggle('active',i+1===n); });
+  if(n===3) draw3();
+  if(n===4) draw4();
+}
+
+/* ================================================================
+   TAB 1 — IMPORT
+================================================================ */
+function importFile(evt) {
+  var file=evt.target.files[0]; if(!file) return;
+  setMsg('s1','⏳ กำลังอ่าน '+file.name+'…','info');
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var wb;
+    try { wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}); }
+    catch(ex){ setMsg('s1','❌ อ่านไฟล์ไม่ได้','err'); return; }
+    var rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+    parseAndSave(rows, file.name);
+  };
+  reader.readAsArrayBuffer(file);
+  evt.target.value='';
+}
+
+function parseAndSave(rows, fname) {
+  // หา header row
+  var hr=-1;
+  for(var i=0;i<rows.length;i++){
+    var rs=rows[i].map(function(c){return String(c).trim();});
+    if(rs.some(function(c){return c.includes('ทะเบียน')||c.includes('เลขที่');})){hr=i;break;}
+  }
+  if(hr<0){ setMsg('s1','❌ ไม่พบโครงสร้างไฟล์ตาชั่ง','err'); return; }
+
+  var H=rows[hr].map(function(c){return String(c).trim();});
+  function ci(kw){ return H.findIndex(function(x){return x.includes(kw);}); }
+  var iSeq=ci('เลขที่'), iPlate=ci('ทะเบียน'), iDate=ci('วันที่'),
+      iTime=ci('เวลา'),  iCust=ci('ลูกค้า'),   iProd=ci('สินค้า');
+  var iNet=ci('สุทธิ')>=0?ci('สุทธิ'):ci('นน.สุทธิ');
+
+  var existIds=new Set(wData.map(function(w){return w._id;}));
+  var batch=db.batch();
+  var imp=0, skip=0;
+
+  for(var i=hr+2;i<rows.length-2;i++){
+    var r=rows[i];
+    var seq=String(r[iSeq]||'').trim();
+    if(!seq||/รวม|ผล/.test(seq)||!/^\d/.test(seq)) continue;
+
+    var raw=String(r[iDate]||'').trim();
+    var dm=raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if(!dm) continue;
+    var y=parseInt(dm[3]); if(y>2400) y-=543;
+    var dateStr=y+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
+
+    var rt=String(r[iTime]||'').trim();
+    var timeStr=/^\d{1,2}:\d{2}(:\d{2})?$/.test(rt)?rt:'';
+    var kg=parseFloat(String(r[iNet]||'0').replace(/,/g,''))||0;
+    if(kg<=0) continue;
+
+    var id=dateStr+'_'+seq;
+    if(existIds.has(id)){skip++;continue;}
+
+    batch.set(db.collection('weighings').doc(id),{
+      seq:seq, date:dateStr, time:timeStr,
+      plate:   String(r[iPlate]||'').trim(),
+      customer:String(r[iCust] ||'').trim()||'ลูกค้า (ทั่วไป)',
+      product: String(r[iProd] ||'').trim()||'ทราย',
+      kg:kg,
+      importedAt:new Date().toISOString(),
+      importedBy:curEmail
+    });
+    imp++;
+  }
+
+  if(imp>0){
+    batch.commit()
+      .then(function(){ setMsg('s1','✅ นำเข้า '+imp+' รายการ (ซ้ำ '+skip+')','ok'); vMode='latest'; updVBtn(); })
+      .catch(function(e){ setMsg('s1','❌ Firestore: '+e.message,'err'); });
+  } else {
+    setMsg('s1','⚠️ ไม่มีรายการใหม่ (ซ้ำ '+skip+')','warn');
+  }
+}
+
+function toggleView() {
+  vMode = vMode==='latest'?'all':'latest';
+  page1=1; updVBtn(); draw1();
+}
+function updVBtn(){
+  var b=document.getElementById('vBtn');
+  if(b) b.textContent = vMode==='latest'?'📋 ทั้งหมด':'📄 ล่าสุด';
+}
+
+function draw1() {
+  var rows=[].concat(wData);
+  if(vMode==='latest'){
+    var ld=rows[0]?rows[0].date:'';
+    rows=rows.filter(function(r){return r.date===ld;});
+  }
+  var tot=rows.length;
+  document.getElementById('t1cnt').textContent='รวม '+tot+' รายการ';
+  var paged=rows.slice((page1-1)*PAGE, page1*PAGE);
+
+  document.getElementById('t1b').innerHTML = paged.length===0
+    ? '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
+    : paged.map(function(r,i){
+        var c=(r.kg/KPC).toFixed(3);
+        return '<tr><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
+          +'<td style="color:var(--muted)">'+(r.time||'–')+'</td>'
+          +'<td>'+r.customer+'</td><td style="color:var(--muted)">'+r.product+'</td>'
+          +'<td class="r">'+r.kg.toLocaleString('th-TH')+'</td>'
+          +'<td class="r gold">'+c+'</td></tr>';
+      }).join('');
+
+  makePager('t1pg', tot, page1, function(p){ page1=p; draw1(); });
+}
+
+/* ================================================================
+   TAB 2 — หักทรายเปียก
+================================================================ */
+function draw2() {
+  var f = unit==='cubic'?1:1.5;
+  var u = unit==='cubic'?'คิว':'ตัน';
+  document.getElementById('t2b').innerHTML = wData.length===0
+    ? '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
+    : wData.map(function(r){
+        var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d), has=d>0;
+        return '<tr class="'+(has?'ded':'')+'"><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
+          +'<td class="r">'+(g*f).toFixed(3)+' '+u+'</td>'
+          +'<td><input type="number" class="ded-in" step="0.001" min="0"'
+          +' data-id="'+r._id+'" value="'+(has?d.toFixed(3):'')+'" placeholder="0.000"></td>'
+          +'<td class="r gold">'+(n*f).toFixed(3)+' '+u+'</td>'
+          +'<td>'+(has?'<span class="b-audit">🔍 หักแล้ว</span>':'<span style="color:var(--muted);font-size:11px">⏳</span>')+'</td></tr>';
+      }).join('');
+  kpi();
+}
+
+function kpi() {
+  var g=0, d=0;
+  wData.forEach(function(r){ g+=r.kg/KPC; d+=dData[r._id]||0; });
+  var f=unit==='cubic'?1:1.5, u=unit==='cubic'?'คิว':'ตัน';
+  sk('kT',(g*f).toFixed(3),u); sk('kD',(d*f).toFixed(3),u);
+  sk('kN',((g-d)*f).toFixed(3),u); sk('kC',wData.length,'เที่ยว');
+}
+function sk(id,v,u){
+  var el=document.getElementById(id);
+  if(el) el.innerHTML='<span class="kpi-val">'+v+'</span><span class="kpi-unit"> '+u+'</span>';
+}
+
+function saveDed() {
+  var inputs=document.querySelectorAll('.ded-in');
+  var batch=db.batch(); var cnt=0;
+  inputs.forEach(function(inp){
+    var id=inp.dataset.id, v=parseFloat(inp.value)||0;
+    var ref=db.collection('deductions').doc(id);
+    if(v>0){ batch.set(ref,{cubic:parseFloat(v.toFixed(3)),by:curEmail,at:new Date().toISOString()}); cnt++; }
+    else batch.delete(ref);
+  });
+  batch.commit()
+    .then(function(){ setMsg('s2','✅ บันทึก '+cnt+' รายการ','ok'); })
+    .catch(function(e){ setMsg('s2','❌ '+e.message,'err'); });
+}
+
+function togUnit() {
+  unit=unit==='cubic'?'ton':'cubic';
+  var b=document.getElementById('uBtn');
+  if(b) b.textContent=unit==='cubic'?'⚖️ ตัน':'📦 คิว';
+  draw2();
+}
+
+/* ================================================================
+   TAB 3 — รายงาน
+================================================================ */
+function doFilter() { draw3(); }
+
+function draw3() {
+  var fc=(document.getElementById('f3c').value||'').toLowerCase().trim();
+  var fp=(document.getElementById('f3p').value||'').toLowerCase().trim();
+  var fa= document.getElementById('f3a').value||'';
+  var fb= document.getElementById('f3b').value||'';
+  var rows=wData.filter(function(r){
+    if(fc&&!r.customer.toLowerCase().includes(fc)) return false;
+    if(fp&&!r.plate.toLowerCase().includes(fp))    return false;
+    if(fa&&r.date<fa) return false;
+    if(fb&&r.date>fb) return false;
+    return true;
+  });
+  var sg=0, sd=0;
+  document.getElementById('t3b').innerHTML=rows.map(function(r){
+    var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d);
+    sg+=g; sd+=d;
+    return '<tr class="'+(d>0?'ded':'')+'"><td>'+r.date+'</td><td>'+r.seq+'</td>'
+      +'<td><b>'+r.plate+'</b></td><td>'+r.customer+'</td>'
+      +'<td class="r">'+g.toFixed(3)+'</td>'
+      +'<td class="r">'+(d>0?'−'+d.toFixed(3):'–')+'</td>'
+      +'<td class="r gold">'+n.toFixed(3)+'</td>'
+      +'<td>'+(d>0?'⚠️':'')+'</td></tr>';
+  }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:28px">ไม่มีรายการ</td></tr>';
+  document.getElementById('t3sum').textContent=
+    rows.length+' เที่ยว | รวม '+sg.toFixed(3)+' | หัก '+sd.toFixed(3)+' | สุทธิ '+(sg-sd).toFixed(3)+' คิว';
+}
+
+function doExport() {
+  var bom='\uFEFF';
+  var h='วันที่,เลขที่,ทะเบียน,ลูกค้า,สินค้า,นน.(kg),ปริมาตร(คิว),หัก(คิว),สุทธิ(คิว)\n';
+  var b=wData.map(function(r){
+    var g=(r.kg/KPC).toFixed(3), d=(dData[r._id]||0).toFixed(3);
+    var n=Math.max(0,r.kg/KPC-(dData[r._id]||0)).toFixed(3);
+    return r.date+','+r.seq+','+r.plate+',"'+r.customer+'","'+r.product+'",'+r.kg+','+g+','+d+','+n;
+  }).join('\n');
+  var blob=new Blob([bom+h+b],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='ท่าทราย_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ================================================================
+   TAB 4 — สรุปผู้บริหาร
+================================================================ */
+function draw4() {
+  var bm={};
+  wData.forEach(function(r){
+    var m=r.date.slice(0,7);
+    if(!bm[m]) bm[m]={t:0,c:0};
+    bm[m].t++; bm[m].c+=Math.max(0,r.kg/KPC-(dData[r._id]||0));
+  });
+  var ms=Object.keys(bm).sort().reverse();
+  document.getElementById('t4b').innerHTML=ms.length===0
+    ?'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
+    :ms.map(function(m){
+        return '<tr><td>'+m+'</td><td class="r">'+bm[m].t+'</td>'
+          +'<td class="r gold">'+bm[m].c.toFixed(3)+'</td>'
+          +'<td class="r">'+( bm[m].c*1.5).toFixed(3)+'</td></tr>';
+      }).join('');
+
+  var bd={};
+  wData.forEach(function(r){
+    if(!bd[r.date]) bd[r.date]=0;
+    bd[r.date]+=Math.max(0,r.kg/KPC-(dData[r._id]||0));
+  });
+  var days=Object.keys(bd).sort().slice(-7);
+  drawBar('c4', days.map(function(d){return d.slice(5);}), days.map(function(d){return bd[d];}));
+
+  var bc={};
+  wData.forEach(function(r){
+    var c=r.customer||'ไม่ระบุ';
+    if(!bc[c]) bc[c]=0;
+    bc[c]+=Math.max(0,r.kg/KPC-(dData[r._id]||0));
+  });
+  drawPie('p4', bc);
+}
+
+/* ================================================================
+   CANVAS CHARTS
+================================================================ */
+function drawBar(id, labels, vals) {
+  var cv=document.getElementById(id); if(!cv) return;
+  var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  var pad={t:32,r:14,b:44,l:48};
+  var max=Math.max.apply(null,vals.map(Number))*1.15||1;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0d1b2a'; ctx.fillRect(0,0,W,H);
+  var n=labels.length||1, sw=(W-pad.l-pad.r)/n, bw=sw*0.55;
+  labels.forEach(function(lb,i){
+    var v=parseFloat(vals[i])||0, bh=(v/max)*(H-pad.t-pad.b);
+    var x=pad.l+i*sw+sw*0.225, y=H-pad.b-bh;
+    var g=ctx.createLinearGradient(0,y,0,H-pad.b);
+    g.addColorStop(0,'#f0a500'); g.addColorStop(1,'#7a4f00');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.roundRect(x,y,bw,Math.max(bh,2),3); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='11px Sarabun,sans-serif'; ctx.textAlign='center';
+    if(bh>14) ctx.fillText(v.toFixed(1),x+bw/2,y-3);
+    ctx.fillStyle='#8ba5be'; ctx.fillText(lb,x+bw/2,H-pad.b+13);
+  });
+  ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1;
+  for(var j=0;j<=4;j++){
+    var yy=H-pad.b-(j/4)*(H-pad.t-pad.b);
+    ctx.beginPath(); ctx.moveTo(pad.l,yy); ctx.lineTo(W-pad.r,yy); ctx.stroke();
+    ctx.fillStyle='#506070'; ctx.font='9px sans-serif'; ctx.textAlign='right';
+    ctx.fillText((max*j/4).toFixed(0),pad.l-3,yy+3);
+  }
+}
+
+function drawPie(id, data) {
+  var cv=document.getElementById(id); if(!cv) return;
+  var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0d1b2a'; ctx.fillRect(0,0,W,H);
+  var keys=Object.keys(data), total=Object.values(data).reduce(function(a,b){return a+b;},0)||1;
+  var COLS=['#f0a500','#e74c3c','#2ecc71','#3498db','#9b59b6','#e67e22','#1abc9c'];
+  var cx=W/2-36, cy=H/2, r=Math.min(cx,cy)-20, ang=-Math.PI/2;
+  keys.forEach(function(k,i){
+    var sl=(data[k]/total)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,ang,ang+sl); ctx.closePath();
+    ctx.fillStyle=COLS[i%COLS.length]; ctx.fill();
+    ctx.strokeStyle='#0d1b2a'; ctx.lineWidth=2; ctx.stroke();
+    ang+=sl;
+  });
+  ctx.beginPath(); ctx.arc(cx,cy,r*.42,0,Math.PI*2); ctx.fillStyle='#0d1b2a'; ctx.fill();
+  keys.forEach(function(k,i){
+    var y=14+i*20;
+    ctx.fillStyle=COLS[i%COLS.length]; ctx.fillRect(W-124,y,11,11);
+    ctx.fillStyle='#cdd'; ctx.font='10px Sarabun,sans-serif'; ctx.textAlign='left';
+    ctx.fillText(k.slice(0,13)+' '+((data[k]/total)*100).toFixed(1)+'%',W-109,y+9);
+  });
+}
+
+/* ================================================================
+   HELPERS
+================================================================ */
+function makePager(cid, total, cur, cb) {
+  var el=document.getElementById(cid); if(!el) return;
+  var tp=Math.ceil(total/PAGE); if(tp<=1){el.innerHTML='';return;}
+  var h='';
+  for(var i=1;i<=tp;i++) h+='<button class="pbtn'+(i===cur?' on':'')+'" onclick="('+cb.toString()+')('+i+')">'+i+'</button>';
+  el.innerHTML=h;
+}
+function setMsg(id, msg, type) {
+  var el=document.getElementById(id);
+  if(el){ el.textContent=msg; el.className='smsg '+type; }
+}
+</script>
+
+</body>
+</html>
