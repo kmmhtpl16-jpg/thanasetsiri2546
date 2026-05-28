@@ -10,10 +10,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <!-- SheetJS -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.mihn.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.mihn.hjs"></script>
 
 <style>
-/* ============================================================
+/* ============================================================h
    DESIGN TOKENS
 ============================================================ */
 :root {
@@ -878,7 +878,8 @@ function draw3() {
     var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d);
     sg+=g; sd+=d;
     return '<tr class="'+(d>0?'ded':'')+'"><td>'+fmtDate(r.date)+'</td><td>'+r.seq+'</td>'
-      +'<td><b>'+,"+'+(r.plate||'').replace(/\.+$/g,'')+'+'",+'</td>'
+      +'<td><b>'+(r.plate||'').replace(/\.+$/g,'')+'</b></td>'
+             +'<td>'+r.customer+'</td>'
       +'<td class="r">'+g.toFixed(3)+'</td>'
       +'<td class="r">'+(d>0?'−'+d.toFixed(3):'–')+'</td>'
       +'<td class="r gold">'+n.toFixed(3)+'</td>'
@@ -894,7 +895,7 @@ function doExport() {
   var b=wData.map(function(r){
     var g=(r.kg/KPC).toFixed(3), d=(dData[r._id]||0).toFixed(3);
     var n=Math.max(0,r.kg/KPC-(dData[r._id]||0)).toFixed(3);
-    return fmtDate(r.date)+','+r.seq+',"+'+(r.plate||'').replace(/\.+$/g,'')+'+'","'+r.customer+'","'+r.product+'",'+r.kg+','+g+','+d+','+n;
+    return fmtDate(r.date)+','+r.seq+','+(r.plate||'').replace(/\.+$/g,'')+','+r.customer+','+r.product+','+r.kg+','+g+','+d+','+n;
   }).join('\n');
   var blob=new Blob([bom+h+b],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a');
