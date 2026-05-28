@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>ท่าทราย ธนเศรษฐ์ศิริ</title>
+<title>ท่าทราย ธนเศรษฐ์ศิริ</title>h
 
 <!-- Firebase Compat SDK (ทำงานได้ทุก browser / iOS Safari) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compath.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <!-- SheetJS -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.mihn.js"></script>
 
 <style>
 /* ============================================================
@@ -827,8 +827,8 @@ function kpi() {
   var g=0, d=0;
   wData.forEach(function(r){ g+=r.kg/KPC; d+=dData[r._id]||0; });
   var f=unit==='cubic'?1:1.5, u=unit==='cubic'?'คิว':'ตัน';
-  sk('kT',(g*f).toFixed(3),u); sk('kD',(d*f).toFixed(3),u);
-  sk('kN',((g-d)*f).toFixed(3),u); sk('kC',wData.length,'เที่ยว');
+  sk('kT',(g*f).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3}),u); sk('kD',(d*f).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3}),u);
+  sk('kN',((g-d)*f).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3}),u); sk('kC',wData.length,'เที่ยว');
 }
 function sk(id,v,u){
   var el=document.getElementById(id);
