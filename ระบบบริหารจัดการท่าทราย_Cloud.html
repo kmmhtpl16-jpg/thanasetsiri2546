@@ -793,7 +793,7 @@ function draw1() {
     ? '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
     : paged.map(function(r,i){
         var c=(r.kg/KPC).toFixed(3);
-        return '<tr><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+fmtDate(r.date)+'</td>'
+        return '<tr><td>'+r.seq+'</td><td><b>'+(r.plate||'').replace(/\.+$/g,'')+'</b></td><td>'+fmtDate(r.date)+'</td>'
           +'<td style="color:var(--muted)">'+(r.time||'–')+'</td>'
           +'<td>'+r.customer+'</td><td style="color:var(--muted)">'+r.product+'</td>'
           +'<td class="r">'+r.kg.toLocaleString('th-TH')+'</td>'
@@ -813,7 +813,7 @@ function draw2() {
     ? '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
     : wData.map(function(r){
         var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d), has=d>0;
-        return '<tr class="'+(has?'ded':'')+'"><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+fmtDate(r.date)+'</td>'
+        return '<tr class="'+(has?'ded':'')+'"><td>'+r.seq+'</td><td><b>'+(r.plate||'').replace(/\.+$/g,'')+'</b></td><td>'+fmtDate(r.date)+'</td>'
           +'<td class="r">'+(g*f).toFixed(3)+' '+u+'</td>'
           +'<td><input type="number" class="ded-in" step="0.001" min="0"'
           +' data-id="'+r._id+'" value="'+(has?d.toFixed(3):'')+'" placeholder="0.000"></td>'
@@ -878,7 +878,7 @@ function draw3() {
     var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d);
     sg+=g; sd+=d;
     return '<tr class="'+(d>0?'ded':'')+'"><td>'+fmtDate(r.date)+'</td><td>'+r.seq+'</td>'
-      +'<td><b>'+r.plate+'</b></td><td>'+r.customer+'</td>'
+      +'<td><b>'+,"+'+(r.plate||'').replace(/\.+$/g,'')+'+'",+'</td>'
       +'<td class="r">'+g.toFixed(3)+'</td>'
       +'<td class="r">'+(d>0?'−'+d.toFixed(3):'–')+'</td>'
       +'<td class="r gold">'+n.toFixed(3)+'</td>'
@@ -894,7 +894,7 @@ function doExport() {
   var b=wData.map(function(r){
     var g=(r.kg/KPC).toFixed(3), d=(dData[r._id]||0).toFixed(3);
     var n=Math.max(0,r.kg/KPC-(dData[r._id]||0)).toFixed(3);
-    return fmtDate(r.date)+','+r.seq+','+r.plate+',"'+r.customer+'","'+r.product+'",'+r.kg+','+g+','+d+','+n;
+    return fmtDate(r.date)+','+r.seq+',"+'+(r.plate||'').replace(/\.+$/g,'')+'+'","'+r.customer+'","'+r.product+'",'+r.kg+','+g+','+d+','+n;
   }).join('\n');
   var blob=new Blob([bom+h+b],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a');
