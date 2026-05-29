@@ -792,7 +792,7 @@ function parseSheet(rows, dateStr, existIds, batch) {
     batch.set(db.collection('weighings').doc(id), {
       seq:      seq,
       date:     dateStr,
-      plate:    String(r[iPlate]||'').trim(),
+      plate:    String(r[iPlate]||'').trim().replace(/[^\u0E00-\u0E7Fa-zA-Z0-9\-\s]/g,'').trim(),
       customer: String(r[iCust] ||'').trim() || 'ทั่วไป',
       product:  String(r[iProd] ||'').trim() || 'ทราย',
       kgIn:     Math.round(parseFloat(String(r[iIn] ||'0').replace(/,/g,''))||0),
