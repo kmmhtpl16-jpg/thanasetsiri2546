@@ -1127,155 +1127,189 @@ function printInvoice(sandType, price, vatType, balanceFwd, remark) {
     if(fb&&r.date>fb) return false;
     return true;
   });
-
-  var totalCubic = rows.reduce(function(s,r){ return s + Math.max(0, r.kg/KPC - (dData[r._id]||0)); }, 0);
-  var productName = sandType === 'delivery' ? 'ทราย (รวมค่าจัดส่งถึงหน้างาน)' : 'ทราย (ดิบ)';
-
+  var productName = sandType==='delivery' ? 'ทราย (รวมค่าจัดส่งถึงหน้างาน)' : 'ทราย (ดิบ)';
   var unitPrice = price;
-  var subtotal  = totalCubic * unitPrice;
-  var vatAmt    = 0;
-  var grandTotal;
-  var priceNote;
-
-  if (vatType === 'inclusive') {
-    vatAmt     = subtotal - subtotal/1.07;
-    grandTotal = subtotal;
-    priceNote  = '(ราคารวม VAT 7% แล้ว)';
-  } else if (vatType === 'exclusive') {
-    vatAmt     = subtotal * 0.07;
-    grandTotal = subtotal + vatAmt;
-    priceNote  = '(ยังไม่รวม VAT 7%)';
+  var dayMap = {};
+  rows.forEach(function(r){
+    var net = Math.max(0, r.kg/KPC - (dData[r._id]||0));
+    if(!dayMap[r.date]) dayMap[r.date] = 0;
+    dayMap[r.date] += net;
+  });
+  var dayList = Object.keys(dayMap).sort();
+  var totalCubic = dayList.reduce(function(s,d){ return s + dayMap[d]; }, 0);
+  var subtotal = totalCubic * unitPrice;
+  var vatAmt, grandTotal, priceNote, vatLabel;
+  if (vatType==='inclusive') {
+    vatAmt=subtotal-subtotal/1.07; grandTotal=subtotal;
+    priceNote='(ราคารวม VAT 7% แล้ว)'; vatLabel='ภาษีมูลค่าเพิ่ม 7% (รวมแล้ว)';
+  } else if (vatType==='exclusive') {
+    vatAmt=subtotal*0.07; grandTotal=subtotal+vatAmt;
+    priceNote='(ยังไม่รวม VAT 7%)'; vatLabel='ภาษีมูลค่าเพิ่ม 7%';
   } else {
-    vatAmt     = 0;
-    grandTotal = subtotal;
-    priceNote  = '(VAT 0%)';
+    vatAmt=0; grandTotal=subtotal;
+    priceNote='(VAT 0%)'; vatLabel='ภาษีมูลค่าเพิ่ม 0%';
+  }
+  var netTotal = grandTotal - (balanceFwd||0);
+  var remarkLines = remark ? remark.split('\n').filter(function(l){ return l.trim(); }) : [];
+  var dateLabel = '';
+  if(fa&&fb) dateLabel=fmtDate(fa)+' ถึง '+fmtDate(fb);
+  else if(fa) dateLabel='ตั้งแต่ '+fmtDate(fa);
+  else if(fb) dateLabel='ถึง '+fmtDate(fb);
+  var custLabel = fc||fp ? (fc||'')+(fp?' / '+fp:'') : 'ลูกค้าทั้งหมด';
+
+  var rowsHtml = dayList.map(function(d,i){
+    var qty=dayMap[d], amt=qty*unitPrice;
+    return '<tr>'
+      +'<td style="text-align:center;padding:7px 10px;border-bottom:1px solid #e8e8f0;">'+(i+1)+'</td>'
+      +'<td style="padding:7px 12px;border-bottom:1px solid #e8e8f0;"><b>'+productName+'</b>'
+      +'<div style="font-size:11px;color:#888;margin-top:2px;">ราคาน้ำมัน 41.00-45.00 บาท/ลิตร ('+fmtDate(d)+')</div></td>'
+      +'<td style="text-align:right;padding:7px 10px;border-bottom:1px solid #e8e8f0;">'+qty.toFixed(3)+'</td>'
+      +'<td style="text-align:center;padding:7px 10px;border-bottom:1px solid #e8e8f0;">คิว</td>'
+      +'<td style="text-align:right;padding:7px 10px;border-bottom:1px solid #e8e8f0;">'+unitPrice.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
+      +'<td style="text-align:right;padding:7px 10px;border-bottom:1px solid #e8e8f0;font-weight:600;">'+amt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
+      +'</tr>';
+  }).join('');
+
+  function bahtText(n) {
+    n=Math.round(n*100)/100;
+    var t1=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
+    var pos=['','สิบ','ร้อย','พัน','หมื่น','แสน','ล้าน'];
+    if(n===0) return 'ศูนย์บาทถ้วน';
+    var s=n.toFixed(2).split('.'), satang=parseInt(s[1]), baht=parseInt(s[0]);
+    function conv(num){
+      if(num===0) return '';
+      if(num>=1000000) return conv(Math.floor(num/1000000))+'ล้าน'+conv(num%1000000);
+      var str='', digits=num.toString().split('').reverse();
+      digits.forEach(function(d,i){
+        var dd=parseInt(d); if(dd===0) return;
+        if(i===1&&dd===1) str=pos[i]+str;
+        else if(i===1&&dd===2) str='ยี่'+pos[i]+str;
+        else str=t1[dd]+pos[i]+str;
+      });
+      return str;
+    }
+    var result=conv(baht)+'บาท';
+    if(satang===0) result+='ถ้วน';
+    else result+=conv(Math.floor(satang/10))+t1[satang%10]+'สตางค์';
+    return result;
   }
 
-  var remarkLines = remark ? remark.split('\n').filter(function(l){ return l.trim(); }) : [];
+  var today=new Date();
+  var todayTH=today.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var logoB64='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAJ7UlEQVR4AWyWa3BdVRXHf2vfe5M06SNtKA1NSNMEaaktrz4EWmAoVacFUVqkdMBKkUcREBycwY6jH/zCDJWHRWbwAQOo4FQRRqY66iiiA3aUThD6AIp9v9I0bZKb3NzHOWf73ye5tFX3vevsvdfaa/3XWnvtfY6r61joazsW+brpotB3Xq6xKIwlG5P2I7LazoUja8WvS/kLfZCPCTqdV/hTefWBl67Tms5FfmS+SGsuFy3ywVbAdniHecNMPQ58AibCg+ZeMpfKTGyHiTvy95hZusp7cdKHA8uI50iky2gLokQmg65ZeLpRW4Zs24ghrfIiBIiaoUUeySARP5WhFngYUtTzZI/4a';
 
-  // Build date range label
-  var dateLabel = '';
-  if (fa && fb) dateLabel = fmtDate(fa.replace(/-/g,'-').replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1-$2-$3')) + ' ถึง ' + fmtDate(fb);
-  else if (fa)  dateLabel = 'ตั้งแต่ ' + fmtDate(fa);
-  else if (fb)  dateLabel = 'ถึง ' + fmtDate(fb);
-  else          dateLabel = 'ทั้งหมด';
-
-  // Customer label
-  var custLabel = fc || fp ? ((fc||'')+(fp?' / '+fp:'')) : 'ลูกค้าทั้งหมด';
-
-  var w = window.open('','_blank','width=820,height=960');
-  w.document.write(`<!DOCTYPE html>
-<html lang="th"><head><meta charset="UTF-8">
-<title>ใบแจ้งหนี้ — ท่าทราย ธนเศรษฐ์ศิริ</title>
+  var w=window.open('','_blank','width=860,height=1100');
+  w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
+<title>ใบแจ้งหนี้</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Sarabun','Noto Sans Thai',sans-serif;font-size:14px;background:#fff;color:#111;padding:32px;}
-  .inv-wrap{max-width:720px;margin:0 auto;}
-  .inv-head{display:flex;align-items:flex-start;gap:20px;border-bottom:3px solid #b8860b;padding-bottom:16px;margin-bottom:20px;}
-  .inv-logo{width:68px;height:68px;object-fit:contain;flex-shrink:0;}
-  .inv-company h1{font-size:22px;font-weight:800;color:#7a5100;margin-bottom:2px;}
-  .inv-company p{font-size:12px;color:#555;line-height:1.6;}
-  .inv-title{text-align:center;font-size:20px;font-weight:800;letter-spacing:2px;color:#7a5100;margin-bottom:18px;border:2px solid #b8860b;padding:8px;border-radius:6px;}
-  .inv-meta{display:flex;justify-content:space-between;margin-bottom:18px;font-size:13px;gap:16px;flex-wrap:wrap;}
-  .inv-meta-block{background:#fdf8ec;border:1px solid #e6d18a;border-radius:6px;padding:8px 14px;min-width:200px;}
-  .inv-meta-block b{display:block;font-size:11px;color:#7a5100;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
-  table.inv-table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:13px;}
-  table.inv-table th{background:#7a5100;color:#fff;padding:8px 10px;text-align:left;font-weight:700;}
-  table.inv-table th.r, table.inv-table td.r{text-align:right;}
-  table.inv-table td{padding:7px 10px;border-bottom:1px solid #f0e0a0;}
-  table.inv-table tr:nth-child(even) td{background:#fdf8ec;}
-  .inv-product-note{font-size:11px;color:#888;margin-top:2px;}
-  .inv-summary{margin-left:auto;width:min(320px,100%);margin-bottom:18px;}
-  .inv-summary table{width:100%;border-collapse:collapse;font-size:13px;}
-  .inv-summary table td{padding:5px 10px;}
-  .inv-summary table td.lb{color:#555;}
-  .inv-summary table td.vl{text-align:right;font-weight:600;}
-  .inv-summary table tr.balance td{color:#c0392b;font-weight:700;}
-  .inv-summary table tr.total td{background:#7a5100;color:#fff;font-weight:800;font-size:15px;border-radius:4px;}
-  .inv-bank{border:2px solid #27ae60;border-radius:8px;background:#f0fff4;padding:12px 18px;margin-bottom:18px;font-size:13px;}
-  .inv-bank .bk-title{font-size:12px;font-weight:800;color:#27ae60;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
-  .inv-bank .bk-num{font-size:20px;font-weight:800;color:#27ae60;letter-spacing:2px;}
-  .inv-bank .bk-name{color:#555;font-size:12px;}
-  .inv-remark{margin-bottom:18px;font-size:13px;}
-  .inv-remark .rm-title{font-weight:800;color:#c0392b;margin-bottom:4px;}
-  .inv-sign{display:flex;gap:32px;margin-top:32px;}
-  .inv-sign-box{flex:1;text-align:center;border-top:1px solid #aaa;padding-top:8px;font-size:12px;color:#555;}
-  @media print{body{padding:16px;} .no-print{display:none;}}
-</style>
-</head><body>
-<div class="inv-wrap">
-  <div class="inv-head">
-    <img class="inv-logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAJ7UlEQVR4AWyWa3BdVRXHf2vfe5M06SNtKA1NSNMEaaktrz4EWmAoVacFUVqkdMBKkUcREBycwY6jH/zCDJWHRWbwAQOo4FQRRqY66iiiA3aUThD6AIp9v9I0bZKb3NzHOWf73ye5tFX3vevsvdfaa/3XWnvtfY6r61joazsW+brpotB3Xq6xKIwlG5P2I7LazoUja8WvS/kLfZCPCTqdV/hTefWBl67Tms5FfmS+SGsuFy3ywVbAdniHecNMPQ58AibCg+ZeMpfKTGyHiTvy95hZusp7cdKHA8uI50iky2gLokQmg65ZeLpRW4Zs24ghrfIiBIiaoUUeySARP5WhFngYUtTzZI/4a" alt="logo">
-    <div class="inv-company">
-      <h1>ท่าทราย ธนเศรษฐ์ศิริ</h1>
-      <p>จำหน่ายทรายก่อสร้าง — ใบแจ้งหนี้<br>
-         เลขบัญชี: 376-2-44778-8 ธนาคารกสิกรไทย</p>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sarabun','Noto Sans Thai',sans-serif;font-size:13.5px;background:#f4f4f8;color:#222;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.page{background:#fff;max-width:800px;margin:20px auto;padding:36px 40px 32px;box-shadow:0 2px 16px rgba(80,60,160,.1);}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:14px;border-bottom:2.5px solid #6c63b6;}
+.inv-logo-wrap{display:flex;align-items:center;gap:12px;}
+.inv-logo{width:54px;height:54px;object-fit:contain;}
+.inv-company h1{font-size:21px;font-weight:800;color:#3d3499;line-height:1.2;}
+.inv-company p{font-size:11px;color:#999;margin-top:2px;}
+.inv-title-right{text-align:right;}
+.inv-title-right h2{font-size:19px;font-weight:800;color:#6c63b6;letter-spacing:1px;}
+.inv-title-right .copy{font-size:11px;color:#bbb;margin-top:2px;}
+.inv-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.meta-box{background:#f7f6ff;border:1px solid #dddaf5;border-radius:7px;padding:9px 10px;text-align:center;}
+.meta-box .lbl{font-size:10px;font-weight:700;color:#6c63b6;text-transform:uppercase;letter-spacing:.5px;}
+.meta-box .val{font-size:12px;font-weight:700;color:#222;margin-top:2px;}
+table.inv-tbl{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12.5px;}
+table.inv-tbl thead tr{background:#6c63b6;}
+table.inv-tbl thead th{color:#fff;padding:9px 10px;font-weight:700;}
+table.inv-tbl thead th.r{text-align:right;}
+table.inv-tbl thead th.c{text-align:center;}
+table.inv-tbl tbody tr:nth-child(even) td{background:#f7f6ff;}
+.sum-wrap{display:flex;justify-content:flex-end;margin-bottom:14px;}
+.sum-tbl{width:290px;font-size:12.5px;border-collapse:collapse;}
+.sum-tbl td{padding:5px 10px;}
+.sum-tbl td.lb{color:#555;}
+.sum-tbl td.vl{text-align:right;font-weight:600;}
+.sum-tbl tr.sep td{border-top:1px solid #ddd;padding-top:8px;}
+.sum-tbl tr.bal td{color:#e74c3c;font-weight:700;}
+.sum-tbl tr.tot td{background:#6c63b6;color:#fff;font-weight:800;font-size:14px;padding:8px 10px;border-radius:4px;}
+.bahttext{text-align:center;background:#f7f6ff;border:1px solid #dddaf5;border-radius:6px;padding:8px 12px;font-size:12.5px;margin-bottom:14px;}
+.bahttext span{color:#3d3499;font-weight:700;}
+.bank-box{display:flex;align-items:center;gap:14px;border:2px solid #27ae60;border-radius:8px;background:#f0fff4;padding:10px 16px;margin-bottom:14px;}
+.bank-box .bk-lbl{font-size:10px;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:.5px;}
+.bank-box .bk-num{font-size:18px;font-weight:800;color:#27ae60;letter-spacing:1.5px;}
+.bank-box .bk-name{font-size:11px;color:#555;}
+.remark-box{padding:9px 14px;background:#fff8f0;border-left:3px solid #e67e22;border-radius:0 6px 6px 0;font-size:12.5px;margin-bottom:20px;}
+.remark-box .rm-hd{font-weight:800;color:#e67e22;margin-bottom:3px;}
+.sign-row{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:28px;}
+.sign-box{text-align:center;}
+.sign-box .sign-line{border-top:1px solid #bbb;margin:52px 20px 6px;}
+.sign-box .sign-lbl{font-size:11.5px;color:#666;}
+@media print{body{background:#fff;}.page{margin:0;padding:22px 32px;box-shadow:none;}.no-print{display:none!important;}}
+</style></head><body>
+<div class="page">
+  <div class="inv-header">
+    <div class="inv-logo-wrap">
+      <img class="inv-logo" src="${logoB64}" alt="logo">
+      <div class="inv-company"><h1>ท่าทราย ธนเศรษฐ์ศิริ</h1><p>จำหน่ายทรายก่อสร้าง</p></div>
+    </div>
+    <div class="inv-title-right">
+      <h2>ใบแจ้งหนี้ / INVOICE</h2>
+      <div class="copy">ต้นฉบับ</div>
     </div>
   </div>
-
-  <div class="inv-title">ใบแจ้งหนี้ / INVOICE</div>
 
   <div class="inv-meta">
-    <div class="inv-meta-block">
-      <b>ลูกค้า / ช่วงวันที่</b>
-      ${custLabel}<br>${dateLabel}
-    </div>
-    <div class="inv-meta-block">
-      <b>วันที่ออกใบแจ้งหนี้</b>
-      ${new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'})}
-    </div>
+    <div class="meta-box"><div class="lbl">วันที่ออก</div><div class="val">${todayTH}</div></div>
+    <div class="meta-box"><div class="lbl">ลูกค้า</div><div class="val" style="font-size:11px;">${custLabel}</div></div>
+    <div class="meta-box"><div class="lbl">ช่วงวันที่</div><div class="val" style="font-size:11px;">${dateLabel||'ทั้งหมด'}</div></div>
+    <div class="meta-box"><div class="lbl">ราคาสินค้า</div><div class="val" style="font-size:11px;">${priceNote}</div></div>
   </div>
 
-  <table class="inv-table">
+  <table class="inv-tbl">
     <thead><tr>
-      <th>#</th><th>รายการสินค้า</th><th class="r">ปริมาณ (คิว)</th>
-      <th class="r">ราคา/คิว (บาท)</th><th class="r">จำนวนเงิน (บาท)</th>
+      <th class="c" style="width:38px;">#</th>
+      <th>ชื่อสินค้า / รายละเอียด</th>
+      <th class="r" style="width:90px;">จำนวน</th>
+      <th class="c" style="width:50px;">หน่วย</th>
+      <th class="r" style="width:105px;">ราคาต่อหน่วย</th>
+      <th class="r" style="width:110px;">ยอดรวม</th>
     </tr></thead>
-    <tbody>
-      <tr>
-        <td>1</td>
-        <td>
-          <b>${productName}</b>
-          <div class="inv-product-note">ราคาน้ำมัน 41.00–45.00 บาท/ลิตร</div>
-          <div class="inv-product-note">${priceNote}</div>
-        </td>
-        <td class="r">${totalCubic.toFixed(3)}</td>
-        <td class="r">${unitPrice.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
-        <td class="r">${subtotal.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
-      </tr>
-    </tbody>
+    <tbody>${rowsHtml}</tbody>
   </table>
 
-  <div class="inv-summary">
-    <table>
-      <tr><td class="lb">ราคาสินค้า (ก่อน VAT)</td><td class="vl">${(vatType==='inclusive'?(subtotal/1.07):subtotal).toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
-      <tr><td class="lb">VAT 7%</td><td class="vl">${vatAmt.toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
-      ${balanceFwd > 0 ? '<tr class="balance"><td class="lb">หักวงเงินคงเหลือ</td><td class="vl">-'+balanceFwd.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</td></tr>' : ''}
-      <tr class="total"><td>ยอดรวมทั้งสิ้น</td><td class="vl">${(grandTotal - (balanceFwd||0)).toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
-    </table>
+  <div class="sum-wrap"><table class="sum-tbl">
+    <tr><td class="lb">รวมเป็นเงิน</td><td class="vl">${subtotal.toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
+    <tr><td class="lb">${vatLabel}</td><td class="vl">${vatAmt.toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
+    <tr class="sep"><td class="lb">ราคาไม่รวมภาษีมูลค่าเพิ่ม</td><td class="vl">${(vatType==='inclusive'?subtotal/1.07:subtotal).toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
+    ${balanceFwd>0?'<tr class="bal"><td class="lb">หักวงเงินคงเหลือ</td><td class="vl">-'+balanceFwd.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</td></tr>':''}
+    <tr class="tot"><td>จำนวนเงินรวมทั้งสิ้น</td><td class="vl">${netTotal.toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
+  </table></div>
+
+  <div class="bahttext">(<span>${bahtText(netTotal)}</span>)</div>
+
+  <div class="bank-box">
+    <div style="font-size:28px;">🏦</div>
+    <div>
+      <div class="bk-lbl">ชำระเงินผ่านบัญชีธนาคาร</div>
+      <div class="bk-num">376-2-44778-8</div>
+      <div class="bk-name">ธนาคารกสิกรไทย &nbsp;|&nbsp; ท่าทรายธนเศรษฐ์ศิริ (น้าโสม)</div>
+    </div>
   </div>
 
-  <div class="inv-bank">
-    <div class="bk-title">📱 ชำระเงินผ่านบัญชีธนาคาร</div>
-    <div class="bk-num">376-2-44778-8</div>
-    <div class="bk-name">ธนาคารกสิกรไทย (น้าโสม)</div>
-  </div>
+  ${remarkLines.length>0?'<div class="remark-box"><div class="rm-hd">หมายเหตุ:</div>'+remarkLines.map(function(l,i){return '<div>'+(i+1)+'. '+l+'</div>';}).join('')+'</div>':''}
 
-  ${remarkLines.length > 0 ? '<div class="inv-remark"><div class="rm-title">หมายเหตุ:</div>' + remarkLines.map(function(l,i){return '<div>'+(i+1)+'. '+l+'</div>';}).join('') + '</div>' : ''}
-
-  <div class="inv-sign">
-    <div class="inv-sign-box">ผู้สั่งซื้อ<br><br><br><br>วันที่ ...............</div>
-    <div class="inv-sign-box">ผู้อนุมัติ<br><br><br><br>วันที่ ...............</div>
+  <div class="sign-row">
+    <div class="sign-box"><div class="sign-line"></div><div class="sign-lbl">ผู้รับสินค้า &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; วันที่ ........................</div></div>
+    <div class="sign-box"><div class="sign-line"></div><div class="sign-lbl">ผู้ส่งสินค้า &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; วันที่ ........................</div></div>
   </div>
 
   <div class="no-print" style="text-align:center;margin-top:24px;">
-    <button onclick="window.print()" style="background:#7a5100;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:700;">🖨️ พิมพ์ใบแจ้งหนี้</button>
+    <button onclick="window.print()" style="background:#6c63b6;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:14px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:700;">🖨️ พิมพ์ใบแจ้งหนี้</button>
   </div>
-</div>
-</body></html>`);
+</div></body></html>`);
   w.document.close();
 }
+
 
 function setMsg(id, msg, type) {
   var el=document.getElementById(id);
