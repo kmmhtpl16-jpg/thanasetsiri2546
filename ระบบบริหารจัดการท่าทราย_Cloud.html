@@ -558,7 +558,7 @@ var pinBuf   = '';
 try {
   firebase.initializeApp(FB_CFG);
   db   = firebase.firestore();
-     db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
+     db.settings({ experimentalForceLongPolling: true, merge: true });
   auth = firebase.auth();
   auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
 } catch(e) { setErr('Firebase init error: ' + e.message); }
