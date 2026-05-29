@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <!-- SheetJS -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.mihn.hjs"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 /* ============================================================h
@@ -390,6 +390,7 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
           <label>ถึง <input type="date" id="f3b"></label>
           <button class="btn btn-gold"  onclick="doFilter()">🔍 กรอง</button>
           <button class="btn btn-green" onclick="doExport()">📥 CSV</button>
+          <button class="btn btn-gold"  onclick="openInvoiceModal()">🧾 ใบแจ้งหนี้</button>
         </div>
       </div>
       <div class="card">
@@ -428,6 +429,81 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
       </div>
     </section>
 
+
+  <!-- ===== INVOICE MODAL ===== -->
+  <div id="invoiceModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);align-items:center;justify-content:center;padding:16px;">
+    <div id="invoiceModalBox" style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:min(520px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,.8);position:relative;">
+      <div style="position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:16px 20px 12px;border-radius:16px 16px 0 0;">
+        <div style="font-size:16px;font-weight:800;color:var(--gold);">🧾 ตั้งค่าใบแจ้งหนี้</div>
+      </div>
+      <div style="padding:20px 20px 8px;">
+
+        <!-- 1. ประเภทสินค้า -->
+        <div style="margin-bottom:18px;">
+          <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">1. ประเภทสินค้า</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--border);margin-bottom:6px;">
+            <input type="radio" name="invSandType" id="invSelf" value="self" checked style="accent-color:var(--gold);">
+            <span>ทราย (ลูกค้ารับเอง)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--border);">
+            <input type="radio" name="invSandType" id="invDelivery" value="delivery" style="accent-color:var(--gold);">
+            <span>ทราย (รวมค่าจัดส่งถึงหน้างาน)</span>
+          </label>
+        </div>
+
+        <!-- 2. ราคาต่อคิว -->
+        <div style="margin-bottom:18px;">
+          <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">2. ราคาต่อคิว (บาท)</div>
+          <input type="number" id="invPrice" value="105" min="1" step="0.01"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:15px;padding:9px 12px;outline:none;transition:border-color .2s;"
+            oninput="this.style.borderColor='var(--border)'" placeholder="เช่น 105">
+          <div style="margin-top:8px;display:flex;flex-direction:column;gap:5px;">
+            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
+              <input type="radio" name="invVat" id="invVatInc" value="inclusive" style="accent-color:var(--gold);">
+              ราคานี้รวม VAT 7% แล้ว
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
+              <input type="radio" name="invVat" id="invVatExc" value="exclusive" checked style="accent-color:var(--gold);">
+              ราคานี้ยังไม่รวม VAT 7% (บวกเพิ่ม)
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
+              <input type="radio" name="invVat" id="invVatZero" value="zero" style="accent-color:var(--gold);">
+              ไม่มี VAT (VAT 0%)
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. วงเงินคงเหลือ -->
+        <div style="margin-bottom:18px;">
+          <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">3. วงเงินคงเหลือจากครั้งก่อน (บาท)</div>
+          <input type="number" id="invBalance" value="0" min="0" step="0.01"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:15px;padding:9px 12px;outline:none;"
+            placeholder="0">
+        </div>
+
+        <!-- 4. หมายเหตุ -->
+        <div style="margin-bottom:20px;">
+          <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">4. หมายเหตุ (ถ้ามี)</div>
+          <textarea id="invRemark" rows="3"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:13px;padding:9px 12px;resize:vertical;outline:none;"
+            placeholder="เช่น วางบิลทุก 5,000 คิว / ชำระภายใน 7 วัน"></textarea>
+        </div>
+
+      </div>
+      <div style="padding:0 20px 20px;display:flex;gap:10px;">
+        <button onclick="submitInvoiceModal()"
+          style="flex:1;background:var(--gold);color:#000;border:none;border-radius:8px;padding:12px;font-family:var(--font);font-size:14px;font-weight:800;cursor:pointer;transition:background .2s;"
+          onmouseover="this.style.background='#c47800'" onmouseout="this.style.background='var(--gold)'">
+          🧾 ออกใบแจ้งหนี้
+        </button>
+        <button onclick="closeInvoiceModal()"
+          style="background:#2a3a50;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px 20px;font-family:var(--font);font-size:14px;cursor:pointer;transition:background .2s;"
+          onmouseover="this.style.background='#354a60'" onmouseout="this.style.background='#2a3a50'">
+          ยกเลิก
+        </button>
+      </div>
+    </div>
+  </div>
   </main>
 </div>
 
@@ -1004,6 +1080,203 @@ function makePager(cid, total, cur, cb) {
   for(var i=1;i<=tp;i++) h+='<button class="pbtn'+(i===cur?' on':'')+'" onclick="('+cb.toString()+')('+i+')">'+i+'</button>';
   el.innerHTML=h;
 }
+
+/* ================================================================
+   INVOICE MODAL
+================================================================ */
+function openInvoiceModal() {
+  var m = document.getElementById('invoiceModal');
+  m.style.display = 'flex';
+  document.addEventListener('keydown', _invEscHandler);
+}
+function closeInvoiceModal() {
+  document.getElementById('invoiceModal').style.display = 'none';
+  document.removeEventListener('keydown', _invEscHandler);
+}
+function _invEscHandler(e) { if (e.key === 'Escape') closeInvoiceModal(); }
+document.addEventListener('click', function(e) {
+  if (e.target.id === 'invoiceModal') closeInvoiceModal();
+});
+
+function submitInvoiceModal() {
+  var priceEl = document.getElementById('invPrice');
+  var price = parseFloat(priceEl.value) || 0;
+  if (price <= 0) {
+    priceEl.style.borderColor = '#e74c3c';
+    priceEl.classList.add('shake-input');
+    setTimeout(function(){ priceEl.classList.remove('shake-input'); }, 500);
+    priceEl.focus(); return;
+  }
+  var sandType  = document.querySelector('input[name="invSandType"]:checked').value;
+  var vatType   = document.querySelector('input[name="invVat"]:checked').value;
+  var balance   = parseFloat(document.getElementById('invBalance').value) || 0;
+  var remark    = document.getElementById('invRemark').value.trim();
+  closeInvoiceModal();
+  printInvoice(sandType, price, vatType, balance, remark);
+}
+
+function printInvoice(sandType, price, vatType, balanceFwd, remark) {
+  var fc  = (document.getElementById('f3c').value||'').toLowerCase().trim();
+  var fp  = (document.getElementById('f3p').value||'').toLowerCase().trim();
+  var fa  =  document.getElementById('f3a').value||'';
+  var fb  =  document.getElementById('f3b').value||'';
+  var rows = wData.filter(function(r){
+    if(fc&&!r.customer.toLowerCase().includes(fc)) return false;
+    if(fp&&!r.plate.toLowerCase().includes(fp))    return false;
+    if(fa&&r.date<fa) return false;
+    if(fb&&r.date>fb) return false;
+    return true;
+  });
+
+  var totalCubic = rows.reduce(function(s,r){ return s + Math.max(0, r.kg/KPC - (dData[r._id]||0)); }, 0);
+  var productName = sandType === 'delivery' ? 'ทราย (รวมค่าจัดส่งถึงหน้างาน)' : 'ทราย (ดิบ)';
+
+  var unitPrice = price;
+  var subtotal  = totalCubic * unitPrice;
+  var vatAmt    = 0;
+  var grandTotal;
+  var priceNote;
+
+  if (vatType === 'inclusive') {
+    vatAmt     = subtotal - subtotal/1.07;
+    grandTotal = subtotal;
+    priceNote  = '(ราคารวม VAT 7% แล้ว)';
+  } else if (vatType === 'exclusive') {
+    vatAmt     = subtotal * 0.07;
+    grandTotal = subtotal + vatAmt;
+    priceNote  = '(ยังไม่รวม VAT 7%)';
+  } else {
+    vatAmt     = 0;
+    grandTotal = subtotal;
+    priceNote  = '(VAT 0%)';
+  }
+
+  var remarkLines = remark ? remark.split('\n').filter(function(l){ return l.trim(); }) : [];
+
+  // Build date range label
+  var dateLabel = '';
+  if (fa && fb) dateLabel = fmtDate(fa.replace(/-/g,'-').replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1-$2-$3')) + ' ถึง ' + fmtDate(fb);
+  else if (fa)  dateLabel = 'ตั้งแต่ ' + fmtDate(fa);
+  else if (fb)  dateLabel = 'ถึง ' + fmtDate(fb);
+  else          dateLabel = 'ทั้งหมด';
+
+  // Customer label
+  var custLabel = fc || fp ? ((fc||'')+(fp?' / '+fp:'')) : 'ลูกค้าทั้งหมด';
+
+  var w = window.open('','_blank','width=820,height=960');
+  w.document.write(`<!DOCTYPE html>
+<html lang="th"><head><meta charset="UTF-8">
+<title>ใบแจ้งหนี้ — ท่าทราย ธนเศรษฐ์ศิริ</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Sarabun','Noto Sans Thai',sans-serif;font-size:14px;background:#fff;color:#111;padding:32px;}
+  .inv-wrap{max-width:720px;margin:0 auto;}
+  .inv-head{display:flex;align-items:flex-start;gap:20px;border-bottom:3px solid #b8860b;padding-bottom:16px;margin-bottom:20px;}
+  .inv-logo{width:68px;height:68px;object-fit:contain;flex-shrink:0;}
+  .inv-company h1{font-size:22px;font-weight:800;color:#7a5100;margin-bottom:2px;}
+  .inv-company p{font-size:12px;color:#555;line-height:1.6;}
+  .inv-title{text-align:center;font-size:20px;font-weight:800;letter-spacing:2px;color:#7a5100;margin-bottom:18px;border:2px solid #b8860b;padding:8px;border-radius:6px;}
+  .inv-meta{display:flex;justify-content:space-between;margin-bottom:18px;font-size:13px;gap:16px;flex-wrap:wrap;}
+  .inv-meta-block{background:#fdf8ec;border:1px solid #e6d18a;border-radius:6px;padding:8px 14px;min-width:200px;}
+  .inv-meta-block b{display:block;font-size:11px;color:#7a5100;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+  table.inv-table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:13px;}
+  table.inv-table th{background:#7a5100;color:#fff;padding:8px 10px;text-align:left;font-weight:700;}
+  table.inv-table th.r, table.inv-table td.r{text-align:right;}
+  table.inv-table td{padding:7px 10px;border-bottom:1px solid #f0e0a0;}
+  table.inv-table tr:nth-child(even) td{background:#fdf8ec;}
+  .inv-product-note{font-size:11px;color:#888;margin-top:2px;}
+  .inv-summary{margin-left:auto;width:min(320px,100%);margin-bottom:18px;}
+  .inv-summary table{width:100%;border-collapse:collapse;font-size:13px;}
+  .inv-summary table td{padding:5px 10px;}
+  .inv-summary table td.lb{color:#555;}
+  .inv-summary table td.vl{text-align:right;font-weight:600;}
+  .inv-summary table tr.balance td{color:#c0392b;font-weight:700;}
+  .inv-summary table tr.total td{background:#7a5100;color:#fff;font-weight:800;font-size:15px;border-radius:4px;}
+  .inv-bank{border:2px solid #27ae60;border-radius:8px;background:#f0fff4;padding:12px 18px;margin-bottom:18px;font-size:13px;}
+  .inv-bank .bk-title{font-size:12px;font-weight:800;color:#27ae60;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+  .inv-bank .bk-num{font-size:20px;font-weight:800;color:#27ae60;letter-spacing:2px;}
+  .inv-bank .bk-name{color:#555;font-size:12px;}
+  .inv-remark{margin-bottom:18px;font-size:13px;}
+  .inv-remark .rm-title{font-weight:800;color:#c0392b;margin-bottom:4px;}
+  .inv-sign{display:flex;gap:32px;margin-top:32px;}
+  .inv-sign-box{flex:1;text-align:center;border-top:1px solid #aaa;padding-top:8px;font-size:12px;color:#555;}
+  @media print{body{padding:16px;} .no-print{display:none;}}
+</style>
+</head><body>
+<div class="inv-wrap">
+  <div class="inv-head">
+    <img class="inv-logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAJ7UlEQVR4AWyWa3BdVRXHf2vfe5M06SNtKA1NSNMEaaktrz4EWmAoVacFUVqkdMBKkUcREBycwY6jH/zCDJWHRWbwAQOo4FQRRqY66iiiA3aUThD6AIp9v9I0bZKb3NzHOWf73ye5tFX3vevsvdfaa/3XWnvtfY6r61joazsW+brpotB3Xq6xKIwlG5P2I7LazoUja8WvS/kLfZCPCTqdV/hTefWBl67Tms5FfmS+SGsuFy3ywVbAdniHecNMPQ58AibCg+ZeMpfKTGyHiTvy95hZusp7cdKHA8uI50iky2gLokQmg65ZeLpRW4Zs24ghrfIiBIiaoUUeySARP5WhFngYUtTzZI/4a" alt="logo">
+    <div class="inv-company">
+      <h1>ท่าทราย ธนเศรษฐ์ศิริ</h1>
+      <p>จำหน่ายทรายก่อสร้าง — ใบแจ้งหนี้<br>
+         เลขบัญชี: 376-2-44778-8 ธนาคารกสิกรไทย</p>
+    </div>
+  </div>
+
+  <div class="inv-title">ใบแจ้งหนี้ / INVOICE</div>
+
+  <div class="inv-meta">
+    <div class="inv-meta-block">
+      <b>ลูกค้า / ช่วงวันที่</b>
+      ${custLabel}<br>${dateLabel}
+    </div>
+    <div class="inv-meta-block">
+      <b>วันที่ออกใบแจ้งหนี้</b>
+      ${new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'})}
+    </div>
+  </div>
+
+  <table class="inv-table">
+    <thead><tr>
+      <th>#</th><th>รายการสินค้า</th><th class="r">ปริมาณ (คิว)</th>
+      <th class="r">ราคา/คิว (บาท)</th><th class="r">จำนวนเงิน (บาท)</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>
+          <b>${productName}</b>
+          <div class="inv-product-note">ราคาน้ำมัน 41.00–45.00 บาท/ลิตร</div>
+          <div class="inv-product-note">${priceNote}</div>
+        </td>
+        <td class="r">${totalCubic.toFixed(3)}</td>
+        <td class="r">${unitPrice.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+        <td class="r">${subtotal.toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="inv-summary">
+    <table>
+      <tr><td class="lb">ราคาสินค้า (ก่อน VAT)</td><td class="vl">${(vatType==='inclusive'?(subtotal/1.07):subtotal).toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
+      <tr><td class="lb">VAT 7%</td><td class="vl">${vatAmt.toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
+      ${balanceFwd > 0 ? '<tr class="balance"><td class="lb">หักวงเงินคงเหลือ</td><td class="vl">-'+balanceFwd.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</td></tr>' : ''}
+      <tr class="total"><td>ยอดรวมทั้งสิ้น</td><td class="vl">${(grandTotal - (balanceFwd||0)).toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
+    </table>
+  </div>
+
+  <div class="inv-bank">
+    <div class="bk-title">📱 ชำระเงินผ่านบัญชีธนาคาร</div>
+    <div class="bk-num">376-2-44778-8</div>
+    <div class="bk-name">ธนาคารกสิกรไทย (น้าโสม)</div>
+  </div>
+
+  ${remarkLines.length > 0 ? '<div class="inv-remark"><div class="rm-title">หมายเหตุ:</div>' + remarkLines.map(function(l,i){return '<div>'+(i+1)+'. '+l+'</div>';}).join('') + '</div>' : ''}
+
+  <div class="inv-sign">
+    <div class="inv-sign-box">ผู้สั่งซื้อ<br><br><br><br>วันที่ ...............</div>
+    <div class="inv-sign-box">ผู้อนุมัติ<br><br><br><br>วันที่ ...............</div>
+  </div>
+
+  <div class="no-print" style="text-align:center;margin-top:24px;">
+    <button onclick="window.print()" style="background:#7a5100;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:700;">🖨️ พิมพ์ใบแจ้งหนี้</button>
+  </div>
+</div>
+</body></html>`);
+  w.document.close();
+}
+
 function setMsg(id, msg, type) {
   var el=document.getElementById(id);
   if(el){ el.textContent=msg; el.className='smsg '+type; }
