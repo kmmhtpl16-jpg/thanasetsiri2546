@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>ท่าทราย ธนเศรษฐ์ศิริ</title>h
+<title>ท่าทราย ธนเศรษฐ์ศิริ</title>
 
 <!-- Firebase Compat SDK (ทำงานได้ทุก browser / iOS Safari) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -13,7 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
-/* ============================================================h
+/* ============================================================
    DESIGN TOKENS
 ============================================================ */
 :root {
@@ -240,21 +240,42 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
 ::-webkit-scrollbar-track{background:var(--bg2);}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
+/* ── Freight Tab 5 ── */
+.fr-group-hdr{
+  background:var(--bg3);padding:7px 10px;
+  font-size:10px;font-weight:800;color:var(--gold);
+  text-transform:uppercase;letter-spacing:.8px;
+  border-left:3px solid var(--gold);
+}
+.fr-owner-card{
+  border:1px solid var(--border);border-radius:8px;
+  margin-bottom:12px;overflow:hidden;
+}
+.fr-owner-hdr{
+  background:var(--bg3);padding:10px 14px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.fr-owner-name{font-size:13px;font-weight:700;color:var(--gold);}
+.fr-owner-total{font-size:12px;color:var(--text);}
+.fr-owner-body{padding:0;}
+.badge-canonical{
+  background:rgba(240,165,0,.12);color:var(--gold);
+  border:1px solid rgba(240,165,0,.3);border-radius:4px;
+  padding:2px 7px;font-size:10px;font-weight:700;
+}
+.badge-warn{
+  background:rgba(243,156,18,.15);color:var(--warn);
+  border:1px solid rgba(243,156,18,.4);border-radius:4px;
+  padding:2px 7px;font-size:10px;font-weight:700;
+}
+select{color-scheme:dark;}
+
 /* offline banner */
 #offlineBanner{
   display:none;background:rgba(231,76,60,.15);border-bottom:1px solid rgba(231,76,60,.3);
   color:var(--err);padding:6px 16px;font-size:12px;font-weight:700;text-align:center;
 }
 </style>
-
-  <!-- App Icons & PWA -->
-  <link rel="icon" type="image/png" href="data:image/png;base64,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">
-  <link rel="apple-touch-icon" href="data:image/jpeg;base64,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">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="ท่าทราย ธนเศรษฐ์ศิริ">
-  <meta name="theme-color" content="#070e18">
 </head>
 <body>
 
@@ -264,7 +285,7 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
 <div id="pinScreen">
   <div id="pinBox">
     <div class="pin-logo">
-      <img src="data:image/jpeg;base64,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" alt="ท่าทราย ธนเศรษฐ์ศิริ" style="width:96px;height:96px;border-radius:22px;box-shadow:0 0 24px #f0a500,0 0 8px #f0a50088;display:block;margin:0 auto;">
+      <span class="ico">⛏️</span>
       <h1>ท่าทราย ธนเศรษฐ์ศิริ</h1>
       <p>ระบบบริหารจัดการ v2.0 Cloud</p>
     </div>
@@ -315,6 +336,7 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
     <button class="tab-btn" onclick="goTab(2)">⚖️ หักน้ำหนัก</button>
     <button class="tab-btn ta" onclick="goTab(3)" style="display:none">📊 รายงาน</button>
     <button class="tab-btn ta" onclick="goTab(4)" style="display:none">👑 สรุปผู้บริหาร</button>
+    <button class="tab-btn ta" onclick="goTab(5)" style="display:none">🚛 ค่าเที่ยวรถร่วม</button>
   </nav>
 
   <main class="main-content">
@@ -390,7 +412,6 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
           <label>ถึง <input type="date" id="f3b"></label>
           <button class="btn btn-gold"  onclick="doFilter()">🔍 กรอง</button>
           <button class="btn btn-green" onclick="doExport()">📥 CSV</button>
-          <button class="btn btn-gold"  onclick="openInvoiceModal()">🧾 ใบแจ้งหนี้</button>
         </div>
       </div>
       <div class="card">
@@ -429,81 +450,114 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
       </div>
     </section>
 
+    <!-- TAB 5 — ค่าเที่ยวรถร่วม -->
+    <section class="tab-pane" id="tp5">
 
-  <!-- ===== INVOICE MODAL ===== -->
-  <div id="invoiceModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);align-items:center;justify-content:center;padding:16px;">
-    <div id="invoiceModalBox" style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:min(520px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,.8);position:relative;">
-      <div style="position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:16px 20px 12px;border-radius:16px 16px 0 0;">
-        <div style="font-size:16px;font-weight:800;color:var(--gold);">🧾 ตั้งค่าใบแจ้งหนี้</div>
+      <!-- เลือกประเภทเอกสาร -->
+      <div class="card">
+        <div class="card-title">🚛 ค่าเที่ยวรถร่วม</div>
+        <div class="brow">
+          <button class="btn btn-gold" id="fr-type-inv" onclick="frSetType('invoice')">📄 ใบแจ้งหนี้ลูกค้า</button>
+          <button class="btn btn-ghost" id="fr-type-pay" onclick="frSetType('payment')">💸 ใบจ่ายรถร่วม</button>
+          <button class="btn btn-ghost" id="fr-type-veh" onclick="frSetType('vehicles')" style="margin-left:auto">⚙️ จัดการทะเบียนรถ</button>
+        </div>
       </div>
-      <div style="padding:20px 20px 8px;">
 
-        <!-- 1. ประเภทสินค้า -->
-        <div style="margin-bottom:18px;">
-          <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">1. ประเภทสินค้า</div>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--border);margin-bottom:6px;">
-            <input type="radio" name="invSandType" id="invSelf" value="self" checked style="accent-color:var(--gold);">
-            <span>ทราย (ลูกค้ารับเอง)</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--border);">
-            <input type="radio" name="invSandType" id="invDelivery" value="delivery" style="accent-color:var(--gold);">
-            <span>ทราย (รวมค่าจัดส่งถึงหน้างาน)</span>
-          </label>
+      <!-- ── ส่วน A: ใบแจ้งหนี้ลูกค้า ── -->
+      <div id="fr-invoice-panel">
+        <div class="card">
+          <div class="card-title">📄 สร้างใบแจ้งหนี้ลูกค้า</div>
+          <div class="frow">
+            <label>ลูกค้า
+              <select id="fr-inv-cust" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);">
+                <option value="ไทยเจริญ">ไทยเจริญ (45 บ./คิว, หัก ณ ที่จ่าย 1%)</option>
+                <option value="ธีรนพ">ธีรนพ (145 บ./คิว รวม VAT 7%)</option>
+              </select>
+            </label>
+            <label>ตั้งแต่ <input type="date" id="fr-inv-from"></label>
+            <label>ถึง     <input type="date" id="fr-inv-to"></label>
+            <button class="btn btn-gold" onclick="frFetchInvoice()">🔍 ดึงข้อมูล</button>
+          </div>
+          <div id="fr-inv-msg" class="smsg" style="margin-top:10px"></div>
         </div>
 
-        <!-- 2. ราคาต่อคิว -->
-        <div style="margin-bottom:18px;">
-          <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">2. ราคาต่อคิว (บาท)</div>
-          <input type="number" id="invPrice" value="105" min="1" step="0.01"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:15px;padding:9px 12px;outline:none;transition:border-color .2s;"
-            oninput="this.style.borderColor='var(--border)'" placeholder="เช่น 105">
-          <div style="margin-top:8px;display:flex;flex-direction:column;gap:5px;">
-            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
-              <input type="radio" name="invVat" id="invVatInc" value="inclusive" style="accent-color:var(--gold);">
-              ราคานี้รวม VAT 7% แล้ว
+        <div class="card" id="fr-inv-result" style="display:none">
+          <div class="card-title">
+            📋 สรุปรายทะเบียน
+            <span id="fr-inv-period" style="font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;margin-left:8px"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>เจ้าของรถ</th><th>ทะเบียน</th>
+                <th class="r">คิวสุทธิ</th><th class="r">เงิน (บาท)</th>
+              </tr></thead>
+              <tbody id="fr-inv-tbody"></tbody>
+            </table>
+          </div>
+          <div id="fr-inv-summary" style="margin-top:12px;padding:12px;background:var(--bg3);border-radius:8px;font-size:13px;line-height:2"></div>
+          <div class="brow" style="margin-top:12px">
+            <button class="btn btn-gold" onclick="frSaveInvoice()">💾 บันทึก + ออกใบรถร่วม</button>
+            <button class="btn btn-ghost" onclick="frPrintInvoice()">🖨️ พิมพ์ใบแจ้งหนี้</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ส่วน B: ใบจ่ายรถร่วม ── -->
+      <div id="fr-payment-panel" style="display:none">
+        <div class="card">
+          <div class="card-title">💸 ออกใบจ่ายรถร่วม</div>
+          <div class="frow">
+            <label>อ้างอิงใบลูกค้า
+              <select id="fr-pay-ref" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);min-width:200px">
+                <option value="">— เลือกใบแจ้งหนี้ —</option>
+              </select>
             </label>
-            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
-              <input type="radio" name="invVat" id="invVatExc" value="exclusive" checked style="accent-color:var(--gold);">
-              ราคานี้ยังไม่รวม VAT 7% (บวกเพิ่ม)
-            </label>
-            <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
-              <input type="radio" name="invVat" id="invVatZero" value="zero" style="accent-color:var(--gold);">
-              ไม่มี VAT (VAT 0%)
-            </label>
+            <button class="btn btn-gold" onclick="frLoadPayment()">🔍 โหลด</button>
+          </div>
+          <div id="fr-pay-msg" class="smsg" style="margin-top:10px"></div>
+        </div>
+
+        <div id="fr-pay-owners" style="display:none"></div>
+      </div>
+
+      <!-- ── ส่วน C: จัดการทะเบียนรถ ── -->
+      <div id="fr-vehicles-panel" style="display:none">
+        <div class="card">
+          <div class="card-title">⚙️ จัดการทะเบียน — เจ้าของรถ</div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px">ยืนยันชื่อ canonical (ชื่อหลักที่ใช้สรุปยอด) สำหรับแต่ละทะเบียน ชื่อที่คล้ายกันจะถูกแจ้งเตือน</p>
+          <div class="brow" style="margin-bottom:10px">
+            <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px">เพิ่มทะเบียนใหม่</label>
+            <input type="text" id="veh-plate-in" placeholder="ทะเบียน เช่น 81-5080" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:140px">
+            <input type="text" id="veh-owner-in" placeholder="ชื่อเจ้าของรถ" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:140px">
+            <button class="btn btn-gold" onclick="vehAdd()">➕ เพิ่ม</button>
+          </div>
+          <div id="veh-add-msg" class="smsg" style="margin-bottom:8px"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>ทะเบียน</th><th>ชื่อที่กรอก</th><th>Canonical (ยืนยันแล้ว)</th><th></th>
+              </tr></thead>
+              <tbody id="veh-tbody"></tbody>
+            </table>
           </div>
         </div>
 
-        <!-- 3. วงเงินคงเหลือ -->
-        <div style="margin-bottom:18px;">
-          <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">3. วงเงินคงเหลือจากครั้งก่อน (บาท)</div>
-          <input type="number" id="invBalance" value="0" min="0" step="0.01"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:15px;padding:9px 12px;outline:none;"
-            placeholder="0">
+        <!-- Fuzzy match dialog -->
+        <div id="fuzzy-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center">
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:360px;width:90%">
+            <div style="font-size:14px;font-weight:700;color:var(--gold);margin-bottom:12px">⚠️ ชื่อคล้ายกัน</div>
+            <div id="fuzzy-msg" style="font-size:13px;color:var(--text);margin-bottom:16px;line-height:1.7"></div>
+            <div class="brow">
+              <button class="btn btn-gold" onclick="fuzzyConfirm(true)">✅ ใช่ รวมเป็นคนเดียวกัน</button>
+              <button class="btn btn-ghost" onclick="fuzzyConfirm(false)">❌ ไม่ใช่ แยกต่างหาก</button>
+            </div>
+          </div>
         </div>
-
-        <!-- 4. หมายเหตุ -->
-        <div style="margin-bottom:20px;">
-          <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">4. หมายเหตุ (ถ้ามี)</div>
-          <textarea id="invRemark" rows="3"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:13px;padding:9px 12px;resize:vertical;outline:none;"
-            placeholder="เช่น วางบิลทุก 5,000 คิว / ชำระภายใน 7 วัน"></textarea>
-        </div>
-
       </div>
-      <div style="padding:0 20px 20px;display:flex;gap:10px;">
-        <button onclick="submitInvoiceModal()"
-          style="flex:1;background:var(--gold);color:#000;border:none;border-radius:8px;padding:12px;font-family:var(--font);font-size:14px;font-weight:800;cursor:pointer;transition:background .2s;"
-          onmouseover="this.style.background='#c47800'" onmouseout="this.style.background='var(--gold)'">
-          🧾 ออกใบแจ้งหนี้
-        </button>
-        <button onclick="closeInvoiceModal()"
-          style="background:#2a3a50;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px 20px;font-family:var(--font);font-size:14px;cursor:pointer;transition:background .2s;"
-          onmouseover="this.style.background='#354a60'" onmouseout="this.style.background='#2a3a50'">
-          ยกเลิก
-        </button>
-      </div>
-    </div>
-  </div>
+
+    </section>
+
   </main>
 </div>
 
@@ -513,12 +567,12 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
    คัดลอกจาก Firebase Console > Project Settings > SDK snippet
 ================================================================ */
 var FB_CFG = {
-  apiKey:            "AIzaSyDjeec1gYypCCHPXJKWwX_FEnb9J8RffuE",
-  authDomain:        "thanasetsiri2546.firebaseapp.com",
-  projectId:         "thanasetsiri2546",
-  storageBucket:     "thanasetsiri2546.firebasestorage.app",
-  messagingSenderId: "583880441495",
-  appId:             "1:583880441495:web:30da4fbb276a3f289d33d2"
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 
 /* ================================================================
@@ -558,16 +612,18 @@ var pinBuf   = '';
 try {
   firebase.initializeApp(FB_CFG);
   db   = firebase.firestore();
-     db.settings({ experimentalForceLongPolling: true, merge: true });
   auth = firebase.auth();
-  auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(function(){});
-} catch(e) { setErr('Firebase init error: ' + e.message); }
+} catch(e) {
+  alert('Firebase init error: ' + e.message);
+}
 
-var _pinLoginInProgress = false;
 firebase.auth().onAuthStateChanged(function(user) {
-  if (user && _pinLoginInProgress) { showApp(user); }
-  else if (!user) { _pinLoginInProgress = false; showPin(); }
-  else if (user && !_pinLoginInProgress) { firebase.auth().signOut(); }
+  if (user) {
+    curEmail = user.email;
+    showApp();
+  } else {
+    showPin();
+  }
 });
 
 window.addEventListener('online',  function(){ document.getElementById('offlineBanner').style.display='none'; });
@@ -619,7 +675,6 @@ function tryPin() {
   curRole = acc.role;
   document.getElementById('pinBox').classList.add('ok');
   setErr('');
-  _pinLoginInProgress = true;
   firebase.auth().signInWithEmailAndPassword(acc.email, acc.pw)
     .catch(function(e) {
       document.getElementById('pinBox').classList.remove('ok');
@@ -681,6 +736,7 @@ function goTab(n) {
   document.querySelectorAll('.tab-pane').forEach(function(p,i){ p.classList.toggle('active',i+1===n); });
   if(n===3) draw3();
   if(n===4) draw4();
+  if(n===5){ listenVeh(); frSetType('invoice'); }
 }
 
 /* ================================================================
@@ -694,153 +750,66 @@ function importFile(evt) {
     var wb;
     try { wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}); }
     catch(ex){ setMsg('s1','❌ อ่านไฟล์ไม่ได้','err'); return; }
-    parseAndSave(wb, file.name);
+    var rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+    parseAndSave(rows, file.name);
   };
   reader.readAsArrayBuffer(file);
   evt.target.value='';
 }
 
-// แปลงชื่อ Sheet เช่น "02-05-69" → "2026-05-02"
-// แสดงวันที่เป็น วว/ดด/ปปปป พ.ศ.
-function fmtDate(s) {
-  if (!s) return s;
-  var p = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!p) return s;
-  return p[3]+'/'+p[2]+'/'+(parseInt(p[1])+543);
-}
-// แสดงเดือนเป็น ดด/ปปปป พ.ศ.
-function fmtMonth(s) {
-  if (!s) return s;
-  var p = s.match(/^(\d{4})-(\d{2})$/);
-  if (!p) return s;
-  return p[2]+'/'+(parseInt(p[1])+543);
-}
-
-function sheetNameToDate(name) {
-  var m = name.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{2,4})$/);
-  if (!m) return null;
-  var d=parseInt(m[1]), mo=parseInt(m[2]), y=parseInt(m[3]);
-  if (y < 100) y += 2500;
-  if (y > 2400) y -= 543;
-  return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-}
-
-// ดึงวันที่จากแถวสุดท้ายที่มีข้อมูล เช่น "24/05/2569" หรือ Excel serial
-function extractDateFromLastRow(rows) {
-  // วนจากแถวสุดท้ายขึ้นมา
-  for (var i=rows.length-1; i>=0; i--) {
-    var r = rows[i];
-    for (var j=0; j<r.length; j++) {
-      var v = r[j];
-      if (!v && v !== 0) continue;
-      var s = String(v).trim();
-      // รูปแบบ DD/MM/YYYY หรือ DD-MM-YYYY (รวม พ.ศ.)
-      var m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-      if (m) {
-        var d=parseInt(m[1]), mo=parseInt(m[2]), y=parseInt(m[3]);
-        if (y > 2400) y -= 543;
-        if (y >= 2000 && y <= 2100 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
-          return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-        }
-      }
-      // Excel date serial (เช่น 46165)
-      if (typeof v === 'number' && v > 40000 && v < 60000) {
-        var epoch = new Date(1899,11,30);
-        epoch.setDate(epoch.getDate() + Math.floor(v));
-        var y2=epoch.getFullYear(), mo2=epoch.getMonth()+1, d2=epoch.getDate();
-        if (y2 >= 2000 && y2 <= 2100) {
-          return y2+'-'+String(mo2).padStart(2,'0')+'-'+String(d2).padStart(2,'0');
-        }
-      }
-    }
+function parseAndSave(rows, fname) {
+  // หา header row
+  var hr=-1;
+  for(var i=0;i<rows.length;i++){
+    var rs=rows[i].map(function(c){return String(c).trim();});
+    if(rs.some(function(c){return c.includes('ทะเบียน')||c.includes('เลขที่');})){hr=i;break;}
   }
-  return null;
-}
+  if(hr<0){ setMsg('s1','❌ ไม่พบโครงสร้างไฟล์ตาชั่ง','err'); return; }
 
-// parse 1 sheet — ใช้ร่วมกันทั้ง 2 รูปแบบ
-function parseSheet(rows, dateStr, existIds, batch) {
+  var H=rows[hr].map(function(c){return String(c).trim();});
+  function ci(kw){ return H.findIndex(function(x){return x.includes(kw);}); }
+  var iSeq=ci('เลขที่'), iPlate=ci('ทะเบียน'), iDate=ci('วันที่'),
+      iTime=ci('เวลา'),  iCust=ci('ลูกค้า'),   iProd=ci('สินค้า');
+  var iNet=ci('สุทธิ')>=0?ci('สุทธิ'):ci('นน.สุทธิ');
+
+  var existIds=new Set(wData.map(function(w){return w._id;}));
+  var batch=db.batch();
   var imp=0, skip=0;
 
-  // หา header row ที่มี "ทะเบียนรถ"
-  var hr = -1;
-  for (var i=0; i<rows.length; i++) {
-    var rs = rows[i].map(function(c){ return String(c).trim(); });
-    if (rs.indexOf('ทะเบียนรถ') >= 0 || rs.indexOf('ทะเบียน') >= 0) { hr=i; break; }
-  }
-  if (hr < 0) return {imp:0, skip:0, found:false};
+  for(var i=hr+2;i<rows.length-2;i++){
+    var r=rows[i];
+    var seq=String(r[iSeq]||'').trim();
+    if(!seq||/รวม|ผล/.test(seq)||!/^\d/.test(seq)) continue;
 
-  var H = rows[hr].map(function(c){ return String(c).trim(); });
-  function ci(kw){ return H.findIndex(function(x){ return x===kw||x.includes(kw); }); }
-  var iSeq   = ci('เลขที่');
-  var iPlate = ci('ทะเบียนรถ') >= 0 ? ci('ทะเบียนรถ') : ci('ทะเบียน');
-  var iCust  = ci('ลูกค้า');
-  var iProd  = ci('สินค้า');
-  var iIn    = ci('นน.เข้า');
-  var iOut   = ci('นน.ออก');
-  var iNet   = ci('นน.สุทธิ') >= 0 ? ci('นน.สุทธิ') : ci('สุทธิ');
+    var raw=String(r[iDate]||'').trim();
+    var dm=raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if(!dm) continue;
+    var y=parseInt(dm[3]); if(y>2400) y-=543;
+    var dateStr=y+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
 
-  for (var i=hr+1; i<rows.length; i++) {
-    var r = rows[i];
-    var seq = String(r[iSeq]||'').trim();
-    if (!seq || !/^\d+$/.test(seq)) continue;
+    var rt=String(r[iTime]||'').trim();
+    var timeStr=/^\d{1,2}:\d{2}(:\d{2})?$/.test(rt)?rt:'';
+    var kg=parseFloat(String(r[iNet]||'0').replace(/,/g,''))||0;
+    if(kg<=0) continue;
 
-    var kgNet = parseFloat(String(r[iNet]||'0').replace(/,/g,'')) || 0;
-    if (kgNet <= 0) continue;
+    var id=dateStr+'_'+seq;
+    if(existIds.has(id)){skip++;continue;}
 
-    var id = dateStr+'_'+seq;
-    if (existIds.has(id)) { skip++; continue; }
-
-    batch.set(db.collection('weighings').doc(id), {
-      seq:      seq,
-      date:     dateStr,
-      plate:    String(r[iPlate]||'').trim().replace(/[^\u0E00-\u0E7Fa-zA-Z0-9\-\s]/g,'').trim(),
-      customer: String(r[iCust] ||'').trim() || 'ทั่วไป',
-      product:  String(r[iProd] ||'').trim() || 'ทราย',
-      kgIn:     Math.round(parseFloat(String(r[iIn] ||'0').replace(/,/g,''))||0),
-      kgOut:    Math.round(parseFloat(String(r[iOut]||'0').replace(/,/g,''))||0),
-      kg:       Math.round(kgNet),
-      importedAt: new Date().toISOString(),
-      importedBy: curEmail
+    batch.set(db.collection('weighings').doc(id),{
+      seq:seq, date:dateStr, time:timeStr,
+      plate:   String(r[iPlate]||'').trim(),
+      customer:String(r[iCust] ||'').trim()||'ลูกค้า (ทั่วไป)',
+      product: String(r[iProd] ||'').trim()||'ทราย',
+      kg:kg,
+      importedAt:new Date().toISOString(),
+      importedBy:curEmail
     });
-    existIds.add(id);
     imp++;
   }
-  return {imp:imp, skip:skip, found:true};
-}
 
-function parseAndSave(wb, fname) {
-  var existIds = new Set(wData.map(function(w){ return w._id; }));
-  var batch = db.batch();
-  var imp=0, skip=0, sheetsDone=0;
-
-  for (var si=0; si<wb.SheetNames.length; si++) {
-    var sName = wb.SheetNames[si];
-    var rows = XLSX.utils.sheet_to_json(wb.Sheets[sName], {header:1, defval:''});
-
-    // วิธีที่ 1: ดึงวันที่จากชื่อ Sheet เช่น "02-05-69"
-    var dateStr = sheetNameToDate(sName);
-
-    // วิธีที่ 2: ถ้าชื่อ Sheet ไม่มีวันที่ (เช่น "Sheet1") → ดึงจากแถวสุดท้าย
-    if (!dateStr) dateStr = extractDateFromLastRow(rows);
-
-    // ถ้ายังหาวันที่ไม่ได้เลย ข้าม Sheet นี้
-    if (!dateStr) continue;
-
-    var result = parseSheet(rows, dateStr, existIds, batch);
-    if (!result.found) continue;
-
-    sheetsDone++;
-    imp  += result.imp;
-    skip += result.skip;
-  }
-
-  if (sheetsDone === 0) {
-    setMsg('s1','❌ ไม่พบข้อมูลหรือหาวันที่ไม่ได้ในไฟล์นี้','err');
-    return;
-  }
-  if (imp > 0) {
+  if(imp>0){
     batch.commit()
-      .then(function(){ setMsg('s1','✅ นำเข้า '+imp+' รายการ จาก '+sheetsDone+' วัน (ซ้ำ '+skip+')','ok'); vMode='latest'; updVBtn(); })
+      .then(function(){ setMsg('s1','✅ นำเข้า '+imp+' รายการ (ซ้ำ '+skip+')','ok'); vMode='latest'; updVBtn(); })
       .catch(function(e){ setMsg('s1','❌ Firestore: '+e.message,'err'); });
   } else {
     setMsg('s1','⚠️ ไม่มีรายการใหม่ (ซ้ำ '+skip+')','warn');
@@ -870,7 +839,7 @@ function draw1() {
     ? '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
     : paged.map(function(r,i){
         var c=(r.kg/KPC).toFixed(3);
-        return '<tr><td>'+r.seq+'</td><td><b>'+(r.plate||'').replace(/\.+$/g,'')+'</b></td><td>'+fmtDate(r.date)+'</td>'
+        return '<tr><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
           +'<td style="color:var(--muted)">'+(r.time||'–')+'</td>'
           +'<td>'+r.customer+'</td><td style="color:var(--muted)">'+r.product+'</td>'
           +'<td class="r">'+r.kg.toLocaleString('th-TH')+'</td>'
@@ -890,7 +859,7 @@ function draw2() {
     ? '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
     : wData.map(function(r){
         var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d), has=d>0;
-        return '<tr class="'+(has?'ded':'')+'"><td>'+r.seq+'</td><td><b>'+(r.plate||'').replace(/\.+$/g,'')+'</b></td><td>'+fmtDate(r.date)+'</td>'
+        return '<tr class="'+(has?'ded':'')+'"><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
           +'<td class="r">'+(g*f).toFixed(3)+' '+u+'</td>'
           +'<td><input type="number" class="ded-in" step="0.001" min="0"'
           +' data-id="'+r._id+'" value="'+(has?d.toFixed(3):'')+'" placeholder="0.000"></td>'
@@ -904,8 +873,8 @@ function kpi() {
   var g=0, d=0;
   wData.forEach(function(r){ g+=r.kg/KPC; d+=dData[r._id]||0; });
   var f=unit==='cubic'?1:1.5, u=unit==='cubic'?'คิว':'ตัน';
-  sk('kT',(g*f).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3}),u); sk('kD',(d*f).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3}),u);
-  sk('kN',((g-d)*f).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3}),u); sk('kC',wData.length,'เที่ยว');
+  sk('kT',(g*f).toFixed(3),u); sk('kD',(d*f).toFixed(3),u);
+  sk('kN',((g-d)*f).toFixed(3),u); sk('kC',wData.length,'เที่ยว');
 }
 function sk(id,v,u){
   var el=document.getElementById(id);
@@ -954,9 +923,8 @@ function draw3() {
   document.getElementById('t3b').innerHTML=rows.map(function(r){
     var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d);
     sg+=g; sd+=d;
-    return '<tr class="'+(d>0?'ded':'')+'"><td>'+fmtDate(r.date)+'</td><td>'+r.seq+'</td>'
-      +'<td><b>'+(r.plate||'').replace(/\.+$/g,'')+'</b></td>'
-             +'<td>'+r.customer+'</td>'
+    return '<tr class="'+(d>0?'ded':'')+'"><td>'+r.date+'</td><td>'+r.seq+'</td>'
+      +'<td><b>'+r.plate+'</b></td><td>'+r.customer+'</td>'
       +'<td class="r">'+g.toFixed(3)+'</td>'
       +'<td class="r">'+(d>0?'−'+d.toFixed(3):'–')+'</td>'
       +'<td class="r gold">'+n.toFixed(3)+'</td>'
@@ -972,7 +940,7 @@ function doExport() {
   var b=wData.map(function(r){
     var g=(r.kg/KPC).toFixed(3), d=(dData[r._id]||0).toFixed(3);
     var n=Math.max(0,r.kg/KPC-(dData[r._id]||0)).toFixed(3);
-    return fmtDate(r.date)+','+r.seq+','+(r.plate||'').replace(/\.+$/g,'')+','+r.customer+','+r.product+','+r.kg+','+g+','+d+','+n;
+    return r.date+','+r.seq+','+r.plate+',"'+r.customer+'","'+r.product+'",'+r.kg+','+g+','+d+','+n;
   }).join('\n');
   var blob=new Blob([bom+h+b],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a');
@@ -995,7 +963,7 @@ function draw4() {
   document.getElementById('t4b').innerHTML=ms.length===0
     ?'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
     :ms.map(function(m){
-        return '<tr><td>'+fmtMonth(m)+'</td><td class="r">'+bm[m].t+'</td>'
+        return '<tr><td>'+m+'</td><td class="r">'+bm[m].t+'</td>'
           +'<td class="r gold">'+bm[m].c.toFixed(3)+'</td>'
           +'<td class="r">'+( bm[m].c*1.5).toFixed(3)+'</td></tr>';
       }).join('');
@@ -1006,7 +974,7 @@ function draw4() {
     bd[r.date]+=Math.max(0,r.kg/KPC-(dData[r._id]||0));
   });
   var days=Object.keys(bd).sort().slice(-7);
-  drawBar('c4', days.map(function(d){return fmtDate(d).slice(0,5);}), days.map(function(d){return bd[d];}));
+  drawBar('c4', days.map(function(d){return d.slice(5);}), days.map(function(d){return bd[d];}));
 
   var bc={};
   wData.forEach(function(r){
@@ -1081,240 +1049,401 @@ function makePager(cid, total, cur, cb) {
   for(var i=1;i<=tp;i++) h+='<button class="pbtn'+(i===cur?' on':'')+'" onclick="('+cb.toString()+')('+i+')">'+i+'</button>';
   el.innerHTML=h;
 }
-
-/* ================================================================
-   INVOICE MODAL
-================================================================ */
-function openInvoiceModal() {
-  var m = document.getElementById('invoiceModal');
-  m.style.display = 'flex';
-  document.addEventListener('keydown', _invEscHandler);
-}
-function closeInvoiceModal() {
-  document.getElementById('invoiceModal').style.display = 'none';
-  document.removeEventListener('keydown', _invEscHandler);
-}
-function _invEscHandler(e) { if (e.key === 'Escape') closeInvoiceModal(); }
-document.addEventListener('click', function(e) {
-  if (e.target.id === 'invoiceModal') closeInvoiceModal();
-});
-
-function submitInvoiceModal() {
-  var priceEl = document.getElementById('invPrice');
-  var price = parseFloat(priceEl.value) || 0;
-  if (price <= 0) {
-    priceEl.style.borderColor = '#e74c3c';
-    priceEl.classList.add('shake-input');
-    setTimeout(function(){ priceEl.classList.remove('shake-input'); }, 500);
-    priceEl.focus(); return;
-  }
-  var sandType  = document.querySelector('input[name="invSandType"]:checked').value;
-  var vatType   = document.querySelector('input[name="invVat"]:checked').value;
-  var balance   = parseFloat(document.getElementById('invBalance').value) || 0;
-  var remark    = document.getElementById('invRemark').value.trim();
-  closeInvoiceModal();
-  printInvoice(sandType, price, vatType, balance, remark);
-}
-
-function printInvoice(sandType, price, vatType, balanceFwd, remark) {
-  var fc  = (document.getElementById('f3c').value||'').toLowerCase().trim();
-  var fp  = (document.getElementById('f3p').value||'').toLowerCase().trim();
-  var fa  =  document.getElementById('f3a').value||'';
-  var fb  =  document.getElementById('f3b').value||'';
-  var rows = wData.filter(function(r){
-    if(fc&&!r.customer.toLowerCase().includes(fc)) return false;
-    if(fp&&!r.plate.toLowerCase().includes(fp))    return false;
-    if(fa&&r.date<fa) return false;
-    if(fb&&r.date>fb) return false;
-    return true;
-  });
-  var productName = sandType==='delivery' ? 'ทราย (รวมค่าจัดส่งถึงหน้างาน)' : 'ทราย (ดิบ)';
-  var unitPrice = price;
-  var dayMap = {};
-  rows.forEach(function(r){
-    var net = Math.max(0, r.kg/KPC - (dData[r._id]||0));
-    if(!dayMap[r.date]) dayMap[r.date] = 0;
-    dayMap[r.date] += net;
-  });
-  var dayList = Object.keys(dayMap).sort();
-  var totalCubic = dayList.reduce(function(s,d){ return s + dayMap[d]; }, 0);
-  var subtotal = totalCubic * unitPrice;
-  var vatAmt, grandTotal, priceNote, vatLabel;
-  if (vatType==='inclusive') {
-    vatAmt=subtotal-subtotal/1.07; grandTotal=subtotal;
-    priceNote='(ราคารวม VAT 7% แล้ว)'; vatLabel='ภาษีมูลค่าเพิ่ม 7% (รวมแล้ว)';
-  } else if (vatType==='exclusive') {
-    vatAmt=subtotal*0.07; grandTotal=subtotal+vatAmt;
-    priceNote='(ยังไม่รวม VAT 7%)'; vatLabel='ภาษีมูลค่าเพิ่ม 7%';
-  } else {
-    vatAmt=0; grandTotal=subtotal;
-    priceNote='(VAT 0%)'; vatLabel='ภาษีมูลค่าเพิ่ม 0%';
-  }
-  var netTotal = grandTotal - (balanceFwd||0);
-  var remarkLines = remark ? remark.split('\n').filter(function(l){ return l.trim(); }) : [];
-  var dateLabel = '';
-  if(fa&&fb) dateLabel=fmtDate(fa)+' ถึง '+fmtDate(fb);
-  else if(fa) dateLabel='ตั้งแต่ '+fmtDate(fa);
-  else if(fb) dateLabel='ถึง '+fmtDate(fb);
-  var custLabel = fc||fp ? (fc||'')+(fp?' / '+fp:'') : 'ลูกค้าทั้งหมด';
-
-  var rowsHtml = dayList.map(function(d,i){
-    var qty=dayMap[d], amt=qty*unitPrice;
-    return '<tr>'
-      +'<td style="text-align:center;padding:7px 10px;border-bottom:1px solid #e8e8f0;">'+(i+1)+'</td>'
-      +'<td style="padding:7px 12px;border-bottom:1px solid #e8e8f0;"><b>'+productName+'</b>'
-      +'<div style="font-size:11px;color:#888;margin-top:2px;">ราคาน้ำมัน 41.00-45.00 บาท/ลิตร ('+fmtDate(d)+')</div></td>'
-      +'<td style="text-align:right;padding:7px 10px;border-bottom:1px solid #e8e8f0;">'+qty.toFixed(3)+'</td>'
-      +'<td style="text-align:center;padding:7px 10px;border-bottom:1px solid #e8e8f0;">คิว</td>'
-      +'<td style="text-align:right;padding:7px 10px;border-bottom:1px solid #e8e8f0;">'+unitPrice.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
-      +'<td style="text-align:right;padding:7px 10px;border-bottom:1px solid #e8e8f0;font-weight:600;">'+amt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
-      +'</tr>';
-  }).join('');
-
-  function bahtText(n) {
-    n=Math.round(n*100)/100;
-    var t1=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
-    var pos=['','สิบ','ร้อย','พัน','หมื่น','แสน','ล้าน'];
-    if(n===0) return 'ศูนย์บาทถ้วน';
-    var s=n.toFixed(2).split('.'), satang=parseInt(s[1]), baht=parseInt(s[0]);
-    function conv(num){
-      if(num===0) return '';
-      if(num>=1000000) return conv(Math.floor(num/1000000))+'ล้าน'+conv(num%1000000);
-      var str='', digits=num.toString().split('').reverse();
-      digits.forEach(function(d,i){
-        var dd=parseInt(d); if(dd===0) return;
-        if(i===1&&dd===1) str=pos[i]+str;
-        else if(i===1&&dd===2) str='ยี่'+pos[i]+str;
-        else str=t1[dd]+pos[i]+str;
-      });
-      return str;
-    }
-    var result=conv(baht)+'บาท';
-    if(satang===0) result+='ถ้วน';
-    else result+=conv(Math.floor(satang/10))+t1[satang%10]+'สตางค์';
-    return result;
-  }
-
-  var today=new Date();
-  var todayTH=today.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
-  var logoB64='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAJ7UlEQVR4AWyWa3BdVRXHf2vfe5M06SNtKA1NSNMEaaktrz4EWmAoVacFUVqkdMBKkUcREBycwY6jH/zCDJWHRWbwAQOo4FQRRqY66iiiA3aUThD6AIp9v9I0bZKb3NzHOWf73ye5tFX3vevsvdfaa/3XWnvtfY6r61joazsW+brpotB3Xq6xKIwlG5P2I7LazoUja8WvS/kLfZCPCTqdV/hTefWBl67Tms5FfmS+SGsuFy3ywVbAdniHecNMPQ58AibCg+ZeMpfKTGyHiTvy95hZusp7cdKHA8uI50iky2gLokQmg65ZeLpRW4Zs24ghrfIiBIiaoUUeySARP5WhFngYUtTzZI/4a';
-
-  var w=window.open('','_blank','width=860,height=1100');
-  w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
-<title>ใบแจ้งหนี้</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Sarabun','Noto Sans Thai',sans-serif;font-size:13.5px;background:#f4f4f8;color:#222;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-.page{background:#fff;max-width:800px;margin:20px auto;padding:36px 40px 32px;box-shadow:0 2px 16px rgba(80,60,160,.1);}
-.inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:14px;border-bottom:2.5px solid #6c63b6;}
-.inv-logo-wrap{display:flex;align-items:center;gap:12px;}
-.inv-logo{width:54px;height:54px;object-fit:contain;}
-.inv-company h1{font-size:21px;font-weight:800;color:#3d3499;line-height:1.2;}
-.inv-company p{font-size:11px;color:#999;margin-top:2px;}
-.inv-title-right{text-align:right;}
-.inv-title-right h2{font-size:19px;font-weight:800;color:#6c63b6;letter-spacing:1px;}
-.inv-title-right .copy{font-size:11px;color:#bbb;margin-top:2px;}
-.inv-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
-.meta-box{background:#f7f6ff;border:1px solid #dddaf5;border-radius:7px;padding:9px 10px;text-align:center;}
-.meta-box .lbl{font-size:10px;font-weight:700;color:#6c63b6;text-transform:uppercase;letter-spacing:.5px;}
-.meta-box .val{font-size:12px;font-weight:700;color:#222;margin-top:2px;}
-table.inv-tbl{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12.5px;}
-table.inv-tbl thead tr{background:#6c63b6;}
-table.inv-tbl thead th{color:#fff;padding:9px 10px;font-weight:700;}
-table.inv-tbl thead th.r{text-align:right;}
-table.inv-tbl thead th.c{text-align:center;}
-table.inv-tbl tbody tr:nth-child(even) td{background:#f7f6ff;}
-.sum-wrap{display:flex;justify-content:flex-end;margin-bottom:14px;}
-.sum-tbl{width:290px;font-size:12.5px;border-collapse:collapse;}
-.sum-tbl td{padding:5px 10px;}
-.sum-tbl td.lb{color:#555;}
-.sum-tbl td.vl{text-align:right;font-weight:600;}
-.sum-tbl tr.sep td{border-top:1px solid #ddd;padding-top:8px;}
-.sum-tbl tr.bal td{color:#e74c3c;font-weight:700;}
-.sum-tbl tr.tot td{background:#6c63b6;color:#fff;font-weight:800;font-size:14px;padding:8px 10px;border-radius:4px;}
-.bahttext{text-align:center;background:#f7f6ff;border:1px solid #dddaf5;border-radius:6px;padding:8px 12px;font-size:12.5px;margin-bottom:14px;}
-.bahttext span{color:#3d3499;font-weight:700;}
-.bank-box{display:flex;align-items:center;gap:14px;border:2px solid #27ae60;border-radius:8px;background:#f0fff4;padding:10px 16px;margin-bottom:14px;}
-.bank-box .bk-lbl{font-size:10px;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:.5px;}
-.bank-box .bk-num{font-size:18px;font-weight:800;color:#27ae60;letter-spacing:1.5px;}
-.bank-box .bk-name{font-size:11px;color:#555;}
-.remark-box{padding:9px 14px;background:#fff8f0;border-left:3px solid #e67e22;border-radius:0 6px 6px 0;font-size:12.5px;margin-bottom:20px;}
-.remark-box .rm-hd{font-weight:800;color:#e67e22;margin-bottom:3px;}
-.sign-row{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:28px;}
-.sign-box{text-align:center;}
-.sign-box .sign-line{border-top:1px solid #bbb;margin:52px 20px 6px;}
-.sign-box .sign-lbl{font-size:11.5px;color:#666;}
-@media print{body{background:#fff;}.page{margin:0;padding:22px 32px;box-shadow:none;}.no-print{display:none!important;}}
-</style></head><body>
-<div class="page">
-  <div class="inv-header">
-    <div class="inv-logo-wrap">
-      <img class="inv-logo" src="${logoB64}" alt="logo">
-      <div class="inv-company"><h1>ท่าทราย ธนเศรษฐ์ศิริ</h1><p>จำหน่ายทรายก่อสร้าง</p></div>
-    </div>
-    <div class="inv-title-right">
-      <h2>ใบแจ้งหนี้ / INVOICE</h2>
-      <div class="copy">ต้นฉบับ</div>
-    </div>
-  </div>
-
-  <div class="inv-meta">
-    <div class="meta-box"><div class="lbl">วันที่ออก</div><div class="val">${todayTH}</div></div>
-    <div class="meta-box"><div class="lbl">ลูกค้า</div><div class="val" style="font-size:11px;">${custLabel}</div></div>
-    <div class="meta-box"><div class="lbl">ช่วงวันที่</div><div class="val" style="font-size:11px;">${dateLabel||'ทั้งหมด'}</div></div>
-    <div class="meta-box"><div class="lbl">ราคาสินค้า</div><div class="val" style="font-size:11px;">${priceNote}</div></div>
-  </div>
-
-  <table class="inv-tbl">
-    <thead><tr>
-      <th class="c" style="width:38px;">#</th>
-      <th>ชื่อสินค้า / รายละเอียด</th>
-      <th class="r" style="width:90px;">จำนวน</th>
-      <th class="c" style="width:50px;">หน่วย</th>
-      <th class="r" style="width:105px;">ราคาต่อหน่วย</th>
-      <th class="r" style="width:110px;">ยอดรวม</th>
-    </tr></thead>
-    <tbody>${rowsHtml}</tbody>
-  </table>
-
-  <div class="sum-wrap"><table class="sum-tbl">
-    <tr><td class="lb">รวมเป็นเงิน</td><td class="vl">${subtotal.toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
-    <tr><td class="lb">${vatLabel}</td><td class="vl">${vatAmt.toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
-    <tr class="sep"><td class="lb">ราคาไม่รวมภาษีมูลค่าเพิ่ม</td><td class="vl">${(vatType==='inclusive'?subtotal/1.07:subtotal).toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
-    ${balanceFwd>0?'<tr class="bal"><td class="lb">หักวงเงินคงเหลือ</td><td class="vl">-'+balanceFwd.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</td></tr>':''}
-    <tr class="tot"><td>จำนวนเงินรวมทั้งสิ้น</td><td class="vl">${netTotal.toLocaleString('th-TH',{minimumFractionDigits:2})} บาท</td></tr>
-  </table></div>
-
-  <div class="bahttext">(<span>${bahtText(netTotal)}</span>)</div>
-
-  <div class="bank-box">
-    <div style="font-size:28px;">🏦</div>
-    <div>
-      <div class="bk-lbl">ชำระเงินผ่านบัญชีธนาคาร</div>
-      <div class="bk-num">376-2-44778-8</div>
-      <div class="bk-name">ธนาคารกสิกรไทย &nbsp;|&nbsp; ท่าทรายธนเศรษฐ์ศิริ (น้าโสม)</div>
-    </div>
-  </div>
-
-  ${remarkLines.length>0?'<div class="remark-box"><div class="rm-hd">หมายเหตุ:</div>'+remarkLines.map(function(l,i){return '<div>'+(i+1)+'. '+l+'</div>';}).join('')+'</div>':''}
-
-  <div class="sign-row">
-    <div class="sign-box"><div class="sign-line"></div><div class="sign-lbl">ผู้รับสินค้า &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; วันที่ ........................</div></div>
-    <div class="sign-box"><div class="sign-line"></div><div class="sign-lbl">ผู้ส่งสินค้า &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; วันที่ ........................</div></div>
-  </div>
-
-  <div class="no-print" style="text-align:center;margin-top:24px;">
-    <button onclick="window.print()" style="background:#6c63b6;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:14px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:700;">🖨️ พิมพ์ใบแจ้งหนี้</button>
-  </div>
-</div></body></html>`);
-  w.document.close();
-}
-
-
 function setMsg(id, msg, type) {
   var el=document.getElementById(id);
   if(el){ el.textContent=msg; el.className='smsg '+type; }
+}
+
+/* ================================================================
+   TAB 5 — ค่าเที่ยวรถร่วม
+================================================================ */
+
+/* ── State ── */
+var vehData    = {};
+var frInvData  = [];
+var frInvMeta  = {};
+var frPayInv   = null;
+var fuzzyPending = null;
+var unVeh = null;
+
+/* ── Constants ── */
+var FR_RATES = {
+  'ไทยเจริญ': { rateFromCustomer:45, rateForTruck:30, withholdingTax:0.01, vatRate:0 },
+  'ธีรนพ':    { rateFromCustomer:0,  rateForTruck:30, withholdingTax:0,    vatRate:0.07, sellingPriceWithVat:145 }
+};
+var FUZZY_THRESHOLD = 0.75;
+
+/* ── Panel switching ── */
+function frSetType(type) {
+  document.getElementById('fr-invoice-panel').style.display  = type==='invoice'  ? '' : 'none';
+  document.getElementById('fr-payment-panel').style.display  = type==='payment'  ? '' : 'none';
+  document.getElementById('fr-vehicles-panel').style.display = type==='vehicles' ? '' : 'none';
+  [['fr-type-inv','invoice'],['fr-type-pay','payment'],['fr-type-veh','vehicles']].forEach(function(pair){
+    var btn=document.getElementById(pair[0]);
+    if(btn) btn.className='btn '+(type===pair[1]?'btn-gold':'btn-ghost');
+  });
+  if(type==='payment')  frLoadInvoiceList();
+  if(type==='vehicles') { listenVeh(); drawVeh(); }
+}
+
+/* ── Fuzzy Match ── */
+function editDistance(a,b){
+  var m=a.length,n=b.length,dp=[];
+  for(var i=0;i<=m;i++){dp[i]=[i];}
+  for(var j=0;j<=n;j++){dp[0][j]=j;}
+  for(var i=1;i<=m;i++) for(var j=1;j<=n;j++)
+    dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return dp[m][n];
+}
+function similarity(a,b){
+  a=a.toLowerCase().trim(); b=b.toLowerCase().trim();
+  if(a===b) return 1.0;
+  var longer=a.length>b.length?a:b, shorter=a.length>b.length?b:a, len=longer.length;
+  if(len===0) return 1.0;
+  return (len-editDistance(longer,shorter))/len;
+}
+function findFuzzyMatch(name){
+  var canonicals=[];
+  Object.values(vehData).forEach(function(v){ if(canonicals.indexOf(v.canonical)<0) canonicals.push(v.canonical); });
+  var best=null, bestScore=0;
+  canonicals.forEach(function(c){
+    var s=similarity(name,c);
+    if(s>bestScore&&s>=FUZZY_THRESHOLD&&name.toLowerCase().trim()!==c.toLowerCase().trim()){bestScore=s;best=c;}
+  });
+  return best?{canonical:best,score:bestScore}:null;
+}
+
+/* ── Vehicles ── */
+function listenVeh(){
+  if(unVeh) return;
+  unVeh=db.collection('vehicles').onSnapshot(function(snap){
+    vehData={};
+    snap.docs.forEach(function(d){ vehData[d.id]=d.data(); });
+    drawVeh();
+  });
+}
+function drawVeh(){
+  var plates=Object.keys(vehData).sort();
+  var tb=document.getElementById('veh-tbody'); if(!tb) return;
+  if(!plates.length){ tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มีทะเบียน — เพิ่มด้านบน</td></tr>'; return; }
+  tb.innerHTML=plates.map(function(p){
+    var v=vehData[p], diff=v.ownerName!==v.canonical;
+    return '<tr><td><b>'+p+'</b></td><td>'+v.ownerName+'</td>'
+      +'<td><input type="text" value="'+v.canonical+'" data-plate="'+p+'"'
+      +' style="padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;font-family:var(--font);width:140px">'
+      +(diff?' <span class="badge-warn">แก้สะกด</span>':'')+'</td>'
+      +'<td>'
+      +'<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="vehSaveCanonical(\''+p+'\')">💾</button> '
+      +'<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--err)" onclick="vehDelete(\''+p+'\')">🗑️</button>'
+      +'</td></tr>';
+  }).join('');
+}
+function vehAdd(){
+  var plate=(document.getElementById('veh-plate-in').value||'').trim().toUpperCase();
+  var owner=(document.getElementById('veh-owner-in').value||'').trim();
+  if(!plate||!owner){ setMsg('veh-add-msg','❌ กรอกทะเบียนและชื่อเจ้าของ','err'); return; }
+  if(vehData[plate]){ setMsg('veh-add-msg','⚠️ ทะเบียน '+plate+' มีอยู่แล้ว','warn'); return; }
+  var match=findFuzzyMatch(owner);
+  if(match){
+    fuzzyPending={plate:plate,ownerName:owner,matchCanonical:match.canonical,score:Math.round(match.score*100)};
+    document.getElementById('fuzzy-msg').innerHTML=
+      '"<b>'+owner+'</b>" น่าจะเป็นคนเดียวกับ "<b>'+match.canonical+'</b>" ('+fuzzyPending.score+'%)<br>'
+      +'ถ้าใช่ จะใช้ชื่อ canonical เดิม: <b>'+match.canonical+'</b>';
+    document.getElementById('fuzzy-dialog').style.display='flex';
+  } else { vehSave(plate,owner,owner); }
+}
+function fuzzyConfirm(isSame){
+  document.getElementById('fuzzy-dialog').style.display='none';
+  if(!fuzzyPending) return;
+  vehSave(fuzzyPending.plate, fuzzyPending.ownerName, isSame?fuzzyPending.matchCanonical:fuzzyPending.ownerName);
+  fuzzyPending=null;
+}
+function vehSave(plate,ownerName,canonical){
+  db.collection('vehicles').doc(plate).set({ownerName:ownerName,canonical:canonical,active:true})
+    .then(function(){ setMsg('veh-add-msg','✅ เพิ่ม '+plate+' → '+canonical,'ok');
+      document.getElementById('veh-plate-in').value=''; document.getElementById('veh-owner-in').value=''; })
+    .catch(function(e){ setMsg('veh-add-msg','❌ '+e.message,'err'); });
+}
+function vehSaveCanonical(plate){
+  var inp=document.querySelector('[data-plate="'+plate+'"]'); if(!inp) return;
+  var nc=inp.value.trim(); if(!nc) return;
+  db.collection('vehicles').doc(plate).update({canonical:nc})
+    .then(function(){ setMsg('veh-add-msg','✅ อัปเดต '+plate+' → '+nc,'ok'); })
+    .catch(function(e){ setMsg('veh-add-msg','❌ '+e.message,'err'); });
+}
+function vehDelete(plate){
+  if(!confirm('ลบทะเบียน '+plate+'?')) return;
+  db.collection('vehicles').doc(plate).delete()
+    .then(function(){ setMsg('veh-add-msg','🗑️ ลบ '+plate+' แล้ว','warn'); })
+    .catch(function(e){ setMsg('veh-add-msg','❌ '+e.message,'err'); });
+}
+
+/* ── Invoice ── */
+function frFetchInvoice(){
+  var custKey=document.getElementById('fr-inv-cust').value;
+  var from=document.getElementById('fr-inv-from').value;
+  var to=document.getElementById('fr-inv-to').value;
+  if(!from||!to){ setMsg('fr-inv-msg','❌ เลือกช่วงวันที่ก่อน','err'); return; }
+  if(from>to){ setMsg('fr-inv-msg','❌ วันเริ่มต้องน้อยกว่าวันสิ้นสุด','err'); return; }
+  setMsg('fr-inv-msg','⏳ กำลังดึงข้อมูล…','info');
+
+  var rows=wData.filter(function(w){
+    return w.customer&&w.customer.includes(custKey)&&w.date>=from&&w.date<=to;
+  });
+  if(!rows.length){ setMsg('fr-inv-msg','⚠️ ไม่มีข้อมูลในช่วงวันที่นี้','warn');
+    document.getElementById('fr-inv-result').style.display='none'; return; }
+
+  var plateMap={};
+  rows.forEach(function(w){
+    var net=(w.kg/KPC)-(dData[w._id]||0);
+    if(net<=0) return;
+    var canonical=(vehData[w.plate]&&vehData[w.plate].canonical)||('❓ '+w.plate);
+    if(!plateMap[w.plate]) plateMap[w.plate]={canonical:canonical,netKiu:0};
+    plateMap[w.plate].netKiu+=net;
+  });
+
+  frInvData=Object.keys(plateMap).map(function(p){
+    return {plate:p,canonical:plateMap[p].canonical,netKiu:plateMap[p].netKiu};
+  }).filter(function(t){return t.netKiu>0.0001;})
+    .sort(function(a,b){return a.canonical.localeCompare(b.canonical,'th')||a.plate.localeCompare(b.plate);});
+  frInvMeta={customer:custKey,dateFrom:from,dateTo:to,rates:FR_RATES[custKey]};
+
+  renderInvoiceResult(frInvData,custKey,from,to);
+  setMsg('fr-inv-msg','✅ พบ '+frInvData.length+' ทะเบียน จาก '+rows.length+' เที่ยว','ok');
+}
+
+function renderInvoiceResult(trips,custKey,from,to){
+  var rates=FR_RATES[custKey];
+  var totalNetKiu=trips.reduce(function(s,t){return s+t.netKiu;},0);
+  var canonicals=[];
+  trips.forEach(function(t){if(canonicals.indexOf(t.canonical)<0) canonicals.push(t.canonical);});
+
+  var tbody='';
+  canonicals.forEach(function(c){
+    var grp=trips.filter(function(t){return t.canonical===c;});
+    var gKiu=grp.reduce(function(s,t){return s+t.netKiu;},0);
+    tbody+='<tr class="fr-group-hdr"><td colspan="2">👤 '+c
+      +' <span class="badge-canonical">'+gKiu.toFixed(3)+' คิว</span></td>'
+      +'<td class="r" style="color:var(--gold);font-weight:700">'+gKiu.toFixed(3)+'</td>'
+      +'<td class="r" style="color:var(--gold);font-weight:700">'+Math.round(gKiu*rates.rateForTruck).toLocaleString()+'</td></tr>';
+    grp.forEach(function(t){
+      tbody+='<tr><td style="padding-left:20px;color:var(--muted)">└ '+t.plate+'</td><td></td>'
+        +'<td class="r">'+t.netKiu.toFixed(3)+'</td>'
+        +'<td class="r">'+Math.round(t.netKiu*rates.rateForTruck).toLocaleString()+'</td></tr>';
+    });
+  });
+  var grossLabel=custKey==='ไทยเจริญ'
+    ?Math.round(totalNetKiu*rates.rateFromCustomer).toLocaleString()
+    :Math.round(totalNetKiu*(rates.sellingPriceWithVat||0)).toLocaleString();
+  tbody+='<tr style="border-top:2px solid var(--gold)"><td colspan="2" style="font-weight:700">รวมทั้งหมด</td>'
+    +'<td class="r gold">'+totalNetKiu.toFixed(3)+'</td><td class="r gold">'+grossLabel+'</td></tr>';
+  document.getElementById('fr-inv-tbody').innerHTML=tbody;
+
+  var sumHtml='';
+  if(custKey==='ไทยเจริญ'){
+    var gross=totalNetKiu*rates.rateFromCustomer, w=gross*rates.withholdingTax, net=gross-w;
+    sumHtml='📦 รวม: <b>'+totalNetKiu.toFixed(3)+' คิว</b><br>'
+      +'💰 ยอดก่อนหัก: <b>'+gross.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b> บาท<br>'
+      +'✂️ หัก ณ ที่จ่าย 1%: <b>−'+w.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b> บาท<br>'
+      +'<span style="color:var(--gold);font-size:15px;font-weight:800">✅ ยอดสุทธิ: '+net.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</span><br>'
+      +'<span style="color:var(--muted);font-size:11px">💸 ท่าจ่ายรถร่วม: '+Math.round(totalNetKiu*rates.rateForTruck).toLocaleString()
+      +' บาท | กำไรท่า: '+Math.round(net-totalNetKiu*rates.rateForTruck).toLocaleString()+' บาท</span>';
+  } else {
+    var p=rates.sellingPriceWithVat, bv=p/1.07, vat=p-bv;
+    sumHtml='📦 รวม: <b>'+totalNetKiu.toFixed(3)+' คิว</b><br>'
+      +'💰 ราคาขายรวม VAT: <b>'+Math.round(totalNetKiu*p).toLocaleString()+'</b> บาท<br>'
+      +'🧾 VAT 7%: <b>'+Math.round(totalNetKiu*vat).toLocaleString()+'</b> บาท<br>'
+      +'<span style="color:var(--gold);font-size:15px;font-weight:800">✅ ยอดก่อน VAT: '+Math.round(totalNetKiu*bv).toLocaleString()+' บาท</span><br>'
+      +'<span style="color:var(--muted);font-size:11px">💸 ท่าจ่ายรถร่วม: '+Math.round(totalNetKiu*rates.rateForTruck).toLocaleString()+' บาท</span>';
+  }
+  document.getElementById('fr-inv-summary').innerHTML=sumHtml;
+  document.getElementById('fr-inv-period').textContent=from+' ถึง '+to;
+  document.getElementById('fr-inv-result').style.display='';
+}
+
+function nextDocNo(){
+  var today=new Date().toISOString().slice(0,10).replace(/-/g,''), prefix=today+'-';
+  return Promise.all([
+    db.collection('freight_invoices').where('docNo','>=',prefix+'000').where('docNo','<=',prefix+'999').orderBy('docNo','desc').limit(1).get(),
+    db.collection('freight_payments').where('docNo','>=',prefix+'000').where('docNo','<=',prefix+'999').orderBy('docNo','desc').limit(1).get()
+  ]).then(function(res){
+    var nums=[];
+    res.forEach(function(s){if(!s.empty) nums.push(parseInt(s.docs[0].data().docNo.slice(-3)));});
+    var next=nums.length>0?Math.max.apply(null,nums)+1:1;
+    return prefix+String(next).padStart(3,'0');
+  });
+}
+
+function frSaveInvoice(){
+  if(!frInvData.length){ alert('ดึงข้อมูลก่อน'); return; }
+  var rates=frInvMeta.rates;
+  var totalNetKiu=frInvData.reduce(function(s,t){return s+t.netKiu;},0);
+  nextDocNo().then(function(docNo){
+    var gross=totalNetKiu*(rates.rateFromCustomer||rates.sellingPriceWithVat||0);
+    var withheld=gross*(rates.withholdingTax||0);
+    var data={docNo:docNo,type:'customer',customer:frInvMeta.customer,
+      dateFrom:frInvMeta.dateFrom,dateTo:frInvMeta.dateTo,
+      rateFromCustomer:rates.rateFromCustomer||0,rateForTruck:rates.rateForTruck,
+      withholdingTax:rates.withholdingTax||0,vatRate:rates.vatRate||0,
+      sellingPriceWithVat:rates.sellingPriceWithVat||0,
+      totalNetKiu:parseFloat(totalNetKiu.toFixed(3)),
+      grossAmount:parseFloat(gross.toFixed(2)),
+      withheld:parseFloat(withheld.toFixed(2)),
+      netAmount:parseFloat((gross-withheld).toFixed(2)),
+      createdAt:new Date().toISOString(),createdBy:curEmail,status:'confirmed',
+      trips:frInvData.map(function(t){return {plate:t.plate,canonical:t.canonical,
+        netKiu:parseFloat(t.netKiu.toFixed(3)),amount:parseFloat((t.netKiu*rates.rateForTruck).toFixed(2))};})
+    };
+    return db.collection('freight_invoices').doc(docNo).set(data).then(function(){return docNo;});
+  }).then(function(docNo){
+    setMsg('fr-inv-msg','✅ บันทึกสำเร็จ เลขที่ '+docNo,'ok');
+    frPayInv=docNo;
+    setTimeout(function(){frSetType('payment');},800);
+  }).catch(function(e){setMsg('fr-inv-msg','❌ '+e.message,'err');});
+}
+
+function frPrintInvoice(){
+  if(!frInvData.length){alert('ดึงข้อมูลก่อน');return;}
+  var rates=frInvMeta.rates, custKey=frInvMeta.customer;
+  var totalNetKiu=frInvData.reduce(function(s,t){return s+t.netKiu;},0);
+  var rows=frInvData.map(function(t){
+    var amt=custKey==='ไทยเจริญ'?(t.netKiu*rates.rateFromCustomer):(t.netKiu*(rates.sellingPriceWithVat||0));
+    return '<tr><td>'+t.canonical+'</td><td>'+t.plate+'</td>'
+      +'<td style="text-align:right">'+t.netKiu.toFixed(3)+'</td>'
+      +'<td style="text-align:right">'+amt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+  }).join('');
+  var sumRow='';
+  if(custKey==='ไทยเจริญ'){
+    var gross=totalNetKiu*rates.rateFromCustomer, w=gross*rates.withholdingTax;
+    sumRow='<tr><td colspan="2"><b>รวม</b></td><td style="text-align:right"><b>'+totalNetKiu.toFixed(3)+'</b></td><td style="text-align:right"><b>'+gross.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
+      +'<tr><td colspan="3" style="text-align:right">หัก ณ ที่จ่าย 1%</td><td style="text-align:right;color:red">−'+w.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>'
+      +'<tr><td colspan="3" style="text-align:right"><b>ยอดสุทธิ</b></td><td style="text-align:right;color:#c47800;font-size:15px"><b>'+(gross-w).toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>';
+  } else {
+    var p=rates.sellingPriceWithVat, bv=p/1.07, total=totalNetKiu*p;
+    sumRow='<tr><td colspan="2"><b>รวม</b></td><td style="text-align:right"><b>'+totalNetKiu.toFixed(3)+'</b></td><td style="text-align:right"><b>'+total.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
+      +'<tr><td colspan="3" style="text-align:right">VAT 7%</td><td style="text-align:right">'+Math.round(totalNetKiu*(p-bv)).toLocaleString()+'</td></tr>'
+      +'<tr><td colspan="3" style="text-align:right"><b>ยอดก่อน VAT</b></td><td style="text-align:right;color:#c47800;font-size:15px"><b>'+Math.round(totalNetKiu*bv).toLocaleString()+'</b></td></tr>';
+  }
+  var html='<html><head><meta charset="UTF-8"><title>ใบแจ้งหนี้ค่าขนส่ง</title>'
+    +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
+    +'h2{color:#7a4f00}table{width:100%;border-collapse:collapse;margin-top:12px}'
+    +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc}'
+    +'td{padding:6px 10px;border:1px solid #ddd}@media print{button{display:none}}</style>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">'
+    +'</head><body><h2>ใบแจ้งหนี้ค่าขนส่ง — หจก.ธนเศรษฐ์ศิริ</h2>'
+    +'<p>ลูกค้า: <b>'+custKey+'</b> | ช่วง: <b>'+frInvMeta.dateFrom+' ถึง '+frInvMeta.dateTo+'</b></p>'
+    +'<table><thead><tr><th>เจ้าของรถ</th><th>ทะเบียน</th><th style="text-align:right">คิวสุทธิ</th><th style="text-align:right">จำนวนเงิน</th></tr></thead>'
+    +'<tbody>'+rows+sumRow+'</tbody></table>'
+    +'<p style="margin-top:16px;color:#888;font-size:11px">พิมพ์: '+new Date().toLocaleString('th-TH')+'</p>'
+    +'<button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#c47800;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ พิมพ์</button>'
+    +'</body></html>';
+  var w=window.open('','_blank'); w.document.write(html); w.document.close();
+}
+
+/* ── Payment ── */
+function frLoadInvoiceList(){
+  db.collection('freight_invoices').orderBy('createdAt','desc').limit(50).get().then(function(snap){
+    var sel=document.getElementById('fr-pay-ref');
+    if(!sel) return;
+    sel.innerHTML='<option value="">— เลือกใบแจ้งหนี้ —</option>';
+    snap.docs.forEach(function(d){
+      var v=d.data();
+      sel.innerHTML+='<option value="'+v.docNo+'">'+v.docNo+' | '+v.customer+' | '+v.dateFrom+' ถึง '+v.dateTo+'</option>';
+    });
+    if(frPayInv){sel.value=frPayInv; frLoadPayment();}
+  });
+}
+
+function frLoadPayment(){
+  var docNo=document.getElementById('fr-pay-ref').value;
+  if(!docNo){setMsg('fr-pay-msg','❌ เลือกใบแจ้งหนี้ก่อน','err');return;}
+  setMsg('fr-pay-msg','⏳ กำลังโหลด…','info');
+  db.collection('freight_invoices').doc(docNo).get().then(function(doc){
+    if(!doc.exists){setMsg('fr-pay-msg','❌ ไม่พบเอกสาร','err');return;}
+    var inv=doc.data(), trips=inv.trips||[];
+    var ownerMap={};
+    trips.forEach(function(t){if(!ownerMap[t.canonical]) ownerMap[t.canonical]=[]; ownerMap[t.canonical].push(t);});
+    var owners=Object.keys(ownerMap).sort();
+    var html=owners.map(function(own){
+      var list=ownerMap[own];
+      var total=list.reduce(function(s,t){return s+t.netKiu;},0);
+      var totalAmt=total*inv.rateForTruck;
+      var rows=list.map(function(t){
+        return '<tr><td style="padding-left:20px;color:var(--muted)">└ '+t.plate+'</td>'
+          +'<td class="r">'+t.netKiu.toFixed(3)+'</td>'
+          +'<td class="r">'+(t.netKiu*inv.rateForTruck).toFixed(2)+'</td></tr>';
+      }).join('');
+      var safeOwn=own.replace(/'/g,"\\'");
+      return '<div class="fr-owner-card"><div class="fr-owner-hdr">'
+        +'<span class="fr-owner-name">👤 '+own+'</span>'
+        +'<span class="fr-owner-total"> รวม '+total.toFixed(3)+' คิว | <b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</b></span>'
+        +'<button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px;font-size:11px"'
+        +' onclick="frSavePayment(\''+docNo+'\',\''+safeOwn+'\','+inv.rateForTruck+')">💾 บันทึก</button>'
+        +' <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px"'
+        +' onclick="frPrintPayment(\''+docNo+'\',\''+safeOwn+'\')">🖨️ พิมพ์</button>'
+        +'</div><div class="table-wrap"><table>'
+        +'<thead><tr><th>ทะเบียน</th><th class="r">คิวสุทธิ</th><th class="r">เงิน (×'+inv.rateForTruck+')</th></tr></thead>'
+        +'<tbody>'+rows
+        +'<tr style="border-top:1px solid var(--border)"><td><b>รวม</b></td>'
+        +'<td class="r gold"><b>'+total.toFixed(3)+'</b></td>'
+        +'<td class="r gold"><b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
+        +'</tbody></table></div></div>';
+    }).join('');
+    document.getElementById('fr-pay-owners').innerHTML=html;
+    document.getElementById('fr-pay-owners').style.display='';
+    setMsg('fr-pay-msg','✅ โหลด '+owners.length+' เจ้าของรถ','ok');
+  }).catch(function(e){setMsg('fr-pay-msg','❌ '+e.message,'err');});
+}
+
+function frSavePayment(refInvoice,canonical,rate){
+  db.collection('freight_invoices').doc(refInvoice).get().then(function(doc){
+    var inv=doc.data();
+    var trips=(inv.trips||[]).filter(function(t){return t.canonical===canonical;});
+    var totalNetKiu=trips.reduce(function(s,t){return s+t.netKiu;},0);
+    return nextDocNo().then(function(docNo){
+      var data={docNo:docNo,type:'truck',refInvoice:refInvoice,customer:inv.customer,
+        canonical:canonical,dateFrom:inv.dateFrom,dateTo:inv.dateTo,rateForTruck:rate,
+        totalNetKiu:parseFloat(totalNetKiu.toFixed(3)),
+        totalAmount:parseFloat((totalNetKiu*rate).toFixed(2)),
+        createdAt:new Date().toISOString(),createdBy:curEmail,trips:trips};
+      return db.collection('freight_payments').doc(docNo).set(data).then(function(){return docNo;});
+    });
+  }).then(function(docNo){setMsg('fr-pay-msg','✅ บันทึก '+canonical+' เลขที่ '+docNo,'ok');})
+    .catch(function(e){setMsg('fr-pay-msg','❌ '+e.message,'err');});
+}
+
+function frPrintPayment(refInvoice,canonical){
+  db.collection('freight_invoices').doc(refInvoice).get().then(function(doc){
+    var inv=doc.data();
+    var trips=(inv.trips||[]).filter(function(t){return t.canonical===canonical;});
+    var totalNetKiu=trips.reduce(function(s,t){return s+t.netKiu;},0);
+    var totalAmt=totalNetKiu*inv.rateForTruck;
+    var rows=trips.map(function(t){
+      return '<tr><td>'+t.plate+'</td>'
+        +'<td style="text-align:right">'+t.netKiu.toFixed(3)+'</td>'
+        +'<td style="text-align:right">'+(t.netKiu*inv.rateForTruck).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+    }).join('')
+    +'<tr style="font-weight:700;font-size:14px"><td>รวม</td>'
+    +'<td style="text-align:right">'+totalNetKiu.toFixed(3)+'</td>'
+    +'<td style="text-align:right;color:#c47800">'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+    var html='<html><head><meta charset="UTF-8"><title>ใบจ่ายค่าเที่ยว</title>'
+      +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
+      +'h2{color:#7a4f00}table{width:100%;border-collapse:collapse;margin-top:12px}'
+      +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc}'
+      +'td{padding:6px 10px;border:1px solid #ddd}@media print{button{display:none}}</style>'
+      +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">'
+      +'</head><body><h2>ใบจ่ายค่าเที่ยวรถร่วม — หจก.ธนเศรษฐ์ศิริ</h2>'
+      +'<p>เจ้าของรถ: <b>'+canonical+'</b></p>'
+      +'<p>ลูกค้า: <b>'+inv.customer+'</b> | ช่วง: <b>'+inv.dateFrom+' ถึง '+inv.dateTo+'</b>'
+      +' | อ้างอิง: <b>'+refInvoice+'</b></p>'
+      +'<p>ราคา: <b>'+inv.rateForTruck+' บาท/คิว</b></p>'
+      +'<table><thead><tr><th>ทะเบียน</th><th style="text-align:right">คิวสุทธิ</th><th style="text-align:right">จำนวนเงิน</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table>'
+      +'<p style="margin-top:16px;color:#888;font-size:11px">พิมพ์: '+new Date().toLocaleString('th-TH')+'</p>'
+      +'<button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#c47800;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ พิมพ์</button>'
+      +'</body></html>';
+    var w=window.open('','_blank'); w.document.write(html); w.document.close();
+  });
 }
 </script>
 
