@@ -467,16 +467,39 @@ select{color-scheme:dark;}
       <div id="fr-invoice-panel">
         <div class="card">
           <div class="card-title">📄 สร้างใบแจ้งหนี้ลูกค้า</div>
-          <div class="frow">
+          <div class="frow" style="flex-wrap:wrap;gap:10px">
             <label>ลูกค้า
-              <select id="fr-inv-cust" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);">
-                <option value="ไทยเจริญ">ไทยเจริญ (45 บ./คิว, หัก ณ ที่จ่าย 1%)</option>
-                <option value="ธีรนพ">ธีรนพ (145 บ./คิว รวม VAT 7%)</option>
+              <select id="fr-inv-cust" onchange="frOnCustChange()"
+                style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);min-width:160px">
+                <option value="">— เลือกลูกค้า —</option>
+              </select>
+            </label>
+            <label>ประเภท
+              <select id="fr-inv-type" onchange="frOnTypeChange()"
+                style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);min-width:200px">
+                <option value="">— เลือกประเภท —</option>
+                <option value="freight_only">เฉพาะค่าเที่ยว</option>
+                <option value="sand_and_freight">ค่าทราย + ค่าเที่ยว (รวม VAT 7%)</option>
+              </select>
+            </label>
+            <label id="fr-rate-label" style="display:none">ราคา (บาท/คิว)
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="number" id="fr-inv-rate" placeholder="กรอกราคา"
+                  step="0.01" min="0"
+                  style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:140px">
+                <span id="fr-rate-hint" style="font-size:10px;color:var(--muted)"></span>
+              </div>
+            </label>
+            <label id="fr-wht-label" style="display:none">หัก ณ ที่จ่าย
+              <select id="fr-inv-wht"
+                style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font)">
+                <option value="0">ไม่หัก</option>
+                <option value="0.01">1% (ตามกฎหมาย)</option>
               </select>
             </label>
             <label>ตั้งแต่ <input type="date" id="fr-inv-from"></label>
             <label>ถึง     <input type="date" id="fr-inv-to"></label>
-            <button class="btn btn-gold" onclick="frFetchInvoice()">🔍 ดึงข้อมูล</button>
+            <button class="btn btn-gold" onclick="frFetchInvoice()" style="align-self:flex-end">🔍 ดึงข้อมูล</button>
           </div>
           <div id="fr-inv-msg" class="smsg" style="margin-top:10px"></div>
         </div>
@@ -1082,8 +1105,77 @@ function frSetType(type) {
     var btn=document.getElementById(pair[0]);
     if(btn) btn.className='btn '+(type===pair[1]?'btn-gold':'btn-ghost');
   });
+  if(type==='invoice')  frBuildCustDropdown();
   if(type==='payment')  frLoadInvoiceList();
   if(type==='vehicles') { listenVeh(); drawVeh(); }
+}
+
+/* ── สร้าง dropdown ลูกค้าจาก weighings ── */
+function frBuildCustDropdown() {
+  var sel = document.getElementById('fr-inv-cust');
+  if(!sel) return;
+  // ดึงชื่อลูกค้า unique จาก wData ที่โหลดอยู่แล้ว
+  var customers = [];
+  wData.forEach(function(w) {
+    if(w.customer && customers.indexOf(w.customer) < 0)
+      customers.push(w.customer);
+  });
+  customers.sort(function(a,b){ return a.localeCompare(b,'th'); });
+  var prev = sel.value;
+  sel.innerHTML = '<option value="">— เลือกลูกค้า —</option>';
+  customers.forEach(function(c) {
+    sel.innerHTML += '<option value="'+c+'"'+(c===prev?' selected':'')+'>'+c+'</option>';
+  });
+}
+
+/* ── เมื่อเลือกลูกค้า → โหลดราคาล่าสุด ── */
+function frOnCustChange() {
+  var cust = document.getElementById('fr-inv-cust').value;
+  var type = document.getElementById('fr-inv-type').value;
+  if(cust && type) frLoadLastRate(cust, type);
+}
+
+/* ── เมื่อเลือกประเภท → แสดง/ซ่อน field ── */
+function frOnTypeChange() {
+  var type = document.getElementById('fr-inv-type').value;
+  var cust = document.getElementById('fr-inv-cust').value;
+  var rateLabel = document.getElementById('fr-rate-label');
+  var whtLabel  = document.getElementById('fr-wht-label');
+  if(type) {
+    rateLabel.style.display = '';
+    whtLabel.style.display  = type === 'freight_only' ? '' : 'none';
+  } else {
+    rateLabel.style.display = 'none';
+    whtLabel.style.display  = 'none';
+  }
+  if(cust && type) frLoadLastRate(cust, type);
+}
+
+/* ── โหลดราคาล่าสุดจาก freight_invoices ── */
+function frLoadLastRate(cust, type) {
+  var hint = document.getElementById('fr-rate-hint');
+  var rateInput = document.getElementById('fr-inv-rate');
+  if(hint) hint.textContent = '⏳';
+  db.collection('freight_invoices')
+    .where('customer','==',cust)
+    .where('invType','==',type)
+    .orderBy('createdAt','desc').limit(1).get()
+    .then(function(snap) {
+      if(!snap.empty) {
+        var last = snap.docs[0].data();
+        var lastRate = last.rateFromCustomer || last.sellingPriceWithVat || 0;
+        if(lastRate > 0) {
+          rateInput.value = lastRate;
+          if(hint) hint.textContent = '(ราคาล่าสุด: '+lastRate+' บ.)';
+        } else {
+          rateInput.value = '';
+          if(hint) hint.textContent = '';
+        }
+      } else {
+        rateInput.value = '';
+        if(hint) hint.textContent = '(ยังไม่มีประวัติ)';
+      }
+    }).catch(function(){ if(hint) hint.textContent = ''; });
 }
 
 /* ── Fuzzy Match ── */
@@ -1180,15 +1272,23 @@ function vehDelete(plate){
 
 /* ── Invoice ── */
 function frFetchInvoice(){
-  var custKey=document.getElementById('fr-inv-cust').value;
-  var from=document.getElementById('fr-inv-from').value;
-  var to=document.getElementById('fr-inv-to').value;
+  var custKey = document.getElementById('fr-inv-cust').value;
+  var invType = document.getElementById('fr-inv-type').value;
+  var rate    = parseFloat(document.getElementById('fr-inv-rate').value)||0;
+  var wht     = parseFloat(document.getElementById('fr-inv-wht')?document.getElementById('fr-inv-wht').value:0)||0;
+  var from    = document.getElementById('fr-inv-from').value;
+  var to      = document.getElementById('fr-inv-to').value;
+
+  if(!custKey){ setMsg('fr-inv-msg','❌ เลือกลูกค้าก่อน','err'); return; }
+  if(!invType){ setMsg('fr-inv-msg','❌ เลือกประเภทการขายก่อน','err'); return; }
+  if(rate<=0) { setMsg('fr-inv-msg','❌ กรอกราคาต่อคิวก่อน','err'); return; }
   if(!from||!to){ setMsg('fr-inv-msg','❌ เลือกช่วงวันที่ก่อน','err'); return; }
   if(from>to){ setMsg('fr-inv-msg','❌ วันเริ่มต้องน้อยกว่าวันสิ้นสุด','err'); return; }
+
   setMsg('fr-inv-msg','⏳ กำลังดึงข้อมูล…','info');
 
-  var rows=wData.filter(function(w){
-    return w.customer&&w.customer.includes(custKey)&&w.date>=from&&w.date<=to;
+  var rows = wData.filter(function(w){
+    return w.customer && w.customer.includes(custKey) && w.date>=from && w.date<=to;
   });
   if(!rows.length){ setMsg('fr-inv-msg','⚠️ ไม่มีข้อมูลในช่วงวันที่นี้','warn');
     document.getElementById('fr-inv-result').style.display='none'; return; }
@@ -1202,13 +1302,23 @@ function frFetchInvoice(){
     plateMap[w.plate].netKiu+=net;
   });
 
-  frInvData=Object.keys(plateMap).map(function(p){
-    return {plate:p,canonical:plateMap[p].canonical,netKiu:plateMap[p].netKiu};
+  frInvData = Object.keys(plateMap).map(function(p){
+    return {plate:p, canonical:plateMap[p].canonical, netKiu:plateMap[p].netKiu};
   }).filter(function(t){return t.netKiu>0.0001;})
     .sort(function(a,b){return a.canonical.localeCompare(b.canonical,'th')||a.plate.localeCompare(b.plate);});
-  frInvMeta={customer:custKey,dateFrom:from,dateTo:to,rates:FR_RATES[custKey]};
 
-  renderInvoiceResult(frInvData,custKey,from,to);
+  // สร้าง rates object จาก input ของผู้ใช้
+  var rates = {
+    invType:          invType,
+    rateFromCustomer: invType==='freight_only' ? rate : 0,
+    sellingPriceWithVat: invType==='sand_and_freight' ? rate : 0,
+    rateForTruck:     0,  // ไม่ใช้ตรงนี้ — ตั้งตอนออกใบรถร่วม
+    withholdingTax:   invType==='freight_only' ? wht : 0,
+    vatRate:          invType==='sand_and_freight' ? 0.07 : 0
+  };
+  frInvMeta = {customer:custKey, dateFrom:from, dateTo:to, rates:rates};
+
+  renderInvoiceResult(frInvData, custKey, from, to);
   setMsg('fr-inv-msg','✅ พบ '+frInvData.length+' ทะเบียน จาก '+rows.length+' เที่ยว','ok');
 }
 
@@ -1281,7 +1391,8 @@ function frSaveInvoice(){
   nextDocNo().then(function(docNo){
     var gross=totalNetKiu*(rates.rateFromCustomer||rates.sellingPriceWithVat||0);
     var withheld=gross*(rates.withholdingTax||0);
-    var data={docNo:docNo,type:'customer',customer:frInvMeta.customer,
+    var invType=frInvMeta.rates.invType||'';
+    var data={docNo:docNo,type:'customer',invType:invType,customer:frInvMeta.customer,
       dateFrom:frInvMeta.dateFrom,dateTo:frInvMeta.dateTo,
       rateFromCustomer:rates.rateFromCustomer||0,rateForTruck:rates.rateForTruck,
       withholdingTax:rates.withholdingTax||0,vatRate:rates.vatRate||0,
