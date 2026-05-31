@@ -1632,8 +1632,8 @@ function drawInvHistory() {
       ? '<span class="badge-pending">⏳ ยังไม่วางบิล</span>'
       : '<span class="badge-billed">✅ วางบิลแล้ว</span>';
     var btn = isPending
-      ? '<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;color:var(--ok)" onclick="invSetBilled(''+d.docNo+'')">✅ วางบิลแล้ว</button>'
-      : '<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;color:var(--muted)" onclick="invSetPending(''+d.docNo+'')">↩ ยกเลิก</button>';
+      ? '<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;color:var(--ok)" onclick="invSetBilled(""+d.docNo+"")">✅ วางบิลแล้ว</button>'
+      : '<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;color:var(--muted)" onclick="invSetPending(""+d.docNo+"")">↩ ยกเลิก</button>';
     return '<tr>'
       +'<td style="font-size:11px"><b>'+d.docNo+'</b></td>'
       +'<td>'+d.customer+'</td>'
