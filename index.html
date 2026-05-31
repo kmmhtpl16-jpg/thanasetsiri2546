@@ -570,18 +570,30 @@ select{color-scheme:dark;}
       <div id="fr-payment-panel" style="display:none">
         <div class="card">
           <div class="card-title">💸 ออกใบจ่ายรถร่วม</div>
-          <div class="frow">
-            <label>อ้างอิงใบลูกค้า
-              <select id="fr-pay-ref" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);min-width:200px">
-                <option value="">— เลือกใบแจ้งหนี้ —</option>
-              </select>
-            </label>
-            <button class="btn btn-gold" onclick="frLoadPayment()">🔍 โหลด</button>
+          <div class="frow" style="gap:8px;margin-bottom:4px">
+            <button id="fr-pay-mode-ref" class="btn btn-gold" onclick="frPayMode('ref')">📄 อ้างอิงใบแจ้งหนี้</button>
+            <button id="fr-pay-mode-man" class="btn btn-ghost" onclick="frPayMode('man')">✏️ กรอกเอง (ไม่มีใบแจ้งหนี้)</button>
+          </div>
+          <div id="fr-pay-refbox">
+            <div class="frow">
+              <label>อ้างอิงใบลูกค้า
+                <select id="fr-pay-ref" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);min-width:200px"><option value="">— เลือกใบแจ้งหนี้ —</option></select>
+              </label>
+              <button class="btn btn-gold" onclick="frLoadPayment()">🔍 โหลด</button>
+            </div>
+          </div>
+          <div id="fr-pay-manbox" style="display:none">
+            <div class="frow" style="flex-wrap:wrap;gap:10px">
+              <label>เจ้าของรถ<select id="fr-man-owner" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);min-width:180px"><option value="">— เลือกเจ้าของรถ —</option></select></label>
+              <label>ลูกค้า<input id="fr-man-cust" type="text" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:160px"></label>
+              <label>ตั้งแต่<input id="fr-man-from" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);"></label>
+              <label>ถึง<input id="fr-man-to" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);"></label>
+              <label>ราคา (บาท/คิว)<input id="fr-man-rate" type="number" step="0.01" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:110px"></label>
+              <button class="btn btn-gold" onclick="frManualLoad()">🔍 ดึงเที่ยว</button>
+            </div>
           </div>
           <div id="fr-pay-msg" class="smsg" style="margin-top:10px"></div>
-        </div>
-
-        <div id="fr-pay-owners" style="display:none"></div>
+          <div id="fr-pay-owners" style="display:none"></div>
       </div>
 
       <!-- ── ส่วน C: จัดการทะเบียนรถ ── -->
@@ -1674,6 +1686,124 @@ function frLoadInvoiceList(){
     });
     if(frPayInv){sel.value=frPayInv; frLoadPayment();}
   });
+}
+
+function frPayMode(m){
+  var refBox=document.getElementById('fr-pay-refbox');
+  var manBox=document.getElementById('fr-pay-manbox');
+  var bRef=document.getElementById('fr-pay-mode-ref');
+  var bMan=document.getElementById('fr-pay-mode-man');
+  var owners=document.getElementById('fr-pay-owners');
+  if(m==='man'){
+    refBox.style.display='none'; manBox.style.display='';
+    bMan.className='btn btn-gold'; bRef.className='btn btn-ghost';
+    var sel=document.getElementById('fr-man-owner');
+    if(sel && sel.options.length<=1){
+      var names={};
+      Object.keys(vehData).forEach(function(p){ var c=vehData[p].canonical; if(c) names[c]=1; });
+      Object.keys(names).sort().forEach(function(n){
+        var o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o);
+      });
+    }
+  } else {
+    refBox.style.display=''; manBox.style.display='none';
+    bRef.className='btn btn-gold'; bMan.className='btn btn-ghost';
+  }
+  owners.style.display='none';
+  setMsg('fr-pay-msg','','info');
+}
+
+function frManualLoad(){
+  var owner=document.getElementById('fr-man-owner').value;
+  var cust=document.getElementById('fr-man-cust').value.trim();
+  var from=document.getElementById('fr-man-from').value;
+  var to=document.getElementById('fr-man-to').value;
+  var rate=parseFloat(document.getElementById('fr-man-rate').value);
+  if(!owner){ setMsg('fr-pay-msg','\u274C \u0e40\u0e25\u0e37\u0e2d\u0e01\u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16','err'); return; }
+  if(!from||!to){ setMsg('fr-pay-msg','\u274C \u0e23\u0e30\u0e1a\u0e38\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','err'); return; }
+  if(!(rate>0)){ setMsg('fr-pay-msg','\u274C \u0e23\u0e30\u0e1a\u0e38\u0e23\u0e32\u0e04\u0e32/\u0e04\u0e34\u0e27','err'); return; }
+  var plateMap={};
+  wData.forEach(function(w){
+    if(w.date<from||w.date>to) return;
+    var canon=(vehData[w.plate]&&vehData[w.plate].canonical)||('\u2753 '+w.plate);
+    if(canon!==owner) return;
+    var net=(w.kg/KPC)-(typeof dData!=='undefined'&&dData[w._id]?dData[w._id]:0);
+    if(net<=0) return;
+    if(!plateMap[w.plate]) plateMap[w.plate]={plate:w.plate,netKiu:0};
+    plateMap[w.plate].netKiu+=net;
+  });
+  var trips=Object.keys(plateMap).map(function(p){ return {plate:p,canonical:owner,netKiu:plateMap[p].netKiu}; }).filter(function(t){return t.netKiu>0.0001;});
+  if(!trips.length){ setMsg('fr-pay-msg','\u26A0\uFE0F \u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e02\u0e2d\u0e07\u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16\u0e19\u0e35\u0e49\u0e43\u0e19\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','warn'); document.getElementById('fr-pay-owners').style.display='none'; return; }
+  window._frManCtx={owner:owner,cust:cust,from:from,to:to,rate:rate,trips:trips};
+  var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
+  var totalAmt=total*rate;
+  var rows=trips.map(function(t){
+    return '<tr><td style="padding-left:20px;color:var(--muted)">\u2514 '+t.plate+'</td>'
+      +'<td class="r">'+t.netKiu.toFixed(3)+'</td>'
+      +'<td class="r">'+(t.netKiu*rate).toFixed(2)+'</td></tr>';
+  }).join('');
+  var html='<div class="fr-owner-card"><div class="fr-owner-hdr">'
+    +'<span class="fr-owner-name">\uD83D\uDE9B '+owner+'</span>'
+    +'<span class="fr-owner-total"> \u0e23\u0e27\u0e21 '+total.toFixed(3)+' \u0e04\u0e34\u0e27 | <b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+' \u0e1a\u0e32\u0e17</b></span>'
+    +'<button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px;font-size:11px" onclick="frSaveManual()">\uD83D\uDCBE \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01</button>'
+    +'<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="frPrintManual()">\uD83D\uDDA8\uFE0F \u0e1e\u0e34\u0e21\u0e1e\u0e4c</button>'
+    +'<div class="table-wrap"><table>'
+    +'<thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th class="r">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th class="r">\u0e40\u0e07\u0e34\u0e19 (\u00D7'+rate+')</th></tr></thead>'
+    +'<tbody>'+rows
+    +'<tr style="border-top:1px solid var(--border)"><td><b>\u0e23\u0e27\u0e21</b></td>'
+    +'<td class="r gold"><b>'+total.toFixed(3)+'</b></td>'
+    +'<td class="r gold"><b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
+    +'</tbody></table></div></div>';
+  var box=document.getElementById('fr-pay-owners');
+  box.innerHTML=html; box.style.display='';
+  setMsg('fr-pay-msg','\u2705 \u0e42\u0e2b\u0e25\u0e14 '+trips.length+' \u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19','ok');
+}
+
+function frSaveManual(){
+  var ctx=window._frManCtx;
+  if(!ctx){ setMsg('fr-pay-msg','\u274C \u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25','err'); return; }
+  var total=ctx.trips.reduce(function(s,t){return s+t.netKiu;},0);
+  nextDocNo().then(function(docNo){
+    var data={docNo:docNo,type:'truck',refInvoice:'',customer:ctx.cust||'-',
+      canonical:ctx.owner,dateFrom:ctx.from,dateTo:ctx.to,rateForTruck:ctx.rate,
+      totalNetKiu:parseFloat(total.toFixed(3)),
+      totalAmount:parseFloat((total*ctx.rate).toFixed(2)),
+      createdAt:new Date().toISOString(),createdBy:curEmail,trips:ctx.trips};
+    return db.collection('freight_payments').doc(docNo).set(data).then(function(){
+      setMsg('fr-pay-msg','\u2705 \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01 '+ctx.owner+' \u0e40\u0e25\u0e02\u0e17\u0e35\u0e48 '+docNo,'ok');
+    });
+  }).catch(function(e){ setMsg('fr-pay-msg','\u274C '+e.message,'err'); });
+}
+
+function frPrintManual(){
+  var ctx=window._frManCtx;
+  if(!ctx) return;
+  var total=ctx.trips.reduce(function(s,t){return s+t.netKiu;},0);
+  var totalAmt=total*ctx.rate;
+  var rows=ctx.trips.map(function(t){
+    return '<tr><td>'+t.plate+'</td>'
+      +'<td style="text-align:right">'+t.netKiu.toFixed(3)+'</td>'
+      +'<td style="text-align:right">'+(t.netKiu*ctx.rate).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+  }).join('')
+  +'<tr style="font-weight:700;font-size:14px"><td>\u0e23\u0e27\u0e21</td>'
+  +'<td style="text-align:right">'+total.toFixed(3)+'</td>'
+  +'<td style="text-align:right;color:#c47800">'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+  var html='<html><head><meta charset="UTF-8"><title>\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27</title>'
+    +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
+    +'h2{color:#7a4f00}table{width:100%;border-collapse:collapse;margin-top:12px}'
+    +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc}'
+    +'td{padding:6px 10px;border:1px solid #ddd}@media print{button{display:none}}</style>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">'
+    +'</head><body><h2>\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e23\u0e16\u0e23\u0e48\u0e27\u0e21 \u2014 \u0e2b\u0e08\u0e01.\u0e18\u0e19\u0e40\u0e28\u0e23\u0e29\u0e10\u0e4c\u0e28\u0e34\u0e23\u0e34</h2>'
+    +'<p>\u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16: <b>'+ctx.owner+'</b></p>'
+    +'<p>\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32: <b>'+(ctx.cust||'-')+'</b> | \u0e0a\u0e48\u0e27\u0e07: <b>'+ctx.from+' \u0e16\u0e36\u0e07 '+ctx.to+'</b></p>'
+    +'<p>\u0e23\u0e32\u0e04\u0e32: <b>'+ctx.rate+' \u0e1a\u0e32\u0e17/\u0e04\u0e34\u0e27</b></p>'
+    +'<table><thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th style="text-align:right">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th style="text-align:right">\u0e08\u0e33\u0e19\u0e27\u0e19\u0e40\u0e07\u0e34\u0e19</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table>'
+    +'<p style="margin-top:16px;color:#888;font-size:11px">\u0e1e\u0e34\u0e21\u0e1e\u0e4c: '+new Date().toLocaleString('th-TH')+'</p>'
+    +'<button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#c47800;color:#fff;border:none;border-radius:6px;cursor:pointer">\uD83D\uDDA8\uFE0F \u0e1e\u0e34\u0e21\u0e1e\u0e4c</button>'
+    +'</body></html>';
+  var w=window.open('','_blank'); w.document.write(html); w.document.close();
 }
 
 function frLoadPayment(){
