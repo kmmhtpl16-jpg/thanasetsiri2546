@@ -1582,26 +1582,22 @@ function frPrintInvoice(){
     +'<p style="margin-top:16px;color:#888;font-size:11px">พิมพ์: '+new Date().toLocaleString('th-TH')+'</p>'
     +'<button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#c47800;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ พิมพ์</button>'
     +'</body></html>';
-  // บันทึก invoice ลง Firestore
+  var invDocNo = 'FR'+new Date().toISOString().slice(0,10).replace(/-/g,'')+String(Math.floor(Math.random()*900+100));
   var invDoc = {
-    docNo:       docNo,
-    customer:    custName,
-    dateFrom:    days.length>0 ? days[0] : '',
-    dateTo:      days.length>0 ? days[days.length-1] : '',
+    docNo:       invDocNo,
+    customer:    frInvMeta.customer,
+    dateFrom:    frInvMeta.dateFrom,
+    dateTo:      frInvMeta.dateTo,
     totalNetKiu: parseFloat(totalNetKiu.toFixed(3)),
-    grandTotal:  parseFloat(grandTotal.toFixed(2)),
-    vatType:     vatType,
-    sandType:    sandType,
-    price:       price,
+    grandTotal:  parseFloat((totalNetKiu*(rates.rateFromCustomer||rates.sellingPriceWithVat||0)).toFixed(2)),
+    vatType:     frInvMeta.rates.invType,
     createdAt:   new Date().toISOString(),
     createdBy:   curEmail,
     status:      'pending'
   };
-  db.collection('invoices').doc(docNo).set(invDoc)
+  db.collection('invoices').doc(invDocNo).set(invDoc)
     .then(function(){ loadInvHistory(); })
     .catch(function(e){ console.warn('Invoice save error:', e.message); });
-
-  var w=window.open('','_blank'); w.document.write(html); w.document.close();
 }
 
 /* ================================================================
