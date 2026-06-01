@@ -535,7 +535,37 @@ select{color-scheme:dark;}
 
     </section>
 
-    <!-- TAB 4 -->\n    <section class=\"tab-pane\" id=\"tp4\">\n      <div class=\"card\">\n        <div class=\"card-title\">📅 สรุปรายเดือน</div>\n        <div class=\"table-wrap\">\n          <table>\n            <thead><tr>\n              <th>เดือน</th><th>เที่ยว</th><th>สุทธิ (คิว)</th><th>สุทธิ (ตัน)</th>\n            </tr></thead>\n            <tbody id=\"t4b\"></tbody>\n          </table>\n        </div>\n      </div>\n      <div class=\"chart-row\">\n        <div class=\"card\"><div class=\"card-title\">📈 7 วันล่าสุด</div><canvas id=\"c4\" width=\"460\" height=\"220\"></canvas></div>\n        <div class=\"card\"><div class=\"card-title\">🥧 สัดส่วนลูกค้า</div><canvas id=\"p4\" width=\"460\" height=\"220\"></canvas></div>\n      </div>\n      <!-- ═══ เปรียบเทียบยอดทราย ═══ -->\n      <div class=\"card\">\n        <div class=\"card-title\">\n          📊 เปรียบเทียบยอดทราย\n          <div class=\"brow\" style=\"margin-left:auto;gap:6px;\">\n            <button class=\"btn btn-gold\"  id=\"cmpBtnDaily\"   onclick=\"setCmpMode('daily')\">รายวัน</button>\n            <button class=\"btn btn-ghost\" id=\"cmpBtnWeekly\"  onclick=\"setCmpMode('weekly')\">รายสัปดาห์</button>\n            <button class=\"btn btn-ghost\" id=\"cmpBtnMonthly\" onclick=\"setCmpMode('monthly')\">รายเดือน</button>\n          </div>\n        </div>\n        <canvas id=\"chartComparison\" height=\"220\" style=\"width:100%;\"></canvas>\n        <div id=\"cmpTable\" style=\"margin-top:12px;\"></div>\n      </div>\n    </section>
+<!-- TAB 4 -->
+    <section class="tab-pane" id="tp4">
+      <div class="card">
+        <div class="card-title">📅 สรุปรายเดือน</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>เดือน</th><th>เที่ยว</th><th>สุทธิ (คิว)</th><th>สุทธิ (ตัน)</th>
+            </tr></thead>
+            <tbody id="t4b"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="chart-row">
+        <div class="card"><div class="card-title">📈 7 วันล่าสุด</div><canvas id="c4" width="460" height="220"></canvas></div>
+        <div class="card"><div class="card-title">🥧 สัดส่วนลูกค้า</div><canvas id="p4" width="460" height="220"></canvas></div>
+      </div>
+      <!-- ═══ เปรียบเทียบยอดทราย ═══ -->
+      <div class="card">
+        <div class="card-title">
+          📊 เปรียบเทียบยอดทราย
+          <div class="brow" style="margin-left:auto;gap:6px;">
+            <button class="btn btn-gold"  id="cmpBtnDaily"   onclick="setCmpMode('daily')">รายวัน</button>
+            <button class="btn btn-ghost" id="cmpBtnWeekly"  onclick="setCmpMode('weekly')">รายสัปดาห์</button>
+            <button class="btn btn-ghost" id="cmpBtnMonthly" onclick="setCmpMode('monthly')">รายเดือน</button>
+          </div>
+        </div>
+        <canvas id="chartComparison" height="220" style="width:100%;"></canvas>
+        <div id="cmpTable" style="margin-top:12px;"></div>
+      </div>
+    </section>
 
     <!-- TAB 5 — ค่าเที่ยวรถร่วม -->
     <section class="tab-pane" id="tp5">
