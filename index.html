@@ -441,33 +441,6 @@ select{color-scheme:dark;}
         </div>
       </div>
 
-    <!-- ประวัติใบแจ้งหนี้ -->
-    <div class="card" id="inv-history-card" style="display:none">
-      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-        🧾 ประวัติใบแจ้งหนี้
-        <div style="display:flex;gap:8px">
-          <select id="inv-filter-status" onchange="drawInvHistory()"
-            style="padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;font-family:var(--font)">
-            <option value="">ทั้งหมด</option>
-            <option value="pending">ยังไม่วางบิล</option>
-            <option value="billed">วางบิลแล้ว</option>
-          </select>
-          <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="loadInvHistory()">🔄 รีเฟรช</button>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>เลขที่</th><th>ลูกค้า</th><th>ช่วงวันที่</th>
-            <th class="r">คิวสุทธิ</th><th class="r">ยอดรวม (บาท)</th>
-            <th>สถานะ</th><th></th>
-          </tr></thead>
-          <tbody id="inv-history-tbody">
-            <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">กด 🔄 รีเฟรช เพื่อโหลด</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
 
     </section>
 
@@ -562,6 +535,7 @@ select{color-scheme:dark;}
           <div class="brow" style="margin-top:12px">
             <button class="btn btn-gold" onclick="frSaveInvoice()">💾 บันทึก + ออกใบรถร่วม</button>
             <button class="btn btn-ghost" onclick="frPrintInvoice()">🖨️ พิมพ์ใบแจ้งหนี้</button>
+          <button class="btn btn-ghost" onclick="loadInvHistory()">&#128203; ประวัติใบแจ้งหนี้</button>
           </div>
         </div>
       </div>
@@ -630,7 +604,25 @@ select{color-scheme:dark;}
         </div>
       </div>
 
-    </section>
+    
+
+      <!-- ประวัติใบแจ้งหนี้ -->
+      <div class="card" id="inv-history-card" style="display:none" data-page="1">
+        <div class="card-header" style="display:flex;align-items:center;gap:8px">
+          <h3 style="margin:0;flex:1">ประวัติใบแจ้งหนี้</h3>
+          <button class="btn btn-ghost btn-sm" onclick="loadInvHistory()">&#128260; รีเฟรช</button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('inv-history-card').style.display='none'">&#10005;</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>เลขที่</th><th>ลูกค้า</th><th>ช่วงวันที่</th><th style="text-align:right">ยอดเงิน</th><th>สถานะ</th>
+            </tr></thead>
+            <tbody id="inv-history-body"></tbody>
+          </table>
+        </div>
+        <div id="inv-history-pg" style="padding:8px;text-align:center"></div>
+      </div></section>
 
   <!-- Invoice Modal -->
   <div id="inv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
@@ -1605,21 +1597,40 @@ function frPrintInvoice(){
 ================================================================ */
 var _invHistoryData = [];
 
-function loadInvHistory() {
-  var card = document.getElementById('inv-history-card');
-  if(card) card.style.display='';
-  var tb = document.getElementById('inv-history-tbody');
-  if(tb) tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">⏳ กำลังโหลด...</td></tr>';
-
-  db.collection('invoices').orderBy('createdAt','desc').limit(100).get()
-    .then(function(snap){
-      _invHistoryData = snap.docs.map(function(d){ return d.data(); });
-      drawInvHistory();
-    })
-    .catch(function(e){
-      if(tb) tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--err);padding:20px">❌ '+e.message+'</td></tr>';
-    });
+function loadInvHistory(){
+  var card=document.getElementById('inv-history-card');
+  if(!card) return;
+  card.style.display='block';
+  var tb=document.getElementById('inv-history-body');
+  var pg=document.getElementById('inv-history-pg');
+  if(!tb) return;
+  db.collection('invoices').orderBy('createdAt','desc').limit(300).get().then(function(snap){
+    var allDocs=snap.docs;
+    var pageSize=30;
+    var totalPages=Math.ceil(allDocs.length/pageSize)||1;
+    var curPage=parseInt(card.getAttribute('data-page')||'1');
+    if(curPage<1)curPage=1;
+    if(curPage>totalPages)curPage=totalPages;
+    card.setAttribute('data-page',curPage);
+    var start=(curPage-1)*pageSize;
+    var pageDocs=allDocs.slice(start,start+pageSize);
+    tb.innerHTML=pageDocs.map(function(d){
+      var v=d.data();
+      return '<tr><td>'+v.docNo+'</td><td>'+(v.customer||'')+'</td><td>'+(v.dateFrom||'')+' - '+(v.dateTo||'')+'</td><td style="text-align:right">'+(v.grandTotal?v.grandTotal.toLocaleString('th-TH',{minimumFractionDigits:2}):'')+'</td><td><span class="badge badge-'+(v.status==='billed'?'green':'gray')+'">'+(v.status||'')+'</span></td></tr>';
+    }).join('');
+    if(pg){
+      var btns='';
+      if(curPage>1) btns+='<button class="btn btn-ghost btn-sm" onclick="invHistGoPage('+(curPage-1)+')">&#8592; ก่อนหน้า</button> ';
+      btns+='<span style="padding:0 8px">หน้า '+curPage+'/'+totalPages+' (ทั้งหมด '+allDocs.length+' รายการ)</span>';
+      if(curPage<totalPages) btns+=' <button class="btn btn-ghost btn-sm" onclick="invHistGoPage('+(curPage+1)+')">ถัดไป &#8594;</button>';
+      pg.innerHTML=btns;
+    }
+  }).catch(function(e){ console.warn('loadInvHistory error:',e.message); });
 }
+function invHistGoPage(p){
+  var card=document.getElementById('inv-history-card');
+  if(card){ card.setAttribute('data-page',p); loadInvHistory(); }
+}}
 
 function drawInvHistory() {
   var filter = (document.getElementById('inv-filter-status')||{}).value || '';
