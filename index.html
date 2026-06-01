@@ -2129,13 +2129,13 @@ function draw3() {
     sg+=g; sd+=d;
     return '<tr class="'+(d>0?'ded':'')+'"><td>'+r.date+'</td><td>'+r.seq+'</td>'
       +'<td><b>'+r.plate+'</b></td><td>'+r.customer+'</td>'
-      +'<td class="r">'+g.toFixed(3)+'</td>'
-      +'<td class="r">'+(d>0?'−'+d.toFixed(3):'–')+'</td>'
-      +'<td class="r gold">'+n.toFixed(3)+'</td>'
+      +'<td class="r">'+fmt3(g)+'</td>'
+      +'<td class="r">'+(d>0?'−'+fmt3(d):'–')+'</td>'
+      +'<td class="r gold">'+fmt3(n)+'</td>'
       +'<td>'+(d>0?'⚠️':'')+'</td></tr>';
   }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:28px">ไม่มีรายการ</td></tr>';
   document.getElementById('t3sum').textContent=
-    rows.length+' เที่ยว | รวม '+sg.toFixed(3)+' | หัก '+sd.toFixed(3)+' | สุทธิ '+(sg-sd).toFixed(3)+' คิว';
+    rows.length+' เที่ยว | รวม '+fmt3(sg)+' | หัก '+fmt3(sd)+' | สุทธิ '+fmt3(sg-sd)+' คิว';
 }
 
 function doExport() {
@@ -2168,8 +2168,8 @@ function draw4() {
     ?'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
     :ms.map(function(m){
         return '<tr><td>'+m+'</td><td class="r">'+bm[m].t+'</td>'
-          +'<td class="r gold">'+bm[m].c.toFixed(3)+'</td>'
-          +'<td class="r">'+( bm[m].c*1.5).toFixed(3)+'</td></tr>';
+          +'<td class="r gold">'+fmt3(bm[m].c)+'</td>'
+          +'<td class="r">'+fmt3(bm[m].c*1.5)+'</td></tr>';
       }).join('');
 
   var bd={};
@@ -2602,12 +2602,12 @@ function renderInvoiceResult(trips,custKey,from,to){
     var grp=trips.filter(function(t){return t.canonical===c;});
     var gKiu=grp.reduce(function(s,t){return s+t.netKiu;},0);
     tbody+='<tr class="fr-group-hdr"><td colspan="2">👤 '+c
-      +' <span class="badge-canonical">'+gKiu.toFixed(3)+' คิว</span></td>'
-      +'<td class="r" style="color:var(--gold);font-weight:700">'+gKiu.toFixed(3)+'</td>'
+      +' <span class="badge-canonical">'+fmt3(gKiu)+' คิว</span></td>'
+      +'<td class="r" style="color:var(--gold);font-weight:700">'+fmt3(gKiu)+'</td>'
       +'<td class="r" style="color:var(--gold);font-weight:700">'+Math.round(gKiu*rates.rateForTruck).toLocaleString()+'</td></tr>';
     grp.forEach(function(t){
       tbody+='<tr><td style="padding-left:20px;color:var(--muted)">└ '+t.plate+'</td><td></td>'
-        +'<td class="r">'+t.netKiu.toFixed(3)+'</td>'
+        +'<td class="r">'+fmt3(t.netKiu)+'</td>'
         +'<td class="r">'+Math.round(t.netKiu*rates.rateForTruck).toLocaleString()+'</td></tr>';
     });
   });
@@ -2615,13 +2615,13 @@ function renderInvoiceResult(trips,custKey,from,to){
     ?Math.round(totalNetKiu*rates.rateFromCustomer).toLocaleString()
     :Math.round(totalNetKiu*(rates.sellingPriceWithVat||0)).toLocaleString();
   tbody+='<tr style="border-top:2px solid var(--gold)"><td colspan="2" style="font-weight:700">รวมทั้งหมด</td>'
-    +'<td class="r gold">'+totalNetKiu.toFixed(3)+'</td><td class="r gold">'+grossLabel+'</td></tr>';
+    +'<td class="r gold">'+fmt3(totalNetKiu)+'</td><td class="r gold">'+grossLabel+'</td></tr>';
   document.getElementById('fr-inv-tbody').innerHTML=tbody;
 
   var sumHtml='';
   if(custKey==='ไทยเจริญ'){
     var gross=totalNetKiu*rates.rateFromCustomer, w=gross*rates.withholdingTax, net=gross-w;
-    sumHtml='📦 รวม: <b>'+totalNetKiu.toFixed(3)+' คิว</b><br>'
+    sumHtml='📦 รวม: <b>'+fmt3(totalNetKiu)+' คิว</b><br>'
       +'💰 ยอดก่อนหัก: <b>'+gross.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b> บาท<br>'
       +'✂️ หัก ณ ที่จ่าย 1%: <b>−'+w.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b> บาท<br>'
       +'<span style="color:var(--gold);font-size:15px;font-weight:800">✅ ยอดสุทธิ: '+net.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</span><br>'
@@ -2629,7 +2629,7 @@ function renderInvoiceResult(trips,custKey,from,to){
       +' บาท | กำไรท่า: '+Math.round(net-totalNetKiu*rates.rateForTruck).toLocaleString()+' บาท</span>';
   } else {
     var p=rates.sellingPriceWithVat, bv=p/1.07, vat=p-bv;
-    sumHtml='📦 รวม: <b>'+totalNetKiu.toFixed(3)+' คิว</b><br>'
+    sumHtml='📦 รวม: <b>'+fmt3(totalNetKiu)+' คิว</b><br>'
       +'💰 ราคาขายรวม VAT: <b>'+Math.round(totalNetKiu*p).toLocaleString()+'</b> บาท<br>'
       +'🧾 VAT 7%: <b>'+Math.round(totalNetKiu*vat).toLocaleString()+'</b> บาท<br>'
       +'<span style="color:var(--gold);font-size:15px;font-weight:800">✅ ยอดก่อน VAT: '+Math.round(totalNetKiu*bv).toLocaleString()+' บาท</span><br>'
@@ -2689,18 +2689,18 @@ function frPrintInvoice(){
   var rows=frInvData.map(function(t){
     var amt=custKey==='ไทยเจริญ'?(t.netKiu*rates.rateFromCustomer):(t.netKiu*(rates.sellingPriceWithVat||0));
     return '<tr><td>'+t.canonical+'</td><td>'+t.plate+'</td>'
-      +'<td style="text-align:right">'+t.netKiu.toFixed(3)+'</td>'
+      +'<td style="text-align:right">'+fmt3(t.netKiu)+'</td>'
       +'<td style="text-align:right">'+amt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
   }).join('');
   var sumRow='';
   if(custKey==='ไทยเจริญ'){
     var gross=totalNetKiu*rates.rateFromCustomer, w=gross*rates.withholdingTax;
-    sumRow='<tr><td colspan="2"><b>รวม</b></td><td style="text-align:right"><b>'+totalNetKiu.toFixed(3)+'</b></td><td style="text-align:right"><b>'+gross.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
+    sumRow='<tr><td colspan="2"><b>รวม</b></td><td style="text-align:right"><b>'+fmt3(totalNetKiu)+'</b></td><td style="text-align:right"><b>'+gross.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
       +'<tr><td colspan="3" style="text-align:right">หัก ณ ที่จ่าย 1%</td><td style="text-align:right;color:red">−'+w.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>'
       +'<tr><td colspan="3" style="text-align:right"><b>ยอดสุทธิ</b></td><td style="text-align:right;color:#c47800;font-size:15px"><b>'+(gross-w).toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>';
   } else {
     var p=rates.sellingPriceWithVat, bv=p/1.07, total=totalNetKiu*p;
-    sumRow='<tr><td colspan="2"><b>รวม</b></td><td style="text-align:right"><b>'+totalNetKiu.toFixed(3)+'</b></td><td style="text-align:right"><b>'+total.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
+    sumRow='<tr><td colspan="2"><b>รวม</b></td><td style="text-align:right"><b>'+fmt3(totalNetKiu)+'</b></td><td style="text-align:right"><b>'+total.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
       +'<tr><td colspan="3" style="text-align:right">VAT 7%</td><td style="text-align:right">'+Math.round(totalNetKiu*(p-bv)).toLocaleString()+'</td></tr>'
       +'<tr><td colspan="3" style="text-align:right"><b>ยอดก่อน VAT</b></td><td style="text-align:right;color:#c47800;font-size:15px"><b>'+Math.round(totalNetKiu*bv).toLocaleString()+'</b></td></tr>';
   }
@@ -2892,20 +2892,20 @@ function frManualLoad(){
     var totalAmt=total*rate;
     var rows=trips.map(function(t){
       return '<tr><td style="padding-left:20px;color:var(--muted)">\u2514 '+t.plate+'</td>'
-        +'<td class="r">'+t.netKiu.toFixed(3)+'</td>'
+        +'<td class="r">'+fmt3(t.netKiu)+'</td>'
         +'<td class="r">'+(t.netKiu*rate).toFixed(2)+'</td></tr>';
     }).join('');
     var safeOwn=own.replace(/'/g,"\\'");
     return '<div class="fr-owner-card"><div class="fr-owner-hdr">'
       +'<span class="fr-owner-name">\uD83D\uDE9B '+own+'</span>'
-      +'<span class="fr-owner-total"> \u0e23\u0e27\u0e21 '+total.toFixed(3)+' \u0e04\u0e34\u0e27 | <b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+' \u0e1a\u0e32\u0e17</b></span>'
+      +'<span class="fr-owner-total"> \u0e23\u0e27\u0e21 '+fmt3(total)+' \u0e04\u0e34\u0e27 | <b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+' \u0e1a\u0e32\u0e17</b></span>'
       +'<button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px;font-size:11px" onclick="frSaveManual(\''+safeOwn+'\')">\uD83D\uDCBE \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01</button>'
       +'<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="frPrintManual(\''+safeOwn+'\')">\uD83D\uDDA8\uFE0F \u0e1e\u0e34\u0e21\u0e1e\u0e4c</button>'
       +'<div class="table-wrap"><table>'
       +'<thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th class="r">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th class="r">\u0e40\u0e07\u0e34\u0e19 (\u00D7'+rate+')</th></tr></thead>'
       +'<tbody>'+rows
       +'<tr style="border-top:1px solid var(--border)"><td><b>\u0e23\u0e27\u0e21</b></td>'
-      +'<td class="r gold"><b>'+total.toFixed(3)+'</b></td>'
+      +'<td class="r gold"><b>'+fmt3(total)+'</b></td>'
       +'<td class="r gold"><b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
       +'</tbody></table></div></div>';
   }).join('');
@@ -2941,11 +2941,11 @@ function frPrintManual(owner){
   var totalAmt=total*ctx.rate;
   var rows=trips.map(function(t){
     return '<tr><td>'+t.plate+'</td>'
-      +'<td style="text-align:right">'+t.netKiu.toFixed(3)+'</td>'
+      +'<td style="text-align:right">'+fmt3(t.netKiu)+'</td>'
       +'<td style="text-align:right">'+(t.netKiu*ctx.rate).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
   }).join('')
   +'<tr style="font-weight:700;font-size:14px"><td>\u0e23\u0e27\u0e21</td>'
-  +'<td style="text-align:right">'+total.toFixed(3)+'</td>'
+  +'<td style="text-align:right">'+fmt3(total)+'</td>'
   +'<td style="text-align:right;color:#c47800">'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
   var html='<html><head><meta charset="UTF-8"><title>\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27</title>'
     +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
@@ -2981,13 +2981,13 @@ function frLoadPayment(){
       var totalAmt=total*inv.rateForTruck;
       var rows=list.map(function(t){
         return '<tr><td style="padding-left:20px;color:var(--muted)">└ '+t.plate+'</td>'
-          +'<td class="r">'+t.netKiu.toFixed(3)+'</td>'
+          +'<td class="r">'+fmt3(t.netKiu)+'</td>'
           +'<td class="r">'+(t.netKiu*inv.rateForTruck).toFixed(2)+'</td></tr>';
       }).join('');
       var safeOwn=own.replace(/'/g,"\\'");
       return '<div class="fr-owner-card"><div class="fr-owner-hdr">'
         +'<span class="fr-owner-name">👤 '+own+'</span>'
-        +'<span class="fr-owner-total"> รวม '+total.toFixed(3)+' คิว | <b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</b></span>'
+        +'<span class="fr-owner-total"> รวม '+fmt3(total)+' คิว | <b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</b></span>'
         +'<button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px;font-size:11px"'
         +' onclick="frSavePayment(\''+docNo+'\',\''+safeOwn+'\','+inv.rateForTruck+')">💾 บันทึก</button>'
         +' <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px"'
@@ -2996,7 +2996,7 @@ function frLoadPayment(){
         +'<thead><tr><th>ทะเบียน</th><th class="r">คิวสุทธิ</th><th class="r">เงิน (×'+inv.rateForTruck+')</th></tr></thead>'
         +'<tbody>'+rows
         +'<tr style="border-top:1px solid var(--border)"><td><b>รวม</b></td>'
-        +'<td class="r gold"><b>'+total.toFixed(3)+'</b></td>'
+        +'<td class="r gold"><b>'+fmt3(total)+'</b></td>'
         +'<td class="r gold"><b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
         +'</tbody></table></div></div>';
     }).join('');
@@ -3031,11 +3031,11 @@ function frPrintPayment(refInvoice,canonical){
     var totalAmt=totalNetKiu*inv.rateForTruck;
     var rows=trips.map(function(t){
       return '<tr><td>'+t.plate+'</td>'
-        +'<td style="text-align:right">'+t.netKiu.toFixed(3)+'</td>'
+        +'<td style="text-align:right">'+fmt3(t.netKiu)+'</td>'
         +'<td style="text-align:right">'+(t.netKiu*inv.rateForTruck).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
     }).join('')
     +'<tr style="font-weight:700;font-size:14px"><td>รวม</td>'
-    +'<td style="text-align:right">'+totalNetKiu.toFixed(3)+'</td>'
+    +'<td style="text-align:right">'+fmt3(totalNetKiu)+'</td>'
     +'<td style="text-align:right;color:#c47800">'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
     var html='<html><head><meta charset="UTF-8"><title>ใบจ่ายค่าเที่ยว</title>'
       +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
