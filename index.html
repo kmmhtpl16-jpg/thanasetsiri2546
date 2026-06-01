@@ -1630,7 +1630,7 @@ function loadInvHistory(){
 function invHistGoPage(p){
   var card=document.getElementById('inv-history-card');
   if(card){ card.setAttribute('data-page',p); loadInvHistory(); }
-}}
+}
 
 function drawInvHistory() {
   var filter = (document.getElementById('inv-filter-status')||{}).value || '';
