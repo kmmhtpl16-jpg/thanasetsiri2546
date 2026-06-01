@@ -535,6 +535,13 @@ select{color-scheme:dark;}
             <tbody id="t3b"></tbody>
           </table>
         </div>
+        <div id="t3pagination" style="display:none;padding:10px 16px;border-top:1px solid var(--border);align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <span id="t3pageInfo" style="font-size:12px;color:var(--muted);"></span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-ghost btn-sm" id="t3prevBtn" onclick="t3PagePrev()">&#8592; ก่อนหน้า</button>
+            <button class="btn btn-ghost btn-sm" id="t3nextBtn" onclick="t3PageNext()">ถัดไป &#8594;</button>
+          </div>
+        </div>
       </div>
 
 
@@ -2109,24 +2116,45 @@ function togUnit() {
 /* ================================================================
    TAB 3 — รายงาน
 ================================================================ */
-function doFilter() { draw3(); }
+var t3AllRows=[], t3CurPage=1;
+var T3_PER_PAGE=30;
+
+function doFilter() { t3CurPage=1; draw3(); }
+
+function t3PagePrev(){ if(t3CurPage>1){ t3CurPage--; draw3(); } }
+function t3PageNext(){
+  var totalPages=Math.ceil(t3AllRows.length/T3_PER_PAGE)||1;
+  if(t3CurPage<totalPages){ t3CurPage++; draw3(); }
+}
 
 function draw3() {
   var fc=(document.getElementById('f3c').value||'').toLowerCase().trim();
   var fp=(document.getElementById('f3p').value||'').toLowerCase().trim();
   var fa= document.getElementById('f3a').value||'';
   var fb= document.getElementById('f3b').value||'';
-  var rows=wData.filter(function(r){
+  t3AllRows=wData.filter(function(r){
     if(fc&&!r.customer.toLowerCase().includes(fc)) return false;
     if(fp&&!r.plate.toLowerCase().includes(fp))    return false;
     if(fa&&r.date<fa) return false;
     if(fb&&r.date>fb) return false;
     return true;
   });
+
+  // คำนวณยอดรวมทั้งหมด (ไม่ใช่แค่หน้านี้)
   var sg=0, sd=0;
-  document.getElementById('t3b').innerHTML=rows.map(function(r){
+  t3AllRows.forEach(function(r){ sg+=r.kg/KPC; sd+=dData[r._id]||0; });
+  document.getElementById('t3sum').textContent=
+    t3AllRows.length+' เที่ยว | รวม '+fmt3(sg)+' | หัก '+fmt3(sd)+' | สุทธิ '+fmt3(sg-sd)+' คิว';
+
+  // pagination
+  var totalPages=Math.ceil(t3AllRows.length/T3_PER_PAGE)||1;
+  if(t3CurPage>totalPages) t3CurPage=totalPages;
+  var start=(t3CurPage-1)*T3_PER_PAGE;
+  var pageRows=t3AllRows.slice(start, start+T3_PER_PAGE);
+
+  // แสดงตาราง
+  document.getElementById('t3b').innerHTML=pageRows.map(function(r){
     var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d);
-    sg+=g; sd+=d;
     return '<tr class="'+(d>0?'ded':'')+'"><td>'+r.date+'</td><td>'+r.seq+'</td>'
       +'<td><b>'+r.plate+'</b></td><td>'+r.customer+'</td>'
       +'<td class="r">'+fmt3(g)+'</td>'
@@ -2134,8 +2162,20 @@ function draw3() {
       +'<td class="r gold">'+fmt3(n)+'</td>'
       +'<td>'+(d>0?'⚠️':'')+'</td></tr>';
   }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:28px">ไม่มีรายการ</td></tr>';
-  document.getElementById('t3sum').textContent=
-    rows.length+' เที่ยว | รวม '+fmt3(sg)+' | หัก '+fmt3(sd)+' | สุทธิ '+fmt3(sg-sd)+' คิว';
+
+  // แสดง/ซ่อน pagination bar
+  var pag=document.getElementById('t3pagination');
+  var info=document.getElementById('t3pageInfo');
+  var prevBtn=document.getElementById('t3prevBtn');
+  var nextBtn=document.getElementById('t3nextBtn');
+  if(t3AllRows.length>T3_PER_PAGE){
+    pag.style.display='flex';
+    info.textContent='หน้า '+t3CurPage+'/'+totalPages+' (แสดง '+pageRows.length+' จาก '+t3AllRows.length+' รายการ)';
+    prevBtn.disabled=(t3CurPage<=1);
+    nextBtn.disabled=(t3CurPage>=totalPages);
+  } else {
+    pag.style.display='none';
+  }
 }
 
 function doExport() {
