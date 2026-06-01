@@ -485,10 +485,15 @@ select{color-scheme:dark;}
           </div>
         </div>
         <div id="s2" class="smsg" style="margin-bottom:8px"></div>
-        <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+        <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <input type="text" id="t2search" placeholder="🔍 ค้นหาเลขที่บิล…"
             oninput="draw2()"
             style="padding:6px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:180px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--muted);user-select:none;">
+            <input type="checkbox" id="t2filterDed" onchange="draw2()"
+              style="width:14px;height:14px;cursor:pointer;accent-color:var(--warn);">
+            <span>⚠️ แสดงเฉพาะที่หักแล้ว</span>
+          </label>
         </div>
         <div class="table-wrap">
           <table>
@@ -1888,9 +1893,6 @@ async function initPayrollTab() {
   renderEmpRegistry();
 }
 
-window.addEventListener('DOMContentLoaded', () => { loadMockData(); });
-
-
 /* ================================================================
    TAB 1 — IMPORT
 ================================================================ */
@@ -2046,9 +2048,12 @@ function draw2() {
   var u = unit==='cubic'?'คิว':'ตัน';
   var q = (document.getElementById('t2search')||{}).value||'';
   q = q.trim().toLowerCase();
-  var rows = q ? wData.filter(function(r){ return r.seq && r.seq.toLowerCase().includes(q); }) : wData;
+  var onlyDed = (document.getElementById('t2filterDed')||{}).checked;
+  var rows = wData;
+  if (q) rows = rows.filter(function(r){ return r.seq && r.seq.toLowerCase().includes(q); });
+  if (onlyDed) rows = rows.filter(function(r){ return (dData[r._id]||0) > 0; });
   document.getElementById('t2b').innerHTML = rows.length===0
-    ? '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">'+(wData.length===0?'ยังไม่มีข้อมูล':'ไม่พบเลขที่บิล')+'</td></tr>'
+    ? '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">'+(wData.length===0?'ยังไม่มีข้อมูล':onlyDed?'ไม่มีรายการที่หักแล้ว':'ไม่พบเลขที่บิล')+'</td></tr>'
     : rows.map(function(r){
         var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d), has=d>0;
         return '<tr class="'+(has?'ded':'')+'"><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
@@ -2328,6 +2333,14 @@ function makePager(cid, total, cur, cb) {
   for(var i=1;i<=tp;i++) h+='<button class="pbtn'+(i===cur?' on':'')+'" onclick="('+cb.toString()+')('+i+')">'+i+'</button>';
   el.innerHTML=h;
 }
+function toast(msg, duration) {
+  var el = document.createElement('div');
+  el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a3050;color:#e2eaf4;border:1px solid #2a4060;border-radius:8px;padding:10px 18px;font-size:13px;font-family:var(--font);z-index:9999;max-width:80vw;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.5);';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function(){ el.remove(); }, duration || 3000);
+}
+
 function setMsg(id, msg, type) {
   var el=document.getElementById(id);
   if(el){ el.textContent=msg; el.className='smsg '+type; }
