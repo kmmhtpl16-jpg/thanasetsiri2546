@@ -242,6 +242,22 @@ input[type=date]{color-scheme:dark;}
 @media(min-width:700px){.chart-row{grid-template-columns:1fr 1fr;}}
 canvas{border-radius:var(--r);display:block;width:100%!important;}
 
+/* ── Tab4 สรุปผู้บริหาร — จำกัดความกว้างบนจอใหญ่ (FlowAccount style) ── */
+@media(min-width:1024px){
+  #tp4{
+    max-width:1280px;
+    margin-left:auto;
+    margin-right:auto;
+    width:100%;
+  }
+  #tp4 canvas{ max-height:300px; }
+  #tp4 .card{ padding:18px 22px; }
+}
+@media(min-width:1600px){
+  #tp4{ max-width:1400px; }
+  #tp4 canvas{ max-height:320px; }
+}
+
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:var(--bg2);}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -512,7 +528,7 @@ select{color-scheme:dark;}
       <div class="card">
         <div class="card-title">🔍 ตัวกรอง</div>
         <div class="frow">
-          <label>ลูกค้า <input type="text" id="f3c" placeholder="ค้นหา…"></label>
+          <label>ลูกค้า <input type="text" id="f3c" placeholder="ค้นหา…" list="f3c-list" autocomplete="off"><datalist id="f3c-list"></datalist></label>
           <label>ทะเบียน <input type="text" id="f3p" placeholder="เช่น 81-7725"></label>
           <label>ตั้งแต่ <input type="date" id="f3a"></label>
           <label>ถึง <input type="date" id="f3b"></label>
@@ -601,7 +617,7 @@ select{color-scheme:dark;}
             <button class="btn btn-ghost" id="cmpBtnMonthly" onclick="setCmpMode('monthly')">รายเดือน</button>
           </div>
         </div>
-        <canvas id="chartComparison" height="220" style="width:100%;"></canvas>
+        <canvas id="chartComparison" height="220" style="width:100%;max-height:340px;"></canvas>
         <div id="cmpTable" style="margin-top:12px;"></div>
       </div>
     </section>
@@ -700,8 +716,10 @@ select{color-scheme:dark;}
             </div>
           </div>
           <div id="fr-pay-manbox" style="display:none">
-            <div class="frow" style="flex-wrap:wrap;gap:10px">
-              <label>ลูกค้า<select id="fr-man-cust" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);min-width:200px"><option value="">— เลือกลูกค้า —</option></select></label>
+            <div class="frow" style="flex-wrap:wrap;gap:10px;align-items:flex-start">
+              <label style="flex:1;min-width:240px">ลูกค้า (เลือกได้หลายชื่อ — รวมจ่ายในใบเดียว)
+                <div id="fr-man-cust-box" style="margin-top:4px;max-height:160px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px"></div>
+              </label>
               <label>ตั้งแต่<input id="fr-man-from" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);"></label>
               <label>ถึง<input id="fr-man-to" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);"></label>
               <label>ราคา (บาท/คิว)<input id="fr-man-rate" type="number" step="0.01" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:110px"></label>
@@ -1100,7 +1118,7 @@ function listenFS() {
   var wRef = db.collection('weighings').orderBy('date','desc').orderBy('seq','asc');
   unW = wRef.onSnapshot(function(snap) {
     wData = snap.docs.map(function(d){ return Object.assign({_id:d.id}, d.data()); });
-    draw1(); draw2(); kpi();
+    draw1(); draw2(); kpi(); populateCustomerList();
   }, function(e){ setMsg('s1','❌ Firestore: '+e.message,'err'); });
 
   unD = db.collection('deductions').onSnapshot(function(snap){
@@ -2148,6 +2166,18 @@ function togUnit() {
 var t3AllRows=[], t3CurPage=1;
 var T3_PER_PAGE=30;
 
+// ── เติมรายชื่อลูกค้าใน datalist (autocomplete) ──
+function populateCustomerList(){
+  var dl=document.getElementById('f3c-list');
+  if(!dl) return;
+  var custs=[];
+  wData.forEach(function(w){ if(w.customer && custs.indexOf(w.customer)<0) custs.push(w.customer); });
+  custs.sort(function(a,b){return a.localeCompare(b,'th');});
+  dl.innerHTML=custs.map(function(c){
+    return '<option value="'+c.replace(/"/g,'&quot;')+'"></option>';
+  }).join('');
+}
+
 function doFilter() { t3CurPage=1; draw3(); }
 
 function t3PagePrev(){ if(t3CurPage>1){ t3CurPage--; draw3(); } }
@@ -2915,14 +2945,17 @@ function frPayMode(m){
   if(m==='man'){
     refBox.style.display='none'; manBox.style.display='';
     bMan.className='btn btn-gold'; bRef.className='btn btn-ghost';
-    var sel=document.getElementById('fr-man-cust');
-    if(sel && sel.options.length<=1){
+    var box=document.getElementById('fr-man-cust-box');
+    if(box && box.children.length===0){
       var custs=[];
       wData.forEach(function(w){ if(w.customer && custs.indexOf(w.customer)<0) custs.push(w.customer); });
       custs.sort(function(a,b){return a.localeCompare(b,'th');});
-      custs.forEach(function(c){
-        var o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o);
-      });
+      box.innerHTML=custs.map(function(c){
+        var safe=c.replace(/"/g,'&quot;');
+        return '<label style="display:flex;align-items:center;gap:7px;padding:4px 2px;cursor:pointer;color:var(--text)">'
+          +'<input type="checkbox" class="fr-man-cust-cb" value="'+safe+'" style="width:15px;height:15px;cursor:pointer">'
+          +'<span>'+c+'</span></label>';
+      }).join('');
     }
   } else {
     refBox.style.display=''; manBox.style.display='none';
@@ -2933,16 +2966,18 @@ function frPayMode(m){
 }
 
 function frManualLoad(){
-  var cust=document.getElementById('fr-man-cust').value;
+  var checked=Array.prototype.slice.call(document.querySelectorAll('.fr-man-cust-cb:checked'));
+  var custList=checked.map(function(cb){return cb.value;});
   var from=document.getElementById('fr-man-from').value;
   var to=document.getElementById('fr-man-to').value;
   var rate=parseFloat(document.getElementById('fr-man-rate').value);
-  if(!cust){ setMsg('fr-pay-msg','\u274C \u0e40\u0e25\u0e37\u0e2d\u0e01\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32','err'); return; }
+  if(!custList.length){ setMsg('fr-pay-msg','\u274C \u0e15\u0e34\u0e4a\u0e01\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e19\u0e49\u0e2d\u0e22 1 \u0e0a\u0e37\u0e48\u0e2d','err'); return; }
   if(!from||!to){ setMsg('fr-pay-msg','\u274C \u0e23\u0e30\u0e1a\u0e38\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','err'); return; }
   if(!(rate>0)){ setMsg('fr-pay-msg','\u274C \u0e23\u0e30\u0e1a\u0e38\u0e23\u0e32\u0e04\u0e32/\u0e04\u0e34\u0e27','err'); return; }
+  var custSet={}; custList.forEach(function(c){custSet[c]=true;});
   var ownerMap={};
   wData.forEach(function(w){
-    if(w.customer!==cust) return;
+    if(!custSet[w.customer]) return;
     if(w.date<from||w.date>to) return;
     var canon=(vehData[w.plate]&&vehData[w.plate].canonical)||('\u2753 '+w.plate);
     var net=(w.kg/KPC)-(typeof dData!=='undefined'&&dData[w._id]?dData[w._id]:0);
@@ -2952,8 +2987,9 @@ function frManualLoad(){
     ownerMap[canon][w.plate]+=net;
   });
   var owners=Object.keys(ownerMap).sort(function(a,b){return a.localeCompare(b,'th');});
-  if(!owners.length){ setMsg('fr-pay-msg','\u26A0\uFE0F \u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e02\u0e2d\u0e07\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e19\u0e35\u0e49\u0e43\u0e19\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','warn'); document.getElementById('fr-pay-owners').style.display='none'; return; }
-  window._frManCtx={cust:cust,from:from,to:to,rate:rate,ownerMap:ownerMap};
+  if(!owners.length){ setMsg('fr-pay-msg','\u26A0\uFE0F \u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e02\u0e2d\u0e07\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e43\u0e19\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','warn'); document.getElementById('fr-pay-owners').style.display='none'; return; }
+  var custLabel=custList.length===1?custList[0]:(custList.length+' \u0e0a\u0e37\u0e48\u0e2d\u0e23\u0e27\u0e21');
+  window._frManCtx={cust:custLabel,custList:custList,from:from,to:to,rate:rate,ownerMap:ownerMap};
   var html=owners.map(function(own){
     var plates=Object.keys(ownerMap[own]).sort();
     var trips=plates.map(function(p){return {plate:p,canonical:own,netKiu:ownerMap[own][p]};}).filter(function(t){return t.netKiu>0.0001;});
