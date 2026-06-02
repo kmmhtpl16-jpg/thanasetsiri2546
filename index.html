@@ -3215,6 +3215,12 @@ function statusLabel(s){
 }
 
 // ── เปิดหน้าประวัติใบแจ้งหนี้ ──
+function invDateFmt(isoDate){
+  if(!isoDate||isoDate.length<10) return '-';
+  var p=isoDate.slice(0,10).split('-');
+  return p[2]+'/'+p[1]+'/'+(parseInt(p[0])+543);
+}
+
 function openInvHistory(){
   document.getElementById('invhist-modal').style.display='flex';
   var tb=document.getElementById('invhist-body');
@@ -3235,7 +3241,7 @@ function openInvHistory(){
         var badge=v.status==='pending'?'<span class="badge-pending">🟡 รอวางบิล</span>'
                  :v.status==='billed'?'<span class="badge-billed">🟢 วางบิลแล้ว</span>'
                  :'<span style="color:var(--muted)">✕ ยกเลิก</span>';
-        var dr=thaiDate(v.dateFrom)+(v.dateFrom!==v.dateTo?(' - '+thaiDate(v.dateTo)):'');
+        var dr=invDateFmt(v.dateFrom)+(v.dateFrom!==v.dateTo?(' - '+invDateFmt(v.dateTo)):'');
         var actions='';
         if(!cancelled){
           actions='<button class="btn btn-ghost btn-sm" onclick="printSavedInvoice(\''+v.docNo+'\')">🖨️ พิมพ์</button>';
@@ -3247,7 +3253,7 @@ function openInvHistory(){
           actions+=' <button class="btn btn-ghost btn-sm" style="color:#e74c3c" onclick="cancelInvoice(\''+v.docNo+'\')">🗑️ ยกเลิก</button>';
         }
         var style=cancelled?' style="opacity:.5;text-decoration:line-through"':'';
-        return '<tr'+style+'><td><b>'+v.docNo+'</b></td><td>'+thaiDate((v.createdAt||'').slice(0,10))+'</td>'
+        return '<tr'+style+'><td><b>'+v.docNo+'</b></td><td>'+invDateFmt((v.createdAt||'').slice(0,10))+'</td>'
           +'<td>'+v.customer+'<br><span style="font-size:10px;color:var(--muted)">'+dr+'</span></td>'
           +'<td class="r">'+fmt3(v.totalNetKiu)+'</td>'
           +'<td class="r gold">'+(v.grandTotal||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
