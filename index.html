@@ -595,7 +595,9 @@ select{color-scheme:dark;}
 <!-- TAB 4 -->
     <section class="tab-pane" id="tp4">
       <div class="tp4-grid">
-        <!-- การ์ด 1: สรุปรายเดือน -->
+        <!-- ซ้ายบน: 7 วันล่าสุด -->
+        <div class="card"><div class="card-title">📈 7 วันล่าสุด</div><canvas id="c4" width="460" height="220"></canvas></div>
+        <!-- ขวาบน: สรุปรายเดือน -->
         <div class="card">
           <div class="card-title">📅 สรุปรายเดือน</div>
           <div class="table-wrap" style="max-height:300px;overflow-y:auto">
@@ -607,11 +609,9 @@ select{color-scheme:dark;}
             </table>
           </div>
         </div>
-        <!-- การ์ด 2: สัดส่วนลูกค้า -->
+        <!-- ซ้ายล่าง: สัดส่วนลูกค้า -->
         <div class="card"><div class="card-title">🥧 สัดส่วนลูกค้า</div><canvas id="p4" width="460" height="220"></canvas></div>
-        <!-- การ์ด 3: 7 วันล่าสุด -->
-        <div class="card"><div class="card-title">📈 7 วันล่าสุด</div><canvas id="c4" width="460" height="220"></canvas></div>
-        <!-- การ์ด 4: เปรียบเทียบยอดทราย -->
+        <!-- ขวาล่าง: เปรียบเทียบยอดทราย -->
         <div class="card">
           <div class="card-title">
             📊 เปรียบเทียบยอดทราย
