@@ -519,9 +519,35 @@ select{color-scheme:dark;}
           <button class="btn btn-gold"  onclick="doFilter()">🔍 กรอง</button>
           <button class="btn btn-green" onclick="doExport()">📥 CSV</button>
           <button class="btn btn-ghost" onclick="openInvoiceModal()">🧾 ใบแจ้งหนี้</button>
-          <button class="btn btn-ghost" onclick="openInvHistory()">📋 ประวัติใบแจ้งหนี้</button>
+          <button class="btn btn-ghost" id="invhist-toggle-btn" onclick="toggleInvHistory()">📋 ประวัติใบแจ้งหนี้</button>
         </div>
       </div>
+
+      <!-- Inline: ประวัติใบแจ้งหนี้ -->
+      <div id="invhist-inline" style="display:none" class="card">
+        <div class="card-title">
+          📋 ประวัติใบแจ้งหนี้
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="openInvHistory()">🔄 รีเฟรช</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleInvHistory()">✕ ปิด</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table style="font-size:14px">
+            <thead><tr>
+              <th style="padding:12px 14px;width:150px">เลขที่</th>
+              <th style="padding:12px 14px;width:110px">วันที่ออก</th>
+              <th style="padding:12px 14px">ลูกค้า / ช่วงวันที่</th>
+              <th style="padding:12px 14px;text-align:right;width:110px">สุทธิ (คิว)</th>
+              <th style="padding:12px 14px;text-align:right;width:150px">ยอดรวม (บาท)</th>
+              <th style="padding:12px 14px;width:130px">สถานะ</th>
+              <th style="padding:12px 14px">จัดการ</th>
+            </tr></thead>
+            <tbody id="invhist-body"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">
           📊 รายการ
@@ -779,26 +805,7 @@ select{color-scheme:dark;}
     </div>
   </div>
 
-  <!-- Panel ประวัติใบแจ้งหนี้ -->
-  <div id="invhist-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:min(820px,95vw);max-height:90vh;overflow-y:auto">
-      <div style="display:flex;align-items:center;margin-bottom:16px;gap:8px">
-        <div style="font-size:15px;font-weight:700;color:var(--gold);flex:1">📋 ประวัติใบแจ้งหนี้</div>
-        <button class="btn btn-ghost btn-sm" onclick="openInvHistory()">🔄 รีเฟรช</button>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('invhist-modal').style.display='none'">✕</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>เลขที่</th><th>วันที่ออก</th><th>ลูกค้า</th>
-            <th class="r">สุทธิ(คิว)</th><th class="r">ยอดรวม</th>
-            <th>สถานะ</th><th></th>
-          </tr></thead>
-          <tbody id="invhist-body"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+
 
     <!-- TAB 6 — เงินเดือน/ค่าแรง (v3) -->
     <section class="tab-pane" id="tp6" style="padding:16px;">
@@ -3201,8 +3208,13 @@ function doSaveInvoice(sandType, price, vatType, balFwd, remark, totalNetKiu, gr
   prDb().collection('invoices').doc(docNo).set(rec)
     .then(function(){
       document.getElementById('inv-modal').style.display='none';
-      alert('✅ บันทึกใบแจ้งหนี้แล้ว (เลขที่ '+docNo+')\nสถานะ: รอวางบิล\n\nเปิดหน้าประวัติเพื่อพิมพ์ได้เลย');
+      alert('✅ บันทึกใบแจ้งหนี้แล้ว (เลขที่ '+docNo+')\nสถานะ: รอวางบิล\n\nดูในประวัติใบแจ้งหนี้ด้านบนได้เลย');
+      var card=document.getElementById('invhist-inline');
+      if(card) card.style.display='block';
+      var btn=document.getElementById('invhist-toggle-btn');
+      if(btn){ btn.style.background='var(--gold)'; btn.style.color='#000'; }
       openInvHistory();
+      card && card.scrollIntoView({behavior:'smooth', block:'start'});
     })
     .catch(function(e){ alert('บันทึกไม่สำเร็จ: '+e.message); });
 }
@@ -3214,6 +3226,21 @@ function statusLabel(s){
   return s;
 }
 
+// ── toggle inline history card ──
+function toggleInvHistory(){
+  var card=document.getElementById('invhist-inline');
+  var btn=document.getElementById('invhist-toggle-btn');
+  if(!card) return;
+  if(card.style.display==='none'){
+    card.style.display='block';
+    if(btn) btn.style.background='var(--gold)'; if(btn) btn.style.color='#000';
+    openInvHistory();
+  } else {
+    card.style.display='none';
+    if(btn){ btn.style.background=''; btn.style.color=''; }
+  }
+}
+
 // ── เปิดหน้าประวัติใบแจ้งหนี้ ──
 function invDateFmt(isoDate){
   if(!isoDate||isoDate.length<10) return '-';
@@ -3222,9 +3249,11 @@ function invDateFmt(isoDate){
 }
 
 function openInvHistory(){
-  document.getElementById('invhist-modal').style.display='flex';
+  var card=document.getElementById('invhist-inline');
+  if(card && card.style.display==='none') card.style.display='block';
   var tb=document.getElementById('invhist-body');
-  tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">⏳ กำลังโหลด...</td></tr>';
+  if(!tb) return;
+  tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">⏳ กำลังโหลด...</td></tr>';
   prDb().collection('invoices').orderBy('createdAt','desc').limit(300).get()
     .then(function(snap){
       var rows=[];
@@ -3244,20 +3273,24 @@ function openInvHistory(){
         var dr=invDateFmt(v.dateFrom)+(v.dateFrom!==v.dateTo?(' - '+invDateFmt(v.dateTo)):'');
         var actions='';
         if(!cancelled){
-          actions='<button class="btn btn-ghost btn-sm" onclick="printSavedInvoice(\''+v.docNo+'\')">🖨️ พิมพ์</button>';
+          actions='<div style="display:flex;flex-wrap:wrap;gap:4px;min-width:200px">'
+            +'<button class="btn btn-ghost btn-sm" onclick="printSavedInvoice(\''+v.docNo+'\')">🖨️ พิมพ์</button>';
           if(v.status==='pending'){
-            actions+=' <button class="btn btn-ghost btn-sm" onclick="setInvStatus(\''+v.docNo+'\',\'billed\')">✅ วางบิลแล้ว</button>';
+            actions+='<button class="btn btn-ghost btn-sm" onclick="setInvStatus(\''+v.docNo+'\',\'billed\')">✅ วางบิลแล้ว</button>';
           } else {
-            actions+=' <button class="btn btn-ghost btn-sm" onclick="setInvStatus(\''+v.docNo+'\',\'pending\')">↩️ คืนเป็นรอวางบิล</button>';
+            actions+='<button class="btn btn-ghost btn-sm" onclick="setInvStatus(\''+v.docNo+'\',\'pending\')">↩️ คืนรอวางบิล</button>';
           }
-          actions+=' <button class="btn btn-ghost btn-sm" style="color:#e74c3c" onclick="cancelInvoice(\''+v.docNo+'\')">🗑️ ยกเลิก</button>';
+          actions+='<button class="btn btn-ghost btn-sm" style="color:#e74c3c" onclick="cancelInvoice(\''+v.docNo+'\')">🗑️ ยกเลิก</button>'
+            +'</div>';
         }
-        var style=cancelled?' style="opacity:.5;text-decoration:line-through"':'';
-        return '<tr'+style+'><td><b>'+v.docNo+'</b></td><td>'+invDateFmt((v.createdAt||'').slice(0,10))+'</td>'
-          +'<td>'+v.customer+'<br><span style="font-size:10px;color:var(--muted)">'+dr+'</span></td>'
-          +'<td class="r">'+fmt3(v.totalNetKiu)+'</td>'
-          +'<td class="r gold">'+(v.grandTotal||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
-          +'<td>'+badge+'</td><td style="white-space:nowrap">'+actions+'</td></tr>';
+        var style=cancelled?' style="opacity:.5;text-decoration:line-through;font-size:14px"':'style="font-size:14px"';
+        return '<tr '+style+'><td style="padding:10px 12px"><b>'+v.docNo+'</b></td>'
+          +'<td style="padding:10px 12px">'+invDateFmt((v.createdAt||'').slice(0,10))+'</td>'
+          +'<td style="padding:10px 12px">'+v.customer+'<br><span style="font-size:12px;color:var(--muted)">'+dr+'</span></td>'
+          +'<td class="r" style="padding:10px 12px">'+fmt3(v.totalNetKiu)+'</td>'
+          +'<td class="r gold" style="padding:10px 12px;font-size:15px;font-weight:700">'+(v.grandTotal||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
+          +'<td style="padding:10px 12px">'+badge+'</td>'
+          +'<td style="padding:10px 12px">'+actions+'</td></tr>';
       }).join('');
     })
     .catch(function(e){
@@ -3326,7 +3359,7 @@ function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo) {
     var kiu=dayMap[d],thD=d.split('-'),thDate2=thD[2]+'/'+thD[1]+'/'+(parseInt(thD[0])+543),amt=kiu*price;
     return '<tr>'
       +'<td>'+(i+1)+'</td>'
-      +'<td><b>'+productName+'</b></td>'
+      +'<td><b>'+productName+'</b><br><span style="font-size:8pt;color:#888">'+thDate2+'</span></td>'
       +'<td class="r">'+kiu.toFixed(2)+'</td><td class="c">คิว</td>'
       +'<td class="r">'+price.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
       +'<td class="r">'+amt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
