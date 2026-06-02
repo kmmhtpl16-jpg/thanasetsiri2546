@@ -716,10 +716,10 @@ select{color-scheme:dark;}
             </div>
           </div>
           <div id="fr-pay-manbox" style="display:none">
-            <div class="frow" style="flex-wrap:wrap;gap:10px;align-items:flex-start">
-              <label style="flex:1;min-width:240px">ลูกค้า (เลือกได้หลายชื่อ — รวมจ่ายในใบเดียว)
-                <div id="fr-man-cust-box" style="margin-top:4px;max-height:160px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px"></div>
-              </label>
+            <label style="display:block;margin-bottom:10px">ลูกค้า (เลือกได้หลายชื่อ — รวมจ่ายในใบเดียว)
+              <div id="fr-man-cust-box" style="margin-top:4px;max-height:200px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 14px"></div>
+            </label>
+            <div class="frow" style="flex-wrap:wrap;gap:10px;align-items:flex-end">
               <label>ตั้งแต่<input id="fr-man-from" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);"></label>
               <label>ถึง<input id="fr-man-to" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);"></label>
               <label>ราคา (บาท/คิว)<input id="fr-man-rate" type="number" step="0.01" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:110px"></label>
@@ -2952,9 +2952,9 @@ function frPayMode(m){
       custs.sort(function(a,b){return a.localeCompare(b,'th');});
       box.innerHTML=custs.map(function(c){
         var safe=c.replace(/"/g,'&quot;');
-        return '<label style="display:flex;align-items:center;gap:7px;padding:4px 2px;cursor:pointer;color:var(--text)">'
-          +'<input type="checkbox" class="fr-man-cust-cb" value="'+safe+'" style="width:15px;height:15px;cursor:pointer">'
-          +'<span>'+c+'</span></label>';
+        return '<label style="display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+          +'<input type="checkbox" class="fr-man-cust-cb" value="'+safe+'" style="width:15px;height:15px;cursor:pointer;flex-shrink:0">'
+          +'<span style="overflow:hidden;text-overflow:ellipsis">'+c+'</span></label>';
       }).join('');
     }
   } else {
