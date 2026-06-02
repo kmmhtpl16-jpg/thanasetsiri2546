@@ -519,6 +519,7 @@ select{color-scheme:dark;}
           <button class="btn btn-gold"  onclick="doFilter()">🔍 กรอง</button>
           <button class="btn btn-green" onclick="doExport()">📥 CSV</button>
           <button class="btn btn-ghost" onclick="openInvoiceModal()">🧾 ใบแจ้งหนี้</button>
+          <button class="btn btn-ghost" onclick="openInvHistory()">📋 ประวัติใบแจ้งหนี้</button>
         </div>
       </div>
       <div class="card">
@@ -773,7 +774,28 @@ select{color-scheme:dark;}
       </div>
       <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
         <button class="btn btn-ghost" onclick="document.getElementById('inv-modal').style.display='none'">ยกเลิก</button>
-        <button class="btn btn-gold" onclick="submitInvoiceModal()">🖨️ ออกใบแจ้งหนี้</button>
+        <button class="btn btn-gold" onclick="submitInvoiceModal()">💾 บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel ประวัติใบแจ้งหนี้ -->
+  <div id="invhist-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:min(820px,95vw);max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;margin-bottom:16px;gap:8px">
+        <div style="font-size:15px;font-weight:700;color:var(--gold);flex:1">📋 ประวัติใบแจ้งหนี้</div>
+        <button class="btn btn-ghost btn-sm" onclick="openInvHistory()">🔄 รีเฟรช</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('invhist-modal').style.display='none'">✕</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>เลขที่</th><th>วันที่ออก</th><th>ลูกค้า</th>
+            <th class="r">สุทธิ(คิว)</th><th class="r">ยอดรวม</th>
+            <th>สถานะ</th><th></th>
+          </tr></thead>
+          <tbody id="invhist-body"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -3125,11 +3147,148 @@ function submitInvoiceModal() {
   var balFwd    = parseFloat(document.getElementById('im-bal').value)||0;
   var remark    = (document.getElementById('im-remark').value||'').trim();
   if(price<=0){ alert('กรอกราคาต่อคิวก่อน'); return; }
-  document.getElementById('inv-modal').style.display='none';
-  printInvoice(sandType, price, vatType, balFwd, remark);
+
+  // คำนวณยอด
+  var totalNetKiu=0;
+  _invRows.forEach(function(r){ totalNetKiu+=Math.max(0,r.kg/KPC-(dData[r._id]||0)); });
+  var subtotal=totalNetKiu*price, vatAmt=0, grandTotal=subtotal;
+  if(vatType==='exclusive'){ vatAmt=Math.round(subtotal*0.07*100)/100; grandTotal=subtotal+vatAmt; }
+
+  var custName=_invRows.length>0?_invRows[0].customer:'—';
+  var dates=_invRows.map(function(r){return r.date;}).sort();
+  var dateFrom=dates[0], dateTo=dates[dates.length-1];
+
+  // ── ตรวจสอบเรียกซ้ำ: ลูกค้า+ช่วงวันเดียวกัน ที่ยังไม่ถูกยกเลิก ──
+  prDb().collection('invoices')
+    .where('customer','==',custName)
+    .where('dateFrom','==',dateFrom)
+    .where('dateTo','==',dateTo)
+    .get()
+    .then(function(snap){
+      var dup=null;
+      snap.forEach(function(d){
+        var v=d.data();
+        if(v.status!=='cancelled') dup=v;
+      });
+      if(dup){
+        alert('⚠️ ยอดนี้เคยออกใบแจ้งหนี้แล้ว (เลขที่ '+dup.docNo+', สถานะ '+statusLabel(dup.status)+')\n\nหากต้องการแก้ไข ให้ยกเลิกใบเดิมก่อนในหน้าประวัติใบแจ้งหนี้');
+        return;
+      }
+      doSaveInvoice(sandType, price, vatType, balFwd, remark, totalNetKiu, grandTotal, custName, dateFrom, dateTo);
+    })
+    .catch(function(e){ alert('ตรวจสอบใบซ้ำไม่สำเร็จ: '+e.message); });
 }
 
-function printInvoice(sandType, price, vatType, balFwd, remark) {
+function doSaveInvoice(sandType, price, vatType, balFwd, remark, totalNetKiu, grandTotal, custName, dateFrom, dateTo){
+  var today=new Date(), yy=today.getFullYear(), mm=String(today.getMonth()+1).padStart(2,'0'), dd=String(today.getDate()).padStart(2,'0');
+  var docNo='BL'+yy+mm+dd+String(Math.floor(Math.random()*900+100));
+  var rec={
+    docNo: docNo,
+    customer: custName,
+    dateFrom: dateFrom,
+    dateTo: dateTo,
+    sandType: sandType,
+    price: price,
+    vatType: vatType,
+    balFwd: balFwd,
+    remark: remark,
+    totalNetKiu: Math.round(totalNetKiu*1000)/1000,
+    grandTotal: Math.round(grandTotal*100)/100,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    createdBy: (auth.currentUser&&auth.currentUser.email)||'-'
+  };
+  prDb().collection('invoices').doc(docNo).set(rec)
+    .then(function(){
+      document.getElementById('inv-modal').style.display='none';
+      alert('✅ บันทึกใบแจ้งหนี้แล้ว (เลขที่ '+docNo+')\nสถานะ: รอวางบิล\n\nเปิดหน้าประวัติเพื่อพิมพ์ได้เลย');
+      openInvHistory();
+    })
+    .catch(function(e){ alert('บันทึกไม่สำเร็จ: '+e.message); });
+}
+
+function statusLabel(s){
+  if(s==='pending') return 'รอวางบิล';
+  if(s==='billed')  return 'วางบิลแล้ว';
+  if(s==='cancelled') return 'ยกเลิก';
+  return s;
+}
+
+// ── เปิดหน้าประวัติใบแจ้งหนี้ ──
+function openInvHistory(){
+  document.getElementById('invhist-modal').style.display='flex';
+  var tb=document.getElementById('invhist-body');
+  tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">⏳ กำลังโหลด...</td></tr>';
+  prDb().collection('invoices').orderBy('createdAt','desc').limit(300).get()
+    .then(function(snap){
+      var rows=[];
+      snap.forEach(function(d){
+        var v=d.data();
+        if(v.docNo && v.docNo.indexOf('BL')===0) rows.push(v);
+      });
+      if(!rows.length){
+        tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">ยังไม่มีใบแจ้งหนี้</td></tr>';
+        return;
+      }
+      tb.innerHTML=rows.map(function(v){
+        var cancelled=v.status==='cancelled';
+        var badge=v.status==='pending'?'<span class="badge-pending">🟡 รอวางบิล</span>'
+                 :v.status==='billed'?'<span class="badge-billed">🟢 วางบิลแล้ว</span>'
+                 :'<span style="color:var(--muted)">✕ ยกเลิก</span>';
+        var dr=thaiDate(v.dateFrom)+(v.dateFrom!==v.dateTo?(' - '+thaiDate(v.dateTo)):'');
+        var actions='';
+        if(!cancelled){
+          actions='<button class="btn btn-ghost btn-sm" onclick="printSavedInvoice(\''+v.docNo+'\')">🖨️ พิมพ์</button>';
+          if(v.status==='pending'){
+            actions+=' <button class="btn btn-ghost btn-sm" onclick="setInvStatus(\''+v.docNo+'\',\'billed\')">✅ วางบิลแล้ว</button>';
+          } else {
+            actions+=' <button class="btn btn-ghost btn-sm" onclick="setInvStatus(\''+v.docNo+'\',\'pending\')">↩️ คืนเป็นรอวางบิล</button>';
+          }
+          actions+=' <button class="btn btn-ghost btn-sm" style="color:#e74c3c" onclick="cancelInvoice(\''+v.docNo+'\')">🗑️ ยกเลิก</button>';
+        }
+        var style=cancelled?' style="opacity:.5;text-decoration:line-through"':'';
+        return '<tr'+style+'><td><b>'+v.docNo+'</b></td><td>'+thaiDate((v.createdAt||'').slice(0,10))+'</td>'
+          +'<td>'+v.customer+'<br><span style="font-size:10px;color:var(--muted)">'+dr+'</span></td>'
+          +'<td class="r">'+fmt3(v.totalNetKiu)+'</td>'
+          +'<td class="r gold">'+(v.grandTotal||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
+          +'<td>'+badge+'</td><td style="white-space:nowrap">'+actions+'</td></tr>';
+      }).join('');
+    })
+    .catch(function(e){
+      tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#e74c3c;padding:20px">โหลดไม่สำเร็จ: '+e.message+'</td></tr>';
+    });
+}
+
+function setInvStatus(docNo, status){
+  prDb().collection('invoices').doc(docNo).update({status:status})
+    .then(function(){ openInvHistory(); })
+    .catch(function(e){ alert('เปลี่ยนสถานะไม่สำเร็จ: '+e.message); });
+}
+
+function cancelInvoice(docNo){
+  if(!confirm('ยืนยันยกเลิกใบแจ้งหนี้ '+docNo+'?\n\nใบที่ยกเลิกจะยังแสดงในประวัติ (ขีดฆ่า)\nและจะออกใบใหม่สำหรับยอดเดิมได้อีกครั้ง')) return;
+  prDb().collection('invoices').doc(docNo).update({status:'cancelled'})
+    .then(function(){ openInvHistory(); })
+    .catch(function(e){ alert('ยกเลิกไม่สำเร็จ: '+e.message); });
+}
+
+// ── พิมพ์ใบที่บันทึกไว้แล้ว (ดึงข้อมูลจาก Firestore) ──
+function printSavedInvoice(docNo){
+  prDb().collection('invoices').doc(docNo).get()
+    .then(function(d){
+      if(!d.exists){ alert('ไม่พบใบแจ้งหนี้'); return; }
+      var v=d.data();
+      // สร้าง _invRows จำลองจากช่วงวันที่ + ลูกค้า เพื่อ reuse printInvoice
+      _invRows=wData.filter(function(r){
+        return r.customer===v.customer && r.date>=v.dateFrom && r.date<=v.dateTo;
+      });
+      if(!_invRows.length){ alert('ไม่พบรายการชั่งของใบนี้ (อาจถูกลบไปแล้ว)'); return; }
+      printInvoice(v.sandType, v.price, v.vatType, v.balFwd, v.remark, v.docNo);
+    })
+    .catch(function(e){ alert('ดึงข้อมูลไม่สำเร็จ: '+e.message); });
+}
+
+function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo) {
   var totalNetKiu=0;
   _invRows.forEach(function(r){ totalNetKiu+=Math.max(0,r.kg/KPC-(dData[r._id]||0)); });
   var productName=sandType==='delivery'?'ทราย (รวมค่าจัดส่งถึงหน้างาน)':'ทราย (รับเอง)';
@@ -3137,7 +3296,7 @@ function printInvoice(sandType, price, vatType, balFwd, remark) {
   if(vatType==='exclusive'){ vatAmt=Math.round(subtotal*0.07*100)/100; grandTotal=subtotal+vatAmt; }
   else if(vatType==='inclusive'){ priceExVat=Math.round(subtotal/1.07*100)/100; vatAmt=Math.round((subtotal-priceExVat)*100)/100; }
   var today=new Date(), yy=today.getFullYear(), mm=String(today.getMonth()+1).padStart(2,'0'), dd=String(today.getDate()).padStart(2,'0');
-  var docNo='BL'+yy+mm+dd+String(Math.floor(Math.random()*900+100));
+  var docNo=fixedDocNo||('BL'+yy+mm+dd+String(Math.floor(Math.random()*900+100)));
   var thDate=dd+'/'+mm+'/'+yy;
 
   function bahtText(n){
