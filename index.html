@@ -243,6 +243,8 @@ input[type=date]{color-scheme:dark;}
 canvas{border-radius:var(--r);display:block;width:100%!important;}
 
 /* ── Tab4 สรุปผู้บริหาร — จำกัดความกว้างบนจอใหญ่ (FlowAccount style) ── */
+.tp4-grid{display:grid;grid-template-columns:1fr;gap:14px;}
+@media(min-width:900px){.tp4-grid{grid-template-columns:1fr 1fr;align-items:start;}}
 @media(min-width:1024px){
   #tp4{
     max-width:1280px;
@@ -250,12 +252,12 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
     margin-right:auto;
     width:100%;
   }
-  #tp4 canvas{ max-height:300px; }
+  #tp4 canvas{ max-height:280px; }
   #tp4 .card{ padding:18px 22px; }
 }
 @media(min-width:1600px){
-  #tp4{ max-width:1400px; }
-  #tp4 canvas{ max-height:320px; }
+  #tp4{ max-width:1440px; }
+  #tp4 canvas{ max-height:300px; }
 }
 
 ::-webkit-scrollbar{width:4px;height:4px;}
@@ -592,34 +594,38 @@ select{color-scheme:dark;}
 
 <!-- TAB 4 -->
     <section class="tab-pane" id="tp4">
-      <div class="card">
-        <div class="card-title">📅 สรุปรายเดือน</div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>เดือน</th><th>เที่ยว</th><th>สุทธิ (คิว)</th><th>สุทธิ (ตัน)</th>
-            </tr></thead>
-            <tbody id="t4b"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="chart-row">
-        <div class="card"><div class="card-title">📈 7 วันล่าสุด</div><canvas id="c4" width="460" height="220"></canvas></div>
-        <div class="card"><div class="card-title">🥧 สัดส่วนลูกค้า</div><canvas id="p4" width="460" height="220"></canvas></div>
-      </div>
-      <!-- ═══ เปรียบเทียบยอดทราย ═══ -->
-      <div class="card">
-        <div class="card-title">
-          📊 เปรียบเทียบยอดทราย
-          <div class="brow" style="margin-left:auto;gap:6px;">
-            <button class="btn btn-gold"  id="cmpBtnDaily"   onclick="setCmpMode('daily')">รายวัน</button>
-            <button class="btn btn-ghost" id="cmpBtnWeekly"  onclick="setCmpMode('weekly')">รายสัปดาห์</button>
-            <button class="btn btn-ghost" id="cmpBtnMonthly" onclick="setCmpMode('monthly')">รายเดือน</button>
+      <div class="tp4-grid">
+        <!-- การ์ด 1: สรุปรายเดือน -->
+        <div class="card">
+          <div class="card-title">📅 สรุปรายเดือน</div>
+          <div class="table-wrap" style="max-height:300px;overflow-y:auto">
+            <table>
+              <thead><tr>
+                <th>เดือน</th><th>เที่ยว</th><th>สุทธิ (คิว)</th><th>สุทธิ (ตัน)</th>
+              </tr></thead>
+              <tbody id="t4b"></tbody>
+            </table>
           </div>
         </div>
-        <canvas id="chartComparison" height="220" style="width:100%;max-height:340px;"></canvas>
-        <div id="cmpTable" style="margin-top:12px;"></div>
+        <!-- การ์ด 2: สัดส่วนลูกค้า -->
+        <div class="card"><div class="card-title">🥧 สัดส่วนลูกค้า</div><canvas id="p4" width="460" height="220"></canvas></div>
+        <!-- การ์ด 3: 7 วันล่าสุด -->
+        <div class="card"><div class="card-title">📈 7 วันล่าสุด</div><canvas id="c4" width="460" height="220"></canvas></div>
+        <!-- การ์ด 4: เปรียบเทียบยอดทราย -->
+        <div class="card">
+          <div class="card-title">
+            📊 เปรียบเทียบยอดทราย
+            <div class="brow" style="margin-left:auto;gap:6px;">
+              <button class="btn btn-gold"  id="cmpBtnDaily"   onclick="setCmpMode('daily')">รายวัน</button>
+              <button class="btn btn-ghost" id="cmpBtnWeekly"  onclick="setCmpMode('weekly')">รายสัปดาห์</button>
+              <button class="btn btn-ghost" id="cmpBtnMonthly" onclick="setCmpMode('monthly')">รายเดือน</button>
+            </div>
+          </div>
+          <canvas id="chartComparison" height="200" style="width:100%;max-height:240px;"></canvas>
+          <div id="cmpTable" style="margin-top:12px;max-height:240px;overflow-y:auto;"></div>
+        </div>
       </div>
+    </section>
     </section>
 
     <!-- TAB 5 — ค่าเที่ยวรถร่วม -->
