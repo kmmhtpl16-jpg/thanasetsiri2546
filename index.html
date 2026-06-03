@@ -1134,7 +1134,7 @@ select{color-scheme:dark;}
         <div>
           <div style="font-size:.7rem;color:#a07830;font-family:monospace;letter-spacing:.05em;">TANK LEVEL</div>
           <div id="fuelStockDisplay" style="font-size:1.4rem;font-weight:800;color:var(--gold);">— ลิตร</div>
-          <div id="fuelStockAvgPrice" style="font-size:.72rem;color:#a07830;">ราคาเฉลี่ย: — บาท/ลิตร</div>
+          <div id="fuelStockAvgPrice" style="font-size:.72rem;color:#a07830;">ราคาเฉลี่ย (ก่อน VAT): — บาท/ลิตร</div>
         </div>
         <div style="text-align:right;">
           <div id="fuelStockValue" style="font-size:.85rem;color:var(--gold);font-weight:600;">มูลค่า: — บาท</div>
@@ -1162,11 +1162,11 @@ select{color-scheme:dark;}
               <input type="text" id="fInPumpName" class="pr-input" placeholder="ชื่อปั๊ม...">
             </div>
             <div><label class="pr-label">จำนวนลิตร *</label><input type="number" id="fInLiters" class="pr-input" placeholder="เช่น 4000" min="1" oninput="fuelCalcTotal()"></div>
-            <div><label class="pr-label">ราคา/ลิตร (บาท) *</label><input type="number" id="fInPricePerL" class="pr-input" placeholder="เช่น 42.00" step="0.01" oninput="fuelCalcTotal()"></div>
+            <div><label class="pr-label">ราคา/ลิตร (รวม VAT) *</label><input type="number" id="fInPricePerL" class="pr-input" placeholder="เช่น 42.00" step="0.01" oninput="fuelCalcTotal()"></div>
             <div><label class="pr-label">ยอดรวม (บาท)</label><input type="number" id="fInTotal" class="pr-input" placeholder="คำนวณอัตโนมัติ" step="0.01" oninput="fuelCalcFromTotal()"></div>
             <div><label class="pr-label">เลขที่ใบกำกับภาษี</label><input type="text" id="fInInvoiceNo" class="pr-input" placeholder="เช่น TI0000..."></div>
           </div>
-          <button class="pr-save-btn" onclick="saveFuelIn()" style="margin-top:8px;">💾 บันทึกรับเข้า</button>
+          <div style="background:rgba(79,195,247,.08);border:1px dashed rgba(79,195,247,.3);border-radius:7px;padding:7px 11px;font-size:.7rem;color:#4a90b8;margin-top:6px;">💡 กรอกราคา<strong>รวม VAT</strong> ตามใบกำกับ — ระบบแยก VAT 7% ให้อัตโนมัติ</div><button class="pr-save-btn" onclick="saveFuelIn()" style="margin-top:8px;">💾 บันทึกรับเข้า</button>
         </div>
         <div class="card" style="margin-top:0;">
           <div class="table-toolbar">
@@ -1228,12 +1228,12 @@ select{color-scheme:dark;}
               <input type="text" id="fExpPumpName" class="pr-input" placeholder="ชื่อปั๊ม...">
             </div>
             <div><label class="pr-label">จำนวนลิตร *</label><input type="number" id="fExpLiters" class="pr-input" placeholder="ลิตร" min="1" oninput="fuelExpCalc()"></div>
-            <div><label class="pr-label">ราคา/ลิตร (บาท) *</label><input type="number" id="fExpPricePerL" class="pr-input" placeholder="เช่น 41.55" step="0.01" oninput="fuelExpCalc()"></div>
+            <div><label class="pr-label">ราคา/ลิตร (รวม VAT) *</label><input type="number" id="fExpPricePerL" class="pr-input" placeholder="เช่น 41.55" step="0.01" oninput="fuelExpCalc()"></div>
             <div><label class="pr-label">ยอดรวม (บาท)</label><input type="number" id="fExpTotal" class="pr-input" placeholder="คำนวณอัตโนมัติ" step="0.01" readonly></div>
             <div><label class="pr-label">เลขไมล์รถ (ไม่บังคับ)</label><input type="number" id="fExpOdometer" class="pr-input" placeholder="km"></div>
             <div style="grid-column:1/-1;"><label class="pr-label">เลขที่ใบกำกับ</label><input type="text" id="fExpInvoiceNo" class="pr-input" placeholder="(ไม่บังคับ)"></div>
           </div>
-          <button class="pr-save-btn" onclick="saveFuelExp()" style="margin-top:8px;">💾 บันทึก</button>
+          <div style="background:rgba(79,195,247,.08);border:1px dashed rgba(79,195,247,.3);border-radius:7px;padding:7px 11px;font-size:.7rem;color:#4a90b8;margin-top:6px;">💡 กรอกราคา<strong>รวม VAT</strong> ตามใบเสร็จ — ระบบแยก VAT 7% ให้อัตโนมัติ</div><button class="pr-save-btn" onclick="saveFuelExp()" style="margin-top:8px;">💾 บันทึก</button>
         </div>
         <div class="card" style="margin-top:0;">
           <div class="table-toolbar"><div class="table-toolbar-title">📋 ประวัติค่าน้ำมันรถ</div></div>
@@ -1250,8 +1250,8 @@ select{color-scheme:dark;}
             <div><label class="pr-label">🔧 ค่าซ่อมบำรุง (บาท)</label><input type="number" id="fCostRepair" class="pr-input" placeholder="0" step="1"></div>
             <div><label class="pr-label">📦 ค่าอื่นๆ (บาท)</label><input type="number" id="fCostOther" class="pr-input" placeholder="0" step="1"></div>
             <div><label class="pr-label">👷 ค่าแรง (ดึงจากเงินเดือน)</label><input type="number" id="fCostLabor" class="pr-input" placeholder="0" readonly style="opacity:.7;"></div>
-            <div><label class="pr-label">⛽ น้ำมันถัง (อัตโนมัติ)</label><input type="number" id="fCostTankFuel" class="pr-input" placeholder="0" readonly style="opacity:.7;"></div>
-            <div><label class="pr-label">🚛 น้ำมันรถ (อัตโนมัติ)</label><input type="number" id="fCostExpFuel" class="pr-input" placeholder="0" readonly style="opacity:.7;"></div>
+            <div><label class="pr-label">⛽ น้ำมันถัง (ก่อน VAT, อัตโนมัติ)</label><input type="number" id="fCostTankFuel" class="pr-input" placeholder="0" readonly style="opacity:.7;"></div>
+            <div><label class="pr-label">🚛 น้ำมันรถ (ก่อน VAT, อัตโนมัติ)</label><input type="number" id="fCostExpFuel" class="pr-input" placeholder="0" readonly style="opacity:.7;"></div>
           </div>
           <button class="pr-save-btn" onclick="saveFuelMonthly()" style="margin-top:8px;">💾 บันทึก / อัปเดต</button>
         </div>
@@ -1260,7 +1260,7 @@ select{color-scheme:dark;}
           <div id="fuelCostResultContent"></div>
         </div>
         <div class="card" style="margin-top:0;">
-          <div class="table-toolbar"><div class="table-toolbar-title">📅 สรุปย้อนหลัง</div></div>
+          <div class="table-toolbar"><div class="table-toolbar-title">📅 สรุปย้อนหลัง <span style="font-size:.62rem;font-weight:400;color:#4a90b8;">(ทุกตัวเลขก่อน VAT)</span></div></div>
           <div id="fuelMonthlyHistoryList" style="overflow-x:auto;"></div>
         </div>
       </div>
@@ -4595,6 +4595,10 @@ var fuelOutData = [];  // fuel_out snapshot
 var fuelExpData = [];  // fuel_expense snapshot
 var fuelUnIn=null, fuelUnOut=null, fuelUnExp=null;
 
+var FUEL_VAT_RATE = 0.07;  // VAT 7%
+// แยกราคาก่อน VAT จากราคารวม VAT
+function exclVat(inclPrice) { return inclPrice / (1 + FUEL_VAT_RATE); }
+
 var FUEL_SOURCES = {
   factory:           'วิลาสินี ออยล์ (โรงงาน)',
   pump_jpp:          'เจ.พี.พี.ปิโตรเลียม',
@@ -4651,9 +4655,12 @@ function calcFuelStock() {
   var totalOut = fuelOutData.reduce(function(s,r){ return s+(r.liters||0); },0);
   var remaining = totalIn - totalOut;
 
-  // Weighted average price
-  var totalCost = fuelInData.reduce(function(s,r){ return s+((r.liters||0)*(r.price_per_liter||0)); },0);
-  var avgPrice  = totalIn>0 ? totalCost/totalIn : 0;
+  // Weighted average price — ใช้ราคาก่อน VAT เป็นต้นทุนจริง
+  var totalCostExcl = fuelInData.reduce(function(s,r){
+    var pExcl = r.price_excl_vat || (r.price_per_liter ? exclVat(r.price_per_liter) : 0);
+    return s+((r.liters||0)*pExcl);
+  },0);
+  var avgPrice  = totalIn>0 ? totalCostExcl/totalIn : 0;   // ก่อน VAT
   var value     = remaining * avgPrice;
   return { remaining: remaining, avgPrice: avgPrice, value: value };
 }
@@ -4665,8 +4672,8 @@ function updateFuelStockDisplay() {
   var ev = document.getElementById('fuelStockValue');
   var eu = document.getElementById('fuelStockUpdated');
   if(el) el.textContent = s.remaining.toLocaleString('th-TH',{minimumFractionDigits:0}) + ' ลิตร';
-  if(ep) ep.textContent = 'ราคาเฉลี่ย: ' + s.avgPrice.toLocaleString('th-TH',{minimumFractionDigits:2}) + ' บาท/ลิตร';
-  if(ev) ev.textContent = 'มูลค่า: ' + s.value.toLocaleString('th-TH',{minimumFractionDigits:0}) + ' บาท';
+  if(ep) ep.textContent = 'ราคาเฉลี่ย (ก่อน VAT): ' + s.avgPrice.toLocaleString('th-TH',{minimumFractionDigits:2}) + ' บาท/ลิตร';
+  if(ev) ev.textContent = 'มูลค่า (ก่อน VAT): ' + s.value.toLocaleString('th-TH',{minimumFractionDigits:0}) + ' บาท';
   if(eu) eu.textContent = 'อัปเดต: ' + new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
 }
 
@@ -4734,8 +4741,14 @@ async function saveFuelIn() {
   if(liters<=0){ toast('⚠️ กรอกจำนวนลิตร'); return; }
   if(ppl<=0)   { toast('⚠️ กรอกราคา/ลิตร'); return; }
   if(!total) total = liters * ppl;
-  var data = { date:date, source:source, liters:liters, price_per_liter:ppl,
-               total_amount:total, invoice_no:inv, pump_name:pumpName,
+  var pplExcl = exclVat(ppl);              // ราคาก่อน VAT
+  var totalExcl = exclVat(total);          // ยอดก่อน VAT
+  var data = { date:date, source:source, liters:liters,
+               price_per_liter:ppl,            // รวม VAT (ที่กรอก)
+               price_excl_vat:pplExcl,         // ก่อน VAT (คำนวณ)
+               total_amount:total,             // รวม VAT
+               total_excl_vat:totalExcl,       // ก่อน VAT
+               invoice_no:inv, pump_name:pumpName,
                by:curEmail||'', created_at:firebase.firestore.FieldValue.serverTimestamp() };
   toast('⏳ กำลังบันทึก...');
   try {
@@ -4789,8 +4802,14 @@ async function saveFuelExp() {
   if(liters<=0){ toast('⚠️ กรอกจำนวนลิตร'); return; }
   if(ppl<=0)  { toast('⚠️ กรอกราคา/ลิตร'); return; }
   if(!total) total = liters*ppl;
+  var pplExcl = exclVat(ppl);
+  var totalExcl = exclVat(total);
   var data = { date:date, plate:plate, pump:pump, pump_name:pName,
-               liters:liters, price_per_liter:ppl, total_amount:total,
+               liters:liters,
+               price_per_liter:ppl,          // รวม VAT
+               price_excl_vat:pplExcl,        // ก่อน VAT
+               total_amount:total,            // รวม VAT
+               total_excl_vat:totalExcl,      // ก่อน VAT
                odometer:odo, invoice_no:inv,
                by:curEmail||'', created_at:firebase.firestore.FieldValue.serverTimestamp() };
   toast('⏳ กำลังบันทึก...');
@@ -4820,7 +4839,7 @@ function drawFuelInList() {
       +'<td><button onclick="delFuelDoc(\'fuel_in\',\''+r._id+'\')" style="background:none;border:none;color:#ef5350;cursor:pointer;font-size:.85rem;">🗑️</button></td>'
       +'</tr>';
   });
-  el.innerHTML = fuelTblWrap(['วันที่','แหล่งที่มา','ลิตร','บาท/ลิตร','ยอดรวม','ใบกำกับ','ลบ'], rows);
+  el.innerHTML = fuelTblWrap(['วันที่','แหล่งที่มา','ลิตร','บาท/ลิตร<br><span style="font-size:.6rem;font-weight:400;">(รวม VAT)</span>','ยอดรวม<br><span style="font-size:.6rem;font-weight:400;">(รวม VAT)</span>','ใบกำกับ','ลบ'], rows);
 }
 function drawFuelOutList() {
   var el = document.getElementById('fuelOutList'); if(!el) return;
@@ -4851,7 +4870,7 @@ function drawFuelExpList() {
       +'<td><button onclick="delFuelDoc(\'fuel_expense\',\''+r._id+'\')" style="background:none;border:none;color:#ef5350;cursor:pointer;font-size:.85rem;">🗑️</button></td>'
       +'</tr>';
   });
-  el.innerHTML = fuelTblWrap(['วันที่','ทะเบียน','ปั๊ม','ลิตร','บาท/ลิตร','ยอดรวม','km','ลบ'], rows);
+  el.innerHTML = fuelTblWrap(['วันที่','ทะเบียน','ปั๊ม','ลิตร','บาท/ลิตร<br><span style="font-size:.6rem;font-weight:400;">(รวม VAT)</span>','ยอดรวม<br><span style="font-size:.6rem;font-weight:400;">(รวม VAT)</span>','km','ลบ'], rows);
 }
 
 async function delFuelDoc(col, id) {
@@ -4867,9 +4886,14 @@ async function loadFuelMonthly() {
   // auto-fill fuel costs from data
   var [yr, mo] = ym.split('-');
   var monthIn  = fuelInData.filter(function(r){ return r.date && r.date.startsWith(ym); });
-  var tankCost = monthIn.reduce(function(s,r){ return s+((r.liters||0)*(r.price_per_liter||0)); },0);
+  // ต้นทุนใช้ราคาก่อน VAT (ราคาจริงทางบัญชี)
+  var tankCost = monthIn.reduce(function(s,r){
+    return s+(r.total_excl_vat || (r.total_amount ? exclVat(r.total_amount) : 0));
+  },0);
   var monthExp = fuelExpData.filter(function(r){ return r.date && r.date.startsWith(ym); });
-  var expCost  = monthExp.reduce(function(s,r){ return s+(r.total_amount||0); },0);
+  var expCost  = monthExp.reduce(function(s,r){
+    return s+(r.total_excl_vat || (r.total_amount ? exclVat(r.total_amount) : 0));
+  },0);
   var el1 = document.getElementById('fCostTankFuel');
   var el2 = document.getElementById('fCostExpFuel');
   if(el1) el1.value = tankCost.toFixed(0);
@@ -4928,7 +4952,9 @@ function calcAndShowFuelCost(ym) {
     +'<div style="background:rgba(129,199,132,.08);border-radius:8px;padding:10px;grid-column:1/-1;"><div style="font-size:.68rem;color:#3a7a3a;margin-bottom:4px;">ต้นทุนผันแปร/คิว</div><div style="font-size:1.6rem;font-weight:800;color:#81c784;">'+perKiu.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท/คิว</div></div>'
     +'<div style="grid-column:1/-1;font-size:.72rem;color:#6b7280;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;">'
     +'น้ำมันถัง '+tank.toLocaleString()+' | น้ำมันรถ '+exp.toLocaleString()+' | ค่าแรง '+labor.toLocaleString()+' | เช่า '+rent.toLocaleString()+' | ซ่อม '+repair.toLocaleString()+' | อื่นๆ '+other.toLocaleString()
-    +'</div></div>';
+    +'</div>'
+    +'<div style="grid-column:1/-1;font-size:.68rem;color:#4a90b8;background:rgba(79,195,247,.06);border-radius:6px;padding:6px 10px;">📌 ต้นทุนน้ำมันทั้งหมดคำนวณจากราคา<strong>ก่อน VAT</strong> (ราคาจริงทางบัญชี — VAT ขอคืนได้)</div>'
+    +'</div>';
 }
 
 async function saveFuelMonthly() {
@@ -4985,13 +5011,17 @@ function fuelRptPreview() {
   var monthExp = fuelExpData.filter(function(r){ return r.date && r.date.startsWith(ym); });
   var totalInL = monthIn.reduce(function(s,r){ return s+(r.liters||0); },0);
   var totalInB = monthIn.reduce(function(s,r){ return s+(r.total_amount||0); },0);
+  var totalInExcl = monthIn.reduce(function(s,r){ return s+(r.total_excl_vat||(r.total_amount?exclVat(r.total_amount):0)); },0);
   var totalOutL= monthOut.reduce(function(s,r){ return s+(r.liters||0); },0);
   var totalExpB= monthExp.reduce(function(s,r){ return s+(r.total_amount||0); },0);
+  var totalExpExcl = monthExp.reduce(function(s,r){ return s+(r.total_excl_vat||(r.total_amount?exclVat(r.total_amount):0)); },0);
   el.innerHTML = '<div style="padding:12px;font-size:.8rem;">'
     +'<div style="font-weight:700;margin-bottom:8px;color:var(--gold);">สรุปน้ำมัน เดือน '+ym+'</div>'
-    +'<div>🛢️ รับเข้า: '+totalInL.toLocaleString()+' ลิตร / '+totalInB.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</div>'
-    +'<div>📤 เบิกออกจากถัง: '+totalOutL.toLocaleString()+' ลิตร</div>'
-    +'<div>🚛 ค่าน้ำมันรถ (ปั๊มนอก): '+totalExpB.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</div>'
+    +'<div>🛢️ รับเข้า: '+totalInL.toLocaleString()+' ลิตร</div>'
+    +'<div style="padding-left:18px;color:#9ca3af;">รวม VAT: '+totalInB.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท / ก่อน VAT: '+totalInExcl.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</div>'
+    +'<div style="margin-top:4px;">📤 เบิกออกจากถัง: '+totalOutL.toLocaleString()+' ลิตร</div>'
+    +'<div style="margin-top:4px;">🚛 ค่าน้ำมันรถ (ปั๊มนอก):</div>'
+    +'<div style="padding-left:18px;color:#9ca3af;">รวม VAT: '+totalExpB.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท / ก่อน VAT: '+totalExpExcl.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</div>'
     +'</div>';
 }
 
@@ -5005,20 +5035,22 @@ function printFuelReport() {
   var bySource = {};
   monthIn.forEach(function(r){
     var k = fuelSourceLabel(r.source, r.pump_name);
-    if(!bySource[k]) bySource[k]={liters:0,amount:0,times:0};
+    if(!bySource[k]) bySource[k]={liters:0,amount:0,amountExcl:0,times:0};
     bySource[k].liters += r.liters||0;
     bySource[k].amount += r.total_amount||0;
+    bySource[k].amountExcl += r.total_excl_vat||(r.total_amount?exclVat(r.total_amount):0);
     bySource[k].times  += 1;
   });
   var srcRows = Object.entries(bySource).map(function(kv){
-    return '<tr><td>'+kv[0]+'</td><td style="text-align:right">'+kv[1].times+'</td><td style="text-align:right">'+kv[1].liters.toLocaleString()+'</td><td style="text-align:right">'+kv[1].amount.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+    return '<tr><td>'+kv[0]+'</td><td style="text-align:right">'+kv[1].times+'</td><td style="text-align:right">'+kv[1].liters.toLocaleString()+'</td><td style="text-align:right">'+kv[1].amount.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td><td style="text-align:right">'+kv[1].amountExcl.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
   }).join('');
   var outRows = monthOut.map(function(r){
     var typeL={boat:'เรือ',excavator:'แม็กโคร',truck:'รถบรรทุก'};
     return '<tr><td>'+isoToBE_fuel(r.date)+'</td><td>'+(typeL[r.type]||r.type)+'</td><td>'+(r.machine_id||'—')+'</td><td style="text-align:right">'+(r.liters||0).toLocaleString()+'</td></tr>';
   }).join('');
   var expRows = monthExp.map(function(r){
-    return '<tr><td>'+isoToBE_fuel(r.date)+'</td><td>'+(r.plate||'—')+'</td><td>'+fuelSourceLabel(r.pump,r.pump_name)+'</td><td style="text-align:right">'+(r.liters||0).toLocaleString()+'</td><td style="text-align:right">'+(r.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+    var ex = r.total_excl_vat||(r.total_amount?exclVat(r.total_amount):0);
+    return '<tr><td>'+isoToBE_fuel(r.date)+'</td><td>'+(r.plate||'—')+'</td><td>'+fuelSourceLabel(r.pump,r.pump_name)+'</td><td style="text-align:right">'+(r.liters||0).toLocaleString()+'</td><td style="text-align:right">'+(r.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td><td style="text-align:right">'+ex.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
   }).join('');
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
     +'<style>@import url("https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap");'
@@ -5030,11 +5062,11 @@ function printFuelReport() {
     +'</head><body>'
     +'<div class="hdr"><div><h1>รายงานน้ำมันเชื้อเพลิง</h1><div class="sub">หจก.ธนเศรษฐ์ศิริ 2546 | 274 ม.2 ต.ผาตั้ง อ.สังคม จ.หนองคาย | เลขที่ผู้เสียภาษี 0413541001000</div></div><div style="text-align:right"><div style="font-weight:700">เดือน: '+ym+'</div></div></div>'
     +'<h2>1. รับน้ำมันเข้า (กระทบถัง)</h2>'
-    +'<table><thead><tr><th>แหล่งที่มา</th><th>จำนวนครั้ง</th><th>ลิตรรวม</th><th>ยอดเงินรวม (บาท)</th></tr></thead><tbody>'+srcRows+'</tbody></table>'
+    +'<table><thead><tr><th>แหล่งที่มา</th><th>จำนวนครั้ง</th><th>ลิตรรวม</th><th>ยอดเงิน (รวม VAT)</th><th>ยอดเงิน (ก่อน VAT)</th></tr></thead><tbody>'+srcRows+'</tbody></table>'
     +'<h2>2. เบิกออกจากถัง</h2>'
     +'<table><thead><tr><th>วันที่</th><th>ประเภท</th><th>เลขเครื่อง/ทะเบียน</th><th>ลิตร</th></tr></thead><tbody>'+(outRows||'<tr><td colspan="4" style="text-align:center;color:#999">ไม่มีรายการ</td></tr>')+'</tbody></table>'
     +'<h2>3. ค่าน้ำมันรถ (เติมปั๊มนอก — ไม่กระทบถัง)</h2>'
-    +'<table><thead><tr><th>วันที่</th><th>ทะเบียน</th><th>ปั๊ม</th><th>ลิตร</th><th>ยอดเงิน (บาท)</th></tr></thead><tbody>'+(expRows||'<tr><td colspan="5" style="text-align:center;color:#999">ไม่มีรายการ</td></tr>')+'</tbody></table>'
+    +'<table><thead><tr><th>วันที่</th><th>ทะเบียน</th><th>ปั๊ม</th><th>ลิตร</th><th>ยอดเงิน (รวม VAT)</th><th>ยอดเงิน (ก่อน VAT)</th></tr></thead><tbody>'+(expRows||'<tr><td colspan="6" style="text-align:center;color:#999">ไม่มีรายการ</td></tr>')+'</tbody></table>'
     +'<div class="no-print" style="text-align:center;margin-top:8mm">'
     +'<button onclick="window.print()" style="padding:6pt 20pt;background:#6c63b6;color:#fff;border:none;border-radius:5pt;font-size:10pt;cursor:pointer;margin-right:6pt">🖨️ พิมพ์ / PDF</button>'
     +'<button onclick="window.close()" style="padding:6pt 20pt;background:#eee;color:#333;border:none;border-radius:5pt;font-size:10pt;cursor:pointer">✕ ปิด</button></div>'
@@ -5045,9 +5077,11 @@ function printFuelReport() {
 function exportFuelInReport() {
   toast('📊 Export รายงานรับเข้า...');
   try {
-    var rows = [['วันที่(CE)','วันที่(BE)','แหล่งที่มา','ปั๊ม','ลิตร','ราคา/ลิตร','ยอดรวม','ใบกำกับ']];
+    var rows = [['วันที่(CE)','วันที่(BE)','แหล่งที่มา','ปั๊ม','ลิตร','ราคา/ลิตร(รวมVAT)','ราคา/ลิตร(ก่อนVAT)','ยอดรวม(รวมVAT)','ยอดรวม(ก่อนVAT)','ใบกำกับ']];
     fuelInData.forEach(function(r){
-      rows.push([r.date, isoToBE_fuel(r.date), FUEL_SOURCES[r.source]||r.source, r.pump_name||'', r.liters||0, r.price_per_liter||0, r.total_amount||0, r.invoice_no||'']);
+      var pEx = r.price_excl_vat||(r.price_per_liter?exclVat(r.price_per_liter):0);
+      var tEx = r.total_excl_vat||(r.total_amount?exclVat(r.total_amount):0);
+      rows.push([r.date, isoToBE_fuel(r.date), FUEL_SOURCES[r.source]||r.source, r.pump_name||'', r.liters||0, r.price_per_liter||0, +pEx.toFixed(4), r.total_amount||0, +tEx.toFixed(2), r.invoice_no||'']);
     });
     var wb = XLSX.utils.book_new();
     var ws = XLSX.utils.aoa_to_sheet(rows);
@@ -5064,9 +5098,10 @@ function exportFuelExcel() {
   try {
     var wb = XLSX.utils.book_new();
     // Sheet 1: รับเข้า
-    var inRows = [['วันที่','แหล่งที่มา','ลิตร','ราคา/ลิตร','ยอดรวม','ใบกำกับ']];
+    var inRows = [['วันที่','แหล่งที่มา','ลิตร','ราคา/ลิตร(รวมVAT)','ยอดรวม(รวมVAT)','ยอดรวม(ก่อนVAT)','ใบกำกับ']];
     fuelInData.filter(function(r){ return r.date && r.date.startsWith(ym); }).forEach(function(r){
-      inRows.push([isoToBE_fuel(r.date), fuelSourceLabel(r.source,r.pump_name), r.liters||0, r.price_per_liter||0, r.total_amount||0, r.invoice_no||'']);
+      var tEx = r.total_excl_vat||(r.total_amount?exclVat(r.total_amount):0);
+      inRows.push([isoToBE_fuel(r.date), fuelSourceLabel(r.source,r.pump_name), r.liters||0, r.price_per_liter||0, r.total_amount||0, +tEx.toFixed(2), r.invoice_no||'']);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(inRows), 'รับเข้า');
     // Sheet 2: เบิกออก
@@ -5077,9 +5112,10 @@ function exportFuelExcel() {
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(outRows), 'เบิกออกจากถัง');
     // Sheet 3: ค่าน้ำมันรถ
-    var expRows2 = [['วันที่','ทะเบียน','ปั๊ม','ลิตร','ราคา/ลิตร','ยอดรวม','ไมล์','ใบกำกับ']];
+    var expRows2 = [['วันที่','ทะเบียน','ปั๊ม','ลิตร','ราคา/ลิตร(รวมVAT)','ยอดรวม(รวมVAT)','ยอดรวม(ก่อนVAT)','ไมล์','ใบกำกับ']];
     fuelExpData.filter(function(r){ return r.date && r.date.startsWith(ym); }).forEach(function(r){
-      expRows2.push([isoToBE_fuel(r.date), r.plate||'', fuelSourceLabel(r.pump,r.pump_name), r.liters||0, r.price_per_liter||0, r.total_amount||0, r.odometer||'', r.invoice_no||'']);
+      var tEx = r.total_excl_vat||(r.total_amount?exclVat(r.total_amount):0);
+      expRows2.push([isoToBE_fuel(r.date), r.plate||'', fuelSourceLabel(r.pump,r.pump_name), r.liters||0, r.price_per_liter||0, r.total_amount||0, +tEx.toFixed(2), r.odometer||'', r.invoice_no||'']);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(expRows2), 'ค่าน้ำมันรถ');
     XLSX.writeFile(wb, 'fuel_report_'+ym+'.xlsx');
