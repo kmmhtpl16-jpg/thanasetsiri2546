@@ -299,10 +299,12 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
 select{color-scheme:dark;}
 
 /* batch list & split layout */
-.tp1-split{display:flex;gap:14px;align-items:flex-start;}
+.tp1-split{display:flex;gap:14px;align-items:stretch;}
 .tp1-main{flex:0 0 65%;min-width:0;}
-.tp1-side{flex:0 0 calc(35% - 14px);min-width:0;position:sticky;top:0;}
-@media(max-width:700px){.tp1-split{flex-direction:column;}.tp1-main,.tp1-side{flex:none;width:100%;position:static;}}
+.tp1-side{flex:0 0 calc(35% - 14px);min-width:0;position:sticky;top:0;align-self:flex-start;max-height:calc(100vh - 200px);}
+.tp1-side .card{height:100%;display:flex;flex-direction:column;}
+.tp1-side #batchList{flex:1;overflow-y:auto;}
+@media(max-width:700px){.tp1-split{flex-direction:column;}.tp1-main,.tp1-side{flex:none;width:100%;position:static;max-height:none;}}
 
 /* คลังไฟล์ table */
 #batchList table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -526,7 +528,7 @@ select{color-scheme:dark;}
               🗄 คลังไฟล์
               <button class="btn btn-ghost" onclick="loadBatches()" style="margin-left:auto;padding:3px 8px;font-size:10px">🔄</button>
             </div>
-            <div id="batchList" style="overflow-y:auto;max-height:calc(100vh - 320px)">
+            <div id="batchList">
               <p style="color:var(--muted);font-size:11px;padding:8px 0">กด 🔄 เพื่อโหลด</p>
             </div>
           </div>
