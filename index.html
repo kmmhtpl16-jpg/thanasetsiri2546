@@ -555,6 +555,19 @@ select{color-scheme:dark;}
           </div>
         </div>
       </div>
+      <!-- Modal ดูใบจ่ายรถร่วม -->
+      <div id="viewpay-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;align-items:center;justify-content:center;padding:16px">
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:22px;max-width:560px;width:100%;max-height:85vh;overflow-y:auto">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <div id="viewpay-title" style="font-size:17px;font-weight:800;color:var(--gold);flex:1">ใบจ่าย</div>
+            <button class="btn btn-ghost" onclick="viewPayClose()" style="padding:5px 12px;font-size:13px">✕ ปิด</button>
+          </div>
+          <div id="viewpay-body"></div>
+          <div class="brow" style="gap:10px;margin-top:16px">
+            <button class="btn btn-gold" style="flex:1;justify-content:center" onclick="viewPayPrint()">🖨️ พิมพ์ A4</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- TAB 2 -->
@@ -2084,7 +2097,8 @@ function importFile(evt) {
     var wb;
     try { wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}); }
     catch(ex){ setMsg('s1','❌ อ่านไฟล์ไม่ได้','err'); return; }
-    var rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+    var sheet=wb.Sheets[wb.SheetNames[0]];
+    var rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
     parseAndSave(rows, file.name);
   };
   reader.readAsArrayBuffer(file);
@@ -2237,6 +2251,30 @@ function escHtml(s) {
 }
 
 function parseAndSave(rows, fname) {
+  // ── แปลงค่าในช่องเป็น ISO date ──
+  // allowSerial=true เฉพาะตอนหาวันที่แถวสุดท้าย (กัน seq/น้ำหนักถูกตีความเป็นวันที่)
+  function cellToISO(val, allowSerial){
+    var s=String(val||'').trim();
+    if(!s) return '';
+    // 1) ข้อความรูปแบบ DD/MM/YYYY หรือ DD-MM-YYYY (ปีอาจเป็น พ.ศ.)
+    var dm=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if(dm){
+      var y=parseInt(dm[3]); if(y>2400) y-=543;
+      return y+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
+    }
+    // 2) Excel serial number — เฉพาะเมื่อ allowSerial (กัน seq/น้ำหนักผิด)
+    if(allowSerial && /^\d{4,5}(\.\d+)?$/.test(s)){
+      var n=parseFloat(s);
+      // ช่วงปี 2020–2035 เท่านั้น (serial 43831–49674) — แคบ กัน seq 5x,xxx ผิด
+      if(n>=43831 && n<=49674){
+        var ms=(n-25569)*86400*1000;
+        var d=new Date(ms);
+        return d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2);
+      }
+    }
+    return '';
+  }
+
   // หา header row
   var hr=-1;
   for(var i=0;i<rows.length;i++){
@@ -2261,15 +2299,13 @@ function parseAndSave(rows, fname) {
     var testDateVal = String(testRow[iDate]||'').trim();
     // ถ้าค่าในช่องวันที่เป็นเวลา (HH:MM:SS) ไม่ใช่วันที่
     if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(testDateVal)){
-      // หาวันที่จากแถวสุดท้าย
-      for(var li=rows.length-1; li>=rows.length-5; li--){
-        var lr = rows[li];
+      // หาวันที่จากแถวสุดท้าย (รองรับทั้งข้อความและ serial number)
+      for(var li=rows.length-1; li>=Math.max(0,rows.length-6); li--){
+        var lr = rows[li]; if(!lr) continue;
         for(var lc=0; lc<lr.length; lc++){
-          var lv = String(lr[lc]||'').trim();
-          var ldm = lv.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-          if(ldm){
-            var ly = parseInt(ldm[3]); if(ly>2400) ly-=543;
-            singleDateStr = ly+'-'+ldm[2].padStart(2,'0')+'-'+ldm[1].padStart(2,'0');
+          var iso = cellToISO(lr[lc], true);
+          if(iso){
+            singleDateStr = iso;
             singleDateMode = true;
             break;
           }
@@ -2295,11 +2331,8 @@ function parseAndSave(rows, fname) {
     if(singleDateMode){
       dateStr = singleDateStr;
     } else {
-      var raw=String(r[iDate]||'').trim();
-      var dm=raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-      if(!dm) continue;
-      var y=parseInt(dm[3]); if(y>2400) y-=543;
-      dateStr=y+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
+      dateStr = cellToISO(r[iDate]);
+      if(!dateStr) continue;
     }
     if(!dateStr) continue;
 
@@ -3000,15 +3033,17 @@ function viewPayment(docNo){
     var rate=p.rateForTruck||0;
     var rows=trips.map(function(t){
       var net=t.netKiu||0;
-      return '<tr><td>'+(t.plate||'')+'</td>'
-        +'<td style="text-align:right">'+fmt3(net)+'</td>'
-        +'<td style="text-align:right">'+(net*rate).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+      return '<tr><td style="padding:6px 10px;border:1px solid var(--border)">'+(t.plate||'')+'</td>'
+        +'<td style="padding:6px 10px;border:1px solid var(--border);text-align:right">'+fmt3(net)+'</td>'
+        +'<td style="padding:6px 10px;border:1px solid var(--border);text-align:right">'+(net*rate).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
     }).join('')
-    +'<tr style="font-weight:700;background:#f5f0e8"><td>รวม</td>'
-    +'<td style="text-align:right">'+fmt3(p.totalNetKiu||0)+'</td>'
-    +'<td style="text-align:right">'+(p.totalAmount||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+    +'<tr style="font-weight:700"><td style="padding:6px 10px;border:1px solid var(--border)">รวม</td>'
+    +'<td style="padding:6px 10px;border:1px solid var(--border);text-align:right" class="gold">'+fmt3(p.totalNetKiu||0)+'</td>'
+    +'<td style="padding:6px 10px;border:1px solid var(--border);text-align:right" class="gold">'+(p.totalAmount||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
     var period=(p.dateFrom&&p.dateTo)?(invDateFmt(p.dateFrom)+' ถึง '+invDateFmt(p.dateTo)):'–';
-    var html='<html><head><meta charset="UTF-8"><title>ใบจ่าย '+docNo+'</title>'
+
+    // เก็บ html สำหรับพิมพ์ (A4) ไว้ใช้ตอนกดปุ่มพิมพ์
+    _viewPayPrintHtml='<html><head><meta charset="UTF-8"><title>ใบจ่าย '+docNo+'</title>'
       +'<style>@page{size:A4 portrait;margin:15mm}*{box-sizing:border-box}'
       +'body{font-family:Sarabun,sans-serif;font-size:13px;color:#111;margin:0;padding:0}'
       +'.sheet{width:180mm;margin:0 auto}h2{color:#7a4f00;margin:0 0 4px}p{margin:3px 0}'
@@ -3026,11 +3061,33 @@ function viewPayment(docNo){
       +'<p>ช่วงวันที่: <b>'+period+'</b> | ราคา: <b>'+rate+' บาท/คิว</b></p></div>'
       +'<div class="company"><b>หจก.ธนเศรษฐ์ศิริ 2546</b><br>274 ม.2 ต.ผาตั้ง อ.สังคม<br>จ.หนองคาย 43160<br>โทร 0818714977</div></div>'
       +'<table><thead><tr><th>ทะเบียน</th><th style="text-align:right">คิวสุทธิ</th><th style="text-align:right">เงิน (×'+rate+')</th></tr></thead>'
-      +'<tbody>'+rows+'</tbody></table>'
-      +'<button onclick="window.print()" style="margin-top:16px;padding:8px 16px;cursor:pointer">🖨️ พิมพ์</button>'
-      +'</div></body></html>';
-    var w=window.open('','_blank'); w.document.write(html); w.document.close();
+      +'<tbody>'+trips.map(function(t){var net=t.netKiu||0;return '<tr><td>'+(t.plate||'')+'</td><td style="text-align:right">'+fmt3(net)+'</td><td style="text-align:right">'+(net*rate).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';}).join('')
+      +'<tr style="font-weight:700;background:#f5f0e8"><td>รวม</td><td style="text-align:right">'+fmt3(p.totalNetKiu||0)+'</td><td style="text-align:right">'+(p.totalAmount||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>'
+      +'</tbody></table></div></body></html>';
+
+    // แสดงใน modal บนหน้าเว็บ (ใช้ได้ทั้งมือถือ/เดสก์ท็อป)
+    document.getElementById('viewpay-title').textContent='ใบจ่าย '+docNo;
+    document.getElementById('viewpay-body').innerHTML=
+      '<div style="font-size:13px;line-height:1.7;margin-bottom:10px">'
+      +'<div>เจ้าของรถ: <b>'+(p.canonical||'')+'</b></div>'
+      +'<div>ลูกค้า: <b>'+(p.customer||'')+'</b></div>'
+      +'<div>ช่วงวันที่: <b>'+period+'</b></div>'
+      +'<div>ราคา: <b>'+rate+' บาท/คิว</b></div></div>'
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+      +'<thead><tr><th style="padding:7px 10px;border:1px solid var(--border);text-align:left;background:var(--bg3)">ทะเบียน</th>'
+      +'<th style="padding:7px 10px;border:1px solid var(--border);text-align:right;background:var(--bg3)">คิวสุทธิ</th>'
+      +'<th style="padding:7px 10px;border:1px solid var(--border);text-align:right;background:var(--bg3)">เงิน (×'+rate+')</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table></div>';
+    document.getElementById('viewpay-dialog').style.display='flex';
   }).catch(function(e){ alert('❌ '+e.message); });
+}
+var _viewPayPrintHtml='';
+function viewPayClose(){ document.getElementById('viewpay-dialog').style.display='none'; }
+function viewPayPrint(){
+  if(!_viewPayPrintHtml) return;
+  var w=window.open('','_blank');
+  if(w){ w.document.write(_viewPayPrintHtml); w.document.close(); }
+  else { alert('เบราว์เซอร์บล็อกการเปิดหน้าต่างพิมพ์ — กรุณาอนุญาต popup สำหรับเว็บนี้'); }
 }
 
 /* ── สร้าง dropdown ลูกค้าจาก weighings ── */
