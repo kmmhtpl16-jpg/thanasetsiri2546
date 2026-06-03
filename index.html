@@ -299,12 +299,10 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
 select{color-scheme:dark;}
 
 /* batch list & split layout */
-.tp1-split{display:flex;gap:14px;align-items:stretch;}
-.tp1-main{flex:0 0 65%;min-width:0;}
-.tp1-side{flex:0 0 calc(35% - 14px);min-width:0;position:sticky;top:0;align-self:flex-start;max-height:calc(100vh - 200px);}
-.tp1-side .card{height:100%;display:flex;flex-direction:column;}
-.tp1-side #batchList{flex:1;overflow-y:auto;}
-@media(max-width:700px){.tp1-split{flex-direction:column;}.tp1-main,.tp1-side{flex:none;width:100%;position:static;max-height:none;}}
+.tp1-split{display:flex;gap:0;align-items:flex-start;margin-left:-16px;margin-right:-16px;}
+.tp1-main{flex:0 0 65%;max-width:65%;min-width:0;padding-right:14px;}
+.tp1-side{flex:0 0 35%;max-width:35%;min-width:0;}
+@media(max-width:700px){.tp1-split{flex-direction:column;margin:0;}.tp1-main{padding-right:0;max-width:100%;}.tp1-main,.tp1-side{flex:none;width:100%;max-width:100%;}}
 
 /* คลังไฟล์ table */
 #batchList table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -318,7 +316,7 @@ select{color-scheme:dark;}
 #batchList tbody tr{border-bottom:1px solid rgba(26,48,80,.4);transition:background .12s;}
 #batchList tbody tr:hover{background:rgba(240,165,0,.05);}
 #batchList tbody td{padding:9px 10px;font-size:13px;vertical-align:middle;white-space:nowrap;}
-#batchList .bc-time{color:var(--muted);font-size:12px;}
+#batchList .bc-time{color:var(--muted);font-size:13px;}
 #batchList .bc-date{color:var(--text);font-weight:600;}
 #batchList .bc-cnt{color:var(--gold);font-weight:800;text-align:right;}
 .btn-red{
@@ -502,7 +500,7 @@ select{color-scheme:dark;}
       <div class="tp1-split">
         <!-- ซ้าย: รายการ -->
         <div class="tp1-main">
-          <div class="card">
+          <div class="card" style="border-radius:0 var(--r) var(--r) 0;border-left:none;">
             <div class="card-title">
               📋 รายการ
               <span id="t1cnt" style="font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"></span>
@@ -523,7 +521,7 @@ select{color-scheme:dark;}
 
         <!-- ขวา: คลังข้อมูล (admin only) -->
         <div class="tp1-side ta" style="display:none">
-          <div class="card" style="height:100%">
+          <div class="card" style="border-radius:var(--r) 0 0 var(--r);border-right:none;">
             <div class="card-title" style="font-size:10px">
               🗄 คลังไฟล์
               <button class="btn btn-ghost" onclick="loadBatches()" style="margin-left:auto;padding:3px 8px;font-size:10px">🔄</button>
@@ -2024,6 +2022,7 @@ function importFile(evt) {
 /* ================================================================
    BATCH MANAGEMENT (admin only)
 ================================================================ */
+var bPage=1;
 function loadBatches() {
   var el=document.getElementById('batchList');
   el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:10px 0">⏳ กำลังโหลด…</p>';
@@ -2047,35 +2046,56 @@ function loadBatches() {
       el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:10px 0">ยังไม่มีข้อมูล</p>';
       return;
     }
-    var rows=keys.map(function(k){
-      var g=groups[k];
-      var atDate=g.importedAt?new Date(g.importedAt):null;
-      var dayStr=atDate?('0'+atDate.getDate()).slice(-2)+'/'
-        +('0'+(atDate.getMonth()+1)).slice(-2):'–';
-      var timeStr=atDate?('0'+atDate.getHours()).slice(-2)+':'
-        +('0'+atDate.getMinutes()).slice(-2):'';
-      var dates=Array.from(g.dates).sort();
-      var d0=dates.length?fmtBE(dates[0]).slice(0,5):'–';
-      var d1=dates.length>1?' – '+fmtBE(dates[dates.length-1]).slice(0,5):'';
-      return '<tr>'
-        +'<td><span class="bc-date">'+dayStr+'</span><br><span class="bc-time">'+timeStr+'</span></td>'
-        +'<td class="bc-date">'+d0+d1+'</td>'
-        +'<td class="bc-cnt">'+g.ids.length+'</td>'
-        +'<td style="text-align:center"><button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑 ลบ</button></td>'
-        +'</tr>';
-    }).join('');
-    el.innerHTML='<table>'
-      +'<thead><tr>'
-      +'<th>นำเข้าเมื่อ</th>'
-      +'<th>วันที่ทราย</th>'
-      +'<th class="r">รายการ</th>'
-      +'<th></th>'
-      +'</tr></thead>'
-      +'<tbody>'+rows+'</tbody>'
-      +'</table>';
+    drawBatches(keys, groups);
   }).catch(function(e){
     el.innerHTML='<p style="color:var(--err);font-size:13px;padding:10px 0">❌ '+e.message+'</p>';
   });
+}
+
+var _bKeys=[], _bGroups={};
+function drawBatches(keys, groups) {
+  if(keys) { _bKeys=keys; _bGroups=groups; bPage=1; }
+  var el=document.getElementById('batchList');
+  var paged=_bKeys.slice((bPage-1)*PAGE, bPage*PAGE);
+  var rows=paged.map(function(k){
+    var g=_bGroups[k];
+    var atDate=g.importedAt?new Date(g.importedAt):null;
+    var dayStr=atDate?('0'+atDate.getDate()).slice(-2)+'/'
+      +('0'+(atDate.getMonth()+1)).slice(-2)+'/'
+      +String(atDate.getFullYear()+543).slice(-2):'–';
+    var timeStr=atDate?('0'+atDate.getHours()).slice(-2)+':'
+      +('0'+atDate.getMinutes()).slice(-2):'–';
+    var dates=Array.from(g.dates).sort();
+    var d0=dates.length?fmtBE(dates[0]).slice(0,5):'–';
+    var d1=dates.length>1?' – '+fmtBE(dates[dates.length-1]).slice(0,5):'';
+    return '<tr>'
+      +'<td class="bc-date">'+dayStr+'</td>'
+      +'<td class="bc-time">'+timeStr+'</td>'
+      +'<td class="bc-date">'+d0+d1+'</td>'
+      +'<td class="bc-cnt">'+g.ids.length+'</td>'
+      +'<td style="text-align:center"><button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑 ลบ</button></td>'
+      +'</tr>';
+  }).join('');
+
+  // pager
+  var tot=_bKeys.length, tp=Math.ceil(tot/PAGE);
+  var pagerHtml='';
+  if(tp>1){
+    pagerHtml='<div class="pager" style="margin-top:8px">';
+    for(var i=1;i<=tp;i++) pagerHtml+='<button class="pbtn'+(i===bPage?' on':'')+'" onclick="bPage='+i+';drawBatches()">'+i+'</button>';
+    pagerHtml+='</div>';
+  }
+
+  el.innerHTML='<table>'
+    +'<thead><tr>'
+    +'<th>นำเข้าเมื่อ</th>'
+    +'<th>เวลา</th>'
+    +'<th>วันที่ทราย</th>'
+    +'<th class="r">รายการ</th>'
+    +'<th></th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody>'
+    +'</table>'+pagerHtml;
 }
 
 function deleteBatch(ids, fname) {
