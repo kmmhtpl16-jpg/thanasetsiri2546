@@ -482,7 +482,7 @@ select{color-scheme:dark;}
     <button class="tab-btn" data-tab="2" onclick="goTab(2)">⚖️ หักน้ำหนัก</button>
     <button class="tab-btn" data-tab="5" onclick="goTab(5)">🚛 ค่าเที่ยวรถร่วม</button>
     <button class="tab-btn" data-tab="6" onclick="goTab(6)">👷 เงินเดือน</button>
-    <button class="tab-btn ta" data-tab="3" onclick="goTab(3)" style="display:none">📊 รายงาน</button>
+    <button class="tab-btn ta" data-tab="3" onclick="goTab(3)" style="display:none">📄 ใบแจ้งหนี้ลูกค้า</button>
     <button class="tab-btn ta" data-tab="4" onclick="goTab(4)" style="display:none">👑 สรุปผู้บริหาร</button>
   </nav>
 
@@ -810,7 +810,8 @@ select{color-scheme:dark;}
             <label>ตั้งแต่<input id="fr-rpt-from" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:var(--font);"></label>
             <label>ถึง<input id="fr-rpt-to" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:var(--font);"></label>
             <button class="btn btn-gold" onclick="frReportRun()">🔍 ค้นหา</button>
-            <button class="btn btn-ghost" onclick="frReportPrint()">🖨️ พิมพ์</button>
+            <button class="btn btn-ghost" onclick="frReportPrint()">🖨️ พิมพ์ A4</button>
+            <button class="btn btn-ghost" onclick="frReportExcel()">📥 Export Excel</button>
           </div>
           <div id="fr-rpt-msg" class="smsg" style="margin-top:10px"></div>
           <div id="fr-rpt-result" style="margin-top:12px"></div>
@@ -2797,19 +2798,56 @@ function frReportPrint(){
   +'<td style="text-align:right">'+fmt3(d.sumDed)+'</td>'
   +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td></tr>';
   var html='<html><head><meta charset="UTF-8"><title>รายงานทะเบียน '+d.plate+'</title>'
-    +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
-    +'h2{color:#7a4f00;margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:12px}'
-    +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc}'
-    +'td{padding:6px 10px;border:1px solid #ddd}@media print{button{display:none}}</style>'
+    +'<style>'
+    +'@page{size:A4 portrait;margin:15mm}'
+    +'*{box-sizing:border-box}'
+    +'body{font-family:Sarabun,sans-serif;font-size:13px;color:#111;margin:0;padding:0}'
+    +'.sheet{width:180mm;margin:0 auto}'
+    +'h2{color:#7a4f00;margin:0 0 4px}'
+    +'p{margin:3px 0}'
+    +'table{width:100%;border-collapse:collapse;margin-top:12px}'
+    +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc;font-size:12px}'
+    +'td{padding:6px 10px;border:1px solid #ddd}'
+    +'.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #7a4f00;padding-bottom:8px;margin-bottom:10px}'
+    +'.company{font-size:11px;color:#555;text-align:right;line-height:1.5}'
+    +'@media print{button{display:none}.sheet{width:auto}}'
+    +'</style>'
     +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"></head><body>'
-    +'<h2>รายงานค่าเที่ยวรถร่วม — ตามทะเบียน</h2>'
+    +'<div class="sheet">'
+    +'<div class="hd"><div><h2>รายงานค่าเที่ยวรถร่วม — ตามทะเบียน</h2>'
     +'<p>ทะเบียน: <b>'+d.plate+'</b> | เจ้าของ: <b>'+d.owner+'</b></p>'
-    +'<p>ช่วงวันที่: <b>'+invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)+'</b></p>'
+    +'<p>ช่วงวันที่: <b>'+invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)+'</b></p></div>'
+    +'<div class="company"><b>หจก.ธนเศรษฐ์ศิริ 2546</b><br>274 ม.2 ต.ผาตั้ง อ.สังคม<br>จ.หนองคาย 43160<br>โทร 0818714977</div></div>'
     +'<table><thead><tr><th>วันที่</th><th>ลูกค้า</th><th style="text-align:right">คิว</th><th style="text-align:right">หักทรายเปียก</th><th style="text-align:right">คิวสุทธิ</th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table>'
-    +'<button onclick="window.print()" style="margin-top:16px;padding:8px 16px">🖨️ พิมพ์</button>'
-    +'</body></html>';
+    +'<button onclick="window.print()" style="margin-top:16px;padding:8px 16px;cursor:pointer">🖨️ พิมพ์</button>'
+    +'</div></body></html>';
   var w=window.open('','_blank'); w.document.write(html); w.document.close();
+}
+
+function frReportExcel(){
+  if(!_frRptData){ setMsg('fr-rpt-msg','❌ ค้นหาก่อน export','err'); return; }
+  var d=_frRptData;
+  var aoa=[
+    ['รายงานค่าเที่ยวรถร่วม — ตามทะเบียน'],
+    ['ทะเบียน', d.plate, '', 'เจ้าของ', d.owner],
+    ['ช่วงวันที่', invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)],
+    [],
+    ['วันที่','ลูกค้า','คิว','หักทรายเปียก','คิวสุทธิ']
+  ];
+  d.trips.forEach(function(t){
+    aoa.push([invDateFmt(t.date), t.customer,
+      parseFloat(t.kiu.toFixed(3)), parseFloat(t.ded.toFixed(3)), parseFloat(t.net.toFixed(3))]);
+  });
+  aoa.push(['รวม '+d.trips.length+' เที่ยว','',
+    parseFloat(d.sumKiu.toFixed(3)), parseFloat(d.sumDed.toFixed(3)), parseFloat(d.sumNet.toFixed(3))]);
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:12},{wch:24},{wch:10},{wch:14},{wch:10}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'รายงาน '+d.plate);
+  var fname='รายงาน_'+d.plate+'_'+d.from+'_'+d.to+'.xlsx';
+  XLSX.writeFile(wb, fname);
+  setMsg('fr-rpt-msg','✅ ดาวน์โหลด '+fname,'ok');
 }
 
 /* ── ประวัติใบจ่ายรถร่วม ── */
