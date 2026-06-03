@@ -40,7 +40,7 @@
 }
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-text-size-adjust:100%;}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:17px;line-height:1.5;-webkit-text-size-adjust:100%;}
 
 /* ============================================================
    PIN SCREEN
@@ -308,25 +308,25 @@ select{color-scheme:dark;}
 @media(max-width:700px){.tp1-split{flex-direction:column;margin:0;}.tp1-main{padding-right:0;max-width:100%;}.tp1-main,.tp1-side{flex:none;width:100%;max-width:100%;}}
 
 /* คลังไฟล์ table */
-#batchList table{width:100%;border-collapse:collapse;font-size:13px;}
+#batchList table{width:100%;border-collapse:collapse;font-size:12px;}
 #batchList thead th{
   background:var(--bg3);color:var(--muted);
-  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
-  padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+  padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);
   white-space:nowrap;
 }
 #batchList thead th.r{text-align:right;}
 #batchList tbody tr{border-bottom:1px solid rgba(26,48,80,.4);transition:background .12s;}
 #batchList tbody tr:hover{background:rgba(240,165,0,.05);}
-#batchList tbody td{padding:9px 10px;font-size:13px;vertical-align:middle;white-space:nowrap;}
-#batchList .bc-time{color:var(--muted);font-size:13px;}
+#batchList tbody td{padding:8px 10px;font-size:12px;vertical-align:middle;white-space:nowrap;}
+#batchList .bc-time{color:var(--muted);font-size:12px;}
 #batchList .bc-date{color:var(--text);font-weight:600;}
 #batchList .bc-cnt{color:var(--gold);font-weight:800;text-align:right;}
 #batchList table th:last-child,#batchList table td:last-child{width:100%;text-align:right;}
 .btn-red{
   background:transparent;border:1px solid rgba(231,76,60,.4);
   color:var(--err);padding:4px 10px;border-radius:5px;cursor:pointer;
-  font-size:13px;font-family:var(--font);white-space:nowrap;
+  font-size:12px;font-family:var(--font);white-space:nowrap;
   transition:background .15s,border-color .15s;
 }
 .btn-red:hover{background:rgba(231,76,60,.2);border-color:var(--err);}
@@ -526,9 +526,9 @@ select{color-scheme:dark;}
         <!-- ขวา: คลังข้อมูล (admin only) -->
         <div class="tp1-side ta" style="display:none">
           <div class="card" style="border-radius:var(--r) 0 0 var(--r);border-right:none;">
-            <div class="card-title" style="font-size:10px">
+            <div class="card-title">
               🗄 คลังไฟล์
-              <button class="btn btn-ghost" onclick="loadBatches()" style="margin-left:auto;padding:3px 8px;font-size:10px">🔄</button>
+              <button class="btn btn-ghost" onclick="loadBatches()" style="margin-left:auto;padding:5px 10px;font-size:11px">🔄 รีเฟรช</button>
             </div>
             <div id="batchList">
               <p style="color:var(--muted);font-size:11px;padding:8px 0">กด 🔄 เพื่อโหลด</p>
@@ -689,6 +689,7 @@ select{color-scheme:dark;}
         <div class="brow">
           <button class="btn btn-gold" id="fr-type-inv" onclick="frSetType('invoice')">📄 ใบแจ้งหนี้ลูกค้า</button>
           <button class="btn btn-ghost" id="fr-type-pay" onclick="frSetType('payment')">💸 ใบจ่ายรถร่วม</button>
+          <button class="btn btn-ghost" id="fr-type-rpt" onclick="frSetType('report')">📊 รายงานตามทะเบียน</button>
           <button class="btn btn-ghost" id="fr-type-veh" onclick="frSetType('vehicles')" style="margin-left:auto">⚙️ จัดการทะเบียนรถ</button>
         </div>
       </div>
@@ -786,6 +787,34 @@ select{color-scheme:dark;}
           </div>
           <div id="fr-pay-msg" class="smsg" style="margin-top:10px"></div>
           <div id="fr-pay-owners" style="display:none"></div>
+        </div>
+        <!-- ประวัติใบจ่ายรถร่วม -->
+        <div class="card">
+          <div class="card-title">
+            📋 ประวัติใบจ่ายรถร่วม
+            <button class="btn btn-ghost" onclick="loadPayHistory()" style="margin-left:auto;padding:5px 10px;font-size:11px">🔄 โหลด</button>
+          </div>
+          <div id="fr-pay-history"><p style="color:var(--muted);font-size:12px;padding:8px 0">กด 🔄 โหลด เพื่อดูใบจ่ายที่บันทึกไว้</p></div>
+        </div>
+      </div>
+
+      <!-- ── ส่วน R: รายงานตามทะเบียน ── -->
+      <div id="fr-report-panel" style="display:none">
+        <div class="card">
+          <div class="card-title">📊 รายงานค่าเที่ยวรถร่วม — ตามเลขทะเบียน</div>
+          <div class="frow" style="flex-wrap:wrap;gap:10px;align-items:flex-end">
+            <label>ทะเบียนรถ
+              <input id="fr-rpt-plate" type="text" list="fr-rpt-platelist" placeholder="เช่น 83-4888" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:var(--font);width:160px">
+              <datalist id="fr-rpt-platelist"></datalist>
+            </label>
+            <label>ตั้งแต่<input id="fr-rpt-from" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:var(--font);"></label>
+            <label>ถึง<input id="fr-rpt-to" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:var(--font);"></label>
+            <button class="btn btn-gold" onclick="frReportRun()">🔍 ค้นหา</button>
+            <button class="btn btn-ghost" onclick="frReportPrint()">🖨️ พิมพ์</button>
+          </div>
+          <div id="fr-rpt-msg" class="smsg" style="margin-top:10px"></div>
+          <div id="fr-rpt-result" style="margin-top:12px"></div>
+        </div>
       </div>
 
       <!-- ── ส่วน C: จัดการทะเบียนรถ ── -->
@@ -818,6 +847,25 @@ select{color-scheme:dark;}
             <div class="brow">
               <button class="btn btn-gold" onclick="fuzzyConfirm(true)">✅ ใช่ รวมเป็นคนเดียวกัน</button>
               <button class="btn btn-ghost" onclick="fuzzyConfirm(false)">❌ ไม่ใช่ แยกต่างหาก</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plate resolve dialog (ตรวจทะเบียนใหม่ตอนดึงเที่ยว) -->
+      <div id="plate-resolve-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1001;align-items:center;justify-content:center">
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:420px;width:92%">
+          <div id="plate-resolve-title" style="font-size:16px;font-weight:800;color:var(--gold);margin-bottom:14px"></div>
+          <div id="plate-resolve-msg" style="font-size:14px;color:var(--text);margin-bottom:18px;line-height:1.7"></div>
+          <div id="plate-resolve-suggest" style="display:none;margin-bottom:14px">
+            <button class="btn btn-gold psug-yes" style="width:100%;justify-content:center;padding:10px">✅ ใช่ ใช้เจ้าของคนนี้</button>
+          </div>
+          <div id="plate-resolve-newbox">
+            <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">หรือกรอกชื่อเจ้าของใหม่:</label>
+            <input type="text" id="plate-resolve-new" placeholder="ชื่อเจ้าของรถ" style="width:100%;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;font-family:var(--font);margin-bottom:12px">
+            <div class="brow" style="gap:8px">
+              <button class="btn btn-gold" style="flex:1;justify-content:center" onclick="plateResolveNew()">💾 บันทึกชื่อใหม่</button>
+              <button class="btn btn-ghost" onclick="plateResolveSkip()">⏭️ ข้ามคันนี้</button>
             </div>
           </div>
         </div>
@@ -2629,18 +2677,176 @@ var FR_RATES = {
 };
 var FUZZY_THRESHOLD = 0.75;
 
+/* ── normalize ทะเบียน: ลบจุด/ช่องว่าง/อักขระแปลก เหลือแค่ตัวเลข ตัวอักษรไทย-อังกฤษ และ - ── */
+function normPlate(p){
+  return String(p||'').trim()
+    .replace(/\s+/g,'')        // ลบช่องว่าง
+    .replace(/[.\u0e46]+$/g,'') // ลบจุด/ๆ ท้าย
+    .replace(/\.+/g,'');        // ลบจุดที่เหลือ
+}
+
+/* ── หา canonical จาก vehData โดยเทียบแบบ normalize ── */
+function lookupVeh(plate){
+  if(vehData[plate]) return vehData[plate];          // ตรงเป๊ะ
+  var np=normPlate(plate);
+  if(vehData[np]) return vehData[np];                // ตรงหลัง normalize
+  // ค้นทุก key ใน vehData ที่ normalize แล้วตรงกัน
+  var keys=Object.keys(vehData);
+  for(var i=0;i<keys.length;i++){
+    if(normPlate(keys[i])===np) return vehData[keys[i]];
+  }
+  return null;
+}
+
 /* ── Panel switching ── */
 function frSetType(type) {
   document.getElementById('fr-invoice-panel').style.display  = type==='invoice'  ? '' : 'none';
   document.getElementById('fr-payment-panel').style.display  = type==='payment'  ? '' : 'none';
+  document.getElementById('fr-report-panel').style.display   = type==='report'   ? '' : 'none';
   document.getElementById('fr-vehicles-panel').style.display = type==='vehicles' ? '' : 'none';
-  [['fr-type-inv','invoice'],['fr-type-pay','payment'],['fr-type-veh','vehicles']].forEach(function(pair){
+  [['fr-type-inv','invoice'],['fr-type-pay','payment'],['fr-type-rpt','report'],['fr-type-veh','vehicles']].forEach(function(pair){
     var btn=document.getElementById(pair[0]);
     if(btn) btn.className='btn '+(type===pair[1]?'btn-gold':'btn-ghost');
   });
   if(type==='invoice')  frBuildCustDropdown();
-  if(type==='payment')  frLoadInvoiceList();
+  if(type==='payment')  { frLoadInvoiceList(); loadPayHistory(); }
+  if(type==='report')   frReportInit();
   if(type==='vehicles') { listenVeh(); drawVeh(); }
+}
+
+/* ── รายงานค่าเที่ยวตามทะเบียน ── */
+var _frRptData=null;
+function frReportInit(){
+  // เติม datalist ทะเบียนจากข้อมูลตาชั่ง
+  var dl=document.getElementById('fr-rpt-platelist');
+  if(dl){
+    var plates={};
+    wData.forEach(function(w){ var p=normPlate(w.plate); if(p) plates[p]=true; });
+    dl.innerHTML=Object.keys(plates).sort().map(function(p){return '<option value="'+p+'">';}).join('');
+  }
+}
+function frReportRun(){
+  var plateIn=normPlate(document.getElementById('fr-rpt-plate').value);
+  var from=document.getElementById('fr-rpt-from').value;
+  var to=document.getElementById('fr-rpt-to').value;
+  var res=document.getElementById('fr-rpt-result');
+  if(!plateIn){ setMsg('fr-rpt-msg','❌ กรอกเลขทะเบียน','err'); res.innerHTML=''; return; }
+  if(!from||!to){ setMsg('fr-rpt-msg','❌ เลือกช่วงวันที่','err'); res.innerHTML=''; return; }
+  if(from>to){ setMsg('fr-rpt-msg','❌ วันเริ่มต้องน้อยกว่าวันสิ้นสุด','err'); return; }
+
+  // ดึงทุกเที่ยวของทะเบียนนี้ในช่วงวันที่
+  var trips=wData.filter(function(w){
+    return normPlate(w.plate)===plateIn && w.date>=from && w.date<=to;
+  }).map(function(w){
+    var kiu=w.kg/KPC;
+    var ded=(typeof dData!=='undefined'&&dData[w._id])?dData[w._id]:0;
+    return {date:w.date,customer:w.customer||'–',kiu:kiu,ded:ded,net:kiu-ded,
+            seq:w.seq||'',time:w.time||''};
+  }).sort(function(a,b){return a.date.localeCompare(b.date)||String(a.seq).localeCompare(String(b.seq));});
+
+  if(!trips.length){
+    setMsg('fr-rpt-msg','⚠️ ไม่พบเที่ยวของทะเบียน '+plateIn+' ในช่วงวันที่นี้','warn');
+    res.innerHTML=''; return;
+  }
+
+  var v=lookupVeh(plateIn);
+  var owner=(v&&v.canonical)||'❓ ไม่ทราบเจ้าของ';
+  var sumKiu=trips.reduce(function(s,t){return s+t.kiu;},0);
+  var sumDed=trips.reduce(function(s,t){return s+t.ded;},0);
+  var sumNet=trips.reduce(function(s,t){return s+t.net;},0);
+
+  _frRptData={plate:plateIn,owner:owner,from:from,to:to,trips:trips,sumKiu:sumKiu,sumDed:sumDed,sumNet:sumNet};
+
+  var rows=trips.map(function(t){
+    return '<tr>'
+      +'<td>'+invDateFmt(t.date)+'</td>'
+      +'<td>'+t.customer+'</td>'
+      +'<td class="r">'+fmt3(t.kiu)+'</td>'
+      +'<td class="r">'+(t.ded>0?fmt3(t.ded):'–')+'</td>'
+      +'<td class="r gold">'+fmt3(t.net)+'</td>'
+      +'</tr>';
+  }).join('');
+
+  res.innerHTML='<div style="margin-bottom:10px;font-size:14px">'
+    +'🚛 ทะเบียน <b style="color:var(--gold)">'+plateIn+'</b> &nbsp;|&nbsp; เจ้าของ: <b>'+owner+'</b><br>'
+    +'<span style="color:var(--muted);font-size:12px">ช่วง '+invDateFmt(from)+' – '+invDateFmt(to)+' &nbsp;|&nbsp; รวม '+trips.length+' เที่ยว</span></div>'
+    +'<div class="table-wrap"><table>'
+    +'<thead><tr><th>วันที่</th><th>ลูกค้า</th><th class="r">คิว</th><th class="r">หักทรายเปียก</th><th class="r">คิวสุทธิ</th></tr></thead>'
+    +'<tbody>'+rows
+    +'<tr style="border-top:2px solid var(--border);font-weight:700">'
+    +'<td colspan="2"><b>รวม '+trips.length+' เที่ยว</b></td>'
+    +'<td class="r"><b>'+fmt3(sumKiu)+'</b></td>'
+    +'<td class="r"><b>'+fmt3(sumDed)+'</b></td>'
+    +'<td class="r gold"><b>'+fmt3(sumNet)+'</b></td>'
+    +'</tr>'
+    +'</tbody></table></div>';
+  setMsg('fr-rpt-msg','✅ พบ '+trips.length+' เที่ยว','ok');
+}
+
+function frReportPrint(){
+  if(!_frRptData){ setMsg('fr-rpt-msg','❌ ค้นหาก่อนพิมพ์','err'); return; }
+  var d=_frRptData;
+  var rows=d.trips.map(function(t){
+    return '<tr><td>'+invDateFmt(t.date)+'</td><td>'+t.customer+'</td>'
+      +'<td style="text-align:right">'+fmt3(t.kiu)+'</td>'
+      +'<td style="text-align:right">'+(t.ded>0?fmt3(t.ded):'-')+'</td>'
+      +'<td style="text-align:right">'+fmt3(t.net)+'</td></tr>';
+  }).join('')
+  +'<tr style="font-weight:700;background:#f5f0e8"><td colspan="2">รวม '+d.trips.length+' เที่ยว</td>'
+  +'<td style="text-align:right">'+fmt3(d.sumKiu)+'</td>'
+  +'<td style="text-align:right">'+fmt3(d.sumDed)+'</td>'
+  +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td></tr>';
+  var html='<html><head><meta charset="UTF-8"><title>รายงานทะเบียน '+d.plate+'</title>'
+    +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
+    +'h2{color:#7a4f00;margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:12px}'
+    +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc}'
+    +'td{padding:6px 10px;border:1px solid #ddd}@media print{button{display:none}}</style>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"></head><body>'
+    +'<h2>รายงานค่าเที่ยวรถร่วม — ตามทะเบียน</h2>'
+    +'<p>ทะเบียน: <b>'+d.plate+'</b> | เจ้าของ: <b>'+d.owner+'</b></p>'
+    +'<p>ช่วงวันที่: <b>'+invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)+'</b></p>'
+    +'<table><thead><tr><th>วันที่</th><th>ลูกค้า</th><th style="text-align:right">คิว</th><th style="text-align:right">หักทรายเปียก</th><th style="text-align:right">คิวสุทธิ</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table>'
+    +'<button onclick="window.print()" style="margin-top:16px;padding:8px 16px">🖨️ พิมพ์</button>'
+    +'</body></html>';
+  var w=window.open('','_blank'); w.document.write(html); w.document.close();
+}
+
+/* ── ประวัติใบจ่ายรถร่วม ── */
+function loadPayHistory(){
+  var el=document.getElementById('fr-pay-history');
+  if(!el) return;
+  el.innerHTML='<p style="color:var(--muted);font-size:12px;padding:8px 0">⏳ กำลังโหลด…</p>';
+  db.collection('freight_payments').orderBy('docNo','desc').limit(100).get().then(function(snap){
+    if(snap.empty){ el.innerHTML='<p style="color:var(--muted);font-size:12px;padding:8px 0">ยังไม่มีใบจ่าย</p>'; return; }
+    var rows=snap.docs.map(function(d){
+      var p=d.data();
+      var created=p.createdAt?new Date(p.createdAt):null;
+      var cStr=created?('0'+created.getDate()).slice(-2)+'/'+('0'+(created.getMonth()+1)).slice(-2)+'/'+String(created.getFullYear()+543).slice(-2):'–';
+      var period=(p.dateFrom&&p.dateTo)?(invDateFmt?invDateFmt(p.dateFrom)+'–'+invDateFmt(p.dateTo):p.dateFrom+'–'+p.dateTo):'–';
+      return '<tr>'
+        +'<td><b>'+(p.docNo||'')+'</b></td>'
+        +'<td>'+(p.canonical||'')+'</td>'
+        +'<td style="color:var(--muted)">'+(p.customer||'')+'</td>'
+        +'<td style="color:var(--muted);font-size:11px">'+period+'</td>'
+        +'<td class="r">'+(p.totalNetKiu||0).toFixed(3)+'</td>'
+        +'<td class="r gold">'+(p.totalAmount||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
+        +'<td style="color:var(--muted);font-size:11px">'+cStr+'</td>'
+        +'<td><button class="btn-red" onclick="deletePayment('+JSON.stringify(p.docNo)+')">🗑 ลบ</button></td>'
+        +'</tr>';
+    }).join('');
+    el.innerHTML='<div class="table-wrap"><table>'
+      +'<thead><tr><th>เลขที่</th><th>เจ้าของรถ</th><th>ลูกค้า</th><th>ช่วงวันที่</th><th class="r">คิว</th><th class="r">เงิน</th><th>บันทึกเมื่อ</th><th></th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table></div>';
+  }).catch(function(e){ el.innerHTML='<p style="color:var(--err);font-size:12px;padding:8px 0">❌ '+e.message+'</p>'; });
+}
+
+function deletePayment(docNo){
+  if(!confirm('ยืนยันลบใบจ่าย '+docNo+'?')) return;
+  db.collection('freight_payments').doc(docNo).delete().then(function(){
+    setMsg('fr-pay-msg','✅ ลบใบจ่าย '+docNo+' แล้ว','ok');
+    loadPayHistory();
+  }).catch(function(e){ setMsg('fr-pay-msg','❌ '+e.message,'err'); });
 }
 
 /* ── สร้าง dropdown ลูกค้าจาก weighings ── */
@@ -2830,9 +3036,11 @@ function frFetchInvoice(){
   rows.forEach(function(w){
     var net=(w.kg/KPC)-(dData[w._id]||0);
     if(net<=0) return;
-    var canonical=(vehData[w.plate]&&vehData[w.plate].canonical)||('❓ '+w.plate);
-    if(!plateMap[w.plate]) plateMap[w.plate]={canonical:canonical,netKiu:0};
-    plateMap[w.plate].netKiu+=net;
+    var np=normPlate(w.plate);
+    var v=lookupVeh(w.plate);
+    var canonical=(v&&v.canonical)||('❓ '+np);
+    if(!plateMap[np]) plateMap[np]={canonical:canonical,netKiu:0};
+    plateMap[np].netKiu+=net;
   });
 
   frInvData = Object.keys(plateMap).map(function(p){
@@ -3140,16 +3348,107 @@ function frManualLoad(){
   if(!from||!to){ setMsg('fr-pay-msg','\u274C \u0e23\u0e30\u0e1a\u0e38\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','err'); return; }
   if(!(rate>0)){ setMsg('fr-pay-msg','\u274C \u0e23\u0e30\u0e1a\u0e38\u0e23\u0e32\u0e04\u0e32/\u0e04\u0e34\u0e27','err'); return; }
   var custSet={}; custList.forEach(function(c){custSet[c]=true;});
+
+  // ── ตรวจทะเบียนที่ยังไม่มีเจ้าของในฐาน ──
+  var unknownSet={};
+  wData.forEach(function(w){
+    if(!custSet[w.customer]) return;
+    if(w.date<from||w.date>to) return;
+    var net=(w.kg/KPC)-(typeof dData!=='undefined'&&dData[w._id]?dData[w._id]:0);
+    if(net<=0) return;
+    if(!lookupVeh(w.plate)){ unknownSet[normPlate(w.plate)]=true; }
+  });
+  var unknowns=Object.keys(unknownSet);
+  if(unknowns.length){
+    // เก็บ context ไว้ทำต่อหลังเคลียร์ทะเบียนใหม่
+    _pendingManualArgs={custSet:custSet,from:from,to:to,rate:rate,custList:custList};
+    startPlateResolve(unknowns);
+    return;
+  }
+  frManualBuild(custSet,from,to,rate,custList);
+}
+
+/* ── จัดการทะเบียนใหม่ทีละคันด้วย popup ── */
+var _plateQueue=[], _pendingManualArgs=null;
+function startPlateResolve(plates){
+  _plateQueue=plates.slice();
+  nextPlateResolve();
+}
+function nextPlateResolve(){
+  if(!_plateQueue.length){
+    // เสร็จแล้ว — ทำต่อ
+    document.getElementById('plate-resolve-dialog').style.display='none';
+    var a=_pendingManualArgs; _pendingManualArgs=null;
+    if(a) frManualBuild(a.custSet,a.from,a.to,a.rate,a.custList);
+    return;
+  }
+  var plate=_plateQueue[0];
+  // หาทะเบียนใกล้เคียงในฐาน (normalize ตรงกัน หรือ มีตัวเลขชุดเดียวกัน)
+  var suggestion=findPlateSuggestion(plate);
+  var dlg=document.getElementById('plate-resolve-dialog');
+  var msg=document.getElementById('plate-resolve-msg');
+  var sugBox=document.getElementById('plate-resolve-suggest');
+  var newBox=document.getElementById('plate-resolve-newbox');
+  document.getElementById('plate-resolve-title').textContent='🚗 ทะเบียนใหม่: '+plate;
+  document.getElementById('plate-resolve-new').value='';
+  if(suggestion){
+    msg.innerHTML='พบทะเบียนคล้ายกันในฐานข้อมูล:<br>'
+      +'<b style="color:var(--gold);font-size:15px">'+suggestion.plate+'</b> → เจ้าของ: <b>'+suggestion.canonical+'</b>';
+    sugBox.style.display='';
+    sugBox.querySelector('.psug-yes').onclick=function(){ resolvePlate(plate, suggestion.canonical, suggestion.ownerName||suggestion.canonical); };
+  } else {
+    msg.innerHTML='ทะเบียน <b>'+plate+'</b> ยังไม่มีในฐานข้อมูล<br>กรุณากรอกชื่อเจ้าของรถ';
+    sugBox.style.display='none';
+  }
+  dlg.style.display='flex';
+}
+function findPlateSuggestion(plate){
+  var np=normPlate(plate);
+  var keys=Object.keys(vehData);
+  // 1) normalize ตรงกันเป๊ะ
+  for(var i=0;i<keys.length;i++) if(normPlate(keys[i])===np) return Object.assign({plate:keys[i]},vehData[keys[i]]);
+  // 2) ตัวเลขชุดเดียวกัน (เอาเฉพาะตัวเลข)
+  var digits=np.replace(/\D/g,'');
+  if(digits.length>=4){
+    for(var j=0;j<keys.length;j++){
+      if(normPlate(keys[j]).replace(/\D/g,'')===digits) return Object.assign({plate:keys[j]},vehData[keys[j]]);
+    }
+  }
+  return null;
+}
+function resolvePlate(plate, canonical, ownerName){
+  db.collection('vehicles').doc(plate).set({ownerName:ownerName,canonical:canonical,active:true})
+    .then(function(){
+      vehData[plate]={ownerName:ownerName,canonical:canonical,active:true};
+      _plateQueue.shift();
+      nextPlateResolve();
+    }).catch(function(e){ alert('บันทึกไม่สำเร็จ: '+e.message); });
+}
+function plateResolveNew(){
+  var plate=_plateQueue[0];
+  var name=(document.getElementById('plate-resolve-new').value||'').trim();
+  if(!name){ alert('กรุณากรอกชื่อเจ้าของ'); return; }
+  resolvePlate(plate, name, name);
+}
+function plateResolveSkip(){
+  // ข้ามคันนี้ (ปล่อยให้ขึ้น ❓ ต่อไป)
+  _plateQueue.shift();
+  nextPlateResolve();
+}
+
+function frManualBuild(custSet,from,to,rate,custList){
   var ownerMap={};
   wData.forEach(function(w){
     if(!custSet[w.customer]) return;
     if(w.date<from||w.date>to) return;
-    var canon=(vehData[w.plate]&&vehData[w.plate].canonical)||('\u2753 '+w.plate);
+    var np=normPlate(w.plate);
+    var v=lookupVeh(w.plate);
+    var canon=(v&&v.canonical)||('\u2753 '+np);
     var net=(w.kg/KPC)-(typeof dData!=='undefined'&&dData[w._id]?dData[w._id]:0);
     if(net<=0) return;
     if(!ownerMap[canon]) ownerMap[canon]={};
-    if(!ownerMap[canon][w.plate]) ownerMap[canon][w.plate]=0;
-    ownerMap[canon][w.plate]+=net;
+    if(!ownerMap[canon][np]) ownerMap[canon][np]=0;
+    ownerMap[canon][np]+=net;
   });
   var owners=Object.keys(ownerMap).sort(function(a,b){return a.localeCompare(b,'th');});
   if(!owners.length){ setMsg('fr-pay-msg','\u26A0\uFE0F \u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e02\u0e2d\u0e07\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e43\u0e19\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','warn'); document.getElementById('fr-pay-owners').style.display='none'; return; }
@@ -3197,7 +3496,8 @@ function frSaveManual(owner){
       totalAmount:parseFloat((total*ctx.rate).toFixed(2)),
       createdAt:new Date().toISOString(),createdBy:curEmail,trips:trips};
     return db.collection('freight_payments').doc(docNo).set(data).then(function(){
-      setMsg('fr-pay-msg','\u2705 \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01 '+owner+' \u0e40\u0e25\u0e02\u0e17\u0e35\u0e48 '+docNo,'ok');
+      setMsg('fr-pay-msg','\u2705 \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01 '+owner+' \u0e40\u0e25\u0e02\u0e17\u0e35\u0e48 '+docNo+' \u2014 \u0e14\u0e39\u0e44\u0e14\u0e49\u0e43\u0e19\u0e1b\u0e23\u0e30\u0e27\u0e31\u0e15\u0e34\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e14\u0e49\u0e32\u0e19\u0e25\u0e48\u0e32\u0e07','ok');
+      loadPayHistory();
     });
   }).catch(function(e){ setMsg('fr-pay-msg','\u274C '+e.message,'err'); });
 }
@@ -3289,7 +3589,7 @@ function frSavePayment(refInvoice,canonical,rate){
         createdAt:new Date().toISOString(),createdBy:curEmail,trips:trips};
       return db.collection('freight_payments').doc(docNo).set(data).then(function(){return docNo;});
     });
-  }).then(function(docNo){setMsg('fr-pay-msg','✅ บันทึก '+canonical+' เลขที่ '+docNo,'ok');})
+  }).then(function(docNo){setMsg('fr-pay-msg','✅ บันทึก '+canonical+' เลขที่ '+docNo+' — ดูได้ในประวัติใบจ่ายด้านล่าง','ok');loadPayHistory();})
     .catch(function(e){setMsg('fr-pay-msg','❌ '+e.message,'err');});
 }
 
