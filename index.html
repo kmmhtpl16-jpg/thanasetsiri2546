@@ -298,18 +298,12 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
 }
 select{color-scheme:dark;}
 
-/* batch list */
-.batch-item{
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  padding:10px 12px;background:var(--bg3);border:1px solid var(--border);
-  border-radius:8px;margin-bottom:6px;
-}
-.batch-item:last-child{margin-bottom:0;}
-.batch-meta{flex:1;min-width:180px;}
-.batch-fname{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
-.batch-sub{font-size:10px;color:var(--muted);margin-top:2px;}
-.batch-cnt{font-size:11px;color:var(--gold);font-weight:700;white-space:nowrap;}
-.btn-red{background:rgba(231,76,60,.15);border:1px solid rgba(231,76,60,.35);color:var(--err);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font);white-space:nowrap;transition:background .2s;}
+/* batch list & split layout */
+.tp1-split{display:flex;gap:14px;align-items:flex-start;}
+.tp1-main{flex:0 0 65%;min-width:0;}
+.tp1-side{flex:0 0 calc(35% - 14px);min-width:0;}
+@media(max-width:700px){.tp1-split{flex-direction:column;}.tp1-main,.tp1-side{flex:none;width:100%;}}
+.btn-red{background:rgba(231,76,60,.15);border:1px solid rgba(231,76,60,.35);color:var(--err);padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;font-family:var(--font);white-space:nowrap;transition:background .2s;}
 .btn-red:hover{background:rgba(231,76,60,.3);}
 
 /* offline banner */
@@ -481,31 +475,41 @@ select{color-scheme:dark;}
         </div>
         <div id="s1" class="smsg" style="margin-top:10px"></div>
       </div>
-      <!-- คลังข้อมูล (admin only) -->
-      <div class="card ta" style="display:none">
-        <div class="card-title">
-          🗄 คลังข้อมูลไฟล์ที่นำเข้า
-          <button class="btn btn-ghost" onclick="loadBatches()" style="margin-left:auto;padding:5px 10px;font-size:11px">🔄 รีเฟรช</button>
-        </div>
-        <div id="batchList"><p style="color:var(--muted);font-size:12px;padding:8px 0">กด รีเฟรช เพื่อโหลดรายการ</p></div>
-      </div>
 
-      <div class="card">
-        <div class="card-title">
-          📋 รายการ
-          <span id="t1cnt" style="font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"></span>
-          <button class="btn btn-ghost" id="vBtn" onclick="toggleView()" style="margin-left:auto;padding:5px 10px">📋 ทั้งหมด</button>
+      <div class="tp1-split">
+        <!-- ซ้าย: รายการ -->
+        <div class="tp1-main">
+          <div class="card">
+            <div class="card-title">
+              📋 รายการ
+              <span id="t1cnt" style="font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"></span>
+              <button class="btn btn-ghost" id="vBtn" onclick="toggleView()" style="margin-left:auto;padding:5px 10px">📋 ทั้งหมด</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>เลขที่</th><th>ทะเบียน</th><th>วันที่</th><th>เวลา</th>
+                  <th>ลูกค้า</th><th>สินค้า</th><th>นน.(kg)</th><th>คิว</th>
+                </tr></thead>
+                <tbody id="t1b"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px">กำลังเชื่อมต่อ…</td></tr></tbody>
+              </table>
+            </div>
+            <div id="t1pg" class="pager"></div>
+          </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>เลขที่</th><th>ทะเบียน</th><th>วันที่</th><th>เวลา</th>
-              <th>ลูกค้า</th><th>สินค้า</th><th>นน.(kg)</th><th>คิว</th>
-            </tr></thead>
-            <tbody id="t1b"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px">กำลังเชื่อมต่อ…</td></tr></tbody>
-          </table>
+
+        <!-- ขวา: คลังข้อมูล (admin only) -->
+        <div class="tp1-side ta" style="display:none">
+          <div class="card" style="height:100%">
+            <div class="card-title" style="font-size:10px">
+              🗄 คลังไฟล์
+              <button class="btn btn-ghost" onclick="loadBatches()" style="margin-left:auto;padding:3px 8px;font-size:10px">🔄</button>
+            </div>
+            <div id="batchList" style="overflow-y:auto;max-height:520px">
+              <p style="color:var(--muted);font-size:11px;padding:8px 0">กด 🔄 เพื่อโหลด</p>
+            </div>
+          </div>
         </div>
-        <div id="t1pg" class="pager"></div>
       </div>
     </section>
 
@@ -1999,7 +2003,7 @@ function importFile(evt) {
 ================================================================ */
 function loadBatches() {
   var el=document.getElementById('batchList');
-  el.innerHTML='<p style="color:var(--muted);font-size:12px;padding:8px 0">⏳ กำลังโหลด…</p>';
+  el.innerHTML='<p style="color:var(--muted);font-size:11px;padding:6px 0">⏳ กำลังโหลด…</p>';
   db.collection('weighings').get().then(function(snap) {
     var groups={};
     snap.docs.forEach(function(d) {
@@ -2008,7 +2012,7 @@ function loadBatches() {
       if(!groups[key]) groups[key]={
         importedAt: data.importedAt||'',
         importedBy: data.importedBy||'',
-        fileName:   data.fileName||'(ไม่ทราบชื่อไฟล์)',
+        fileName:   data.fileName||'–',
         dates: new Set(),
         ids: []
       };
@@ -2017,34 +2021,42 @@ function loadBatches() {
     });
     var keys=Object.keys(groups).sort().reverse();
     if(keys.length===0){
-      el.innerHTML='<p style="color:var(--muted);font-size:12px;padding:8px 0">ยังไม่มีข้อมูล</p>';
+      el.innerHTML='<p style="color:var(--muted);font-size:11px;padding:6px 0">ยังไม่มีข้อมูล</p>';
       return;
     }
-    el.innerHTML=keys.map(function(k,idx){
+    var rows=keys.map(function(k){
       var g=groups[k];
       var atDate=g.importedAt?new Date(g.importedAt):null;
       var atStr=atDate?
         ('0'+atDate.getDate()).slice(-2)+'/'
-        +('0'+(atDate.getMonth()+1)).slice(-2)+'/'
-        +(atDate.getFullYear()+543)+' '
+        +('0'+(atDate.getMonth()+1)).slice(-2)+' '
         +('0'+atDate.getHours()).slice(-2)+':'
         +('0'+atDate.getMinutes()).slice(-2):'–';
       var dates=Array.from(g.dates).sort();
-      var dateRange=dates.length===0?'–':
-        dates.length===1?fmtBE(dates[0]):
-        fmtBE(dates[0])+' – '+fmtBE(dates[dates.length-1]);
-      return '<div class="batch-item">'
-        +'<div class="batch-meta">'
-        +'<div class="batch-fname">📄 '+escHtml(g.fileName)+'</div>'
-        +'<div class="batch-sub">🕐 '+atStr+' &nbsp;|&nbsp; 👤 '+escHtml(g.importedBy)+'</div>'
-        +'<div class="batch-sub">📅 วันที่ทราย: <b style="color:var(--text)">'+dateRange+'</b></div>'
-        +'</div>'
-        +'<div class="batch-cnt">'+g.ids.length+' รายการ</div>'
-        +'<button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑 ลบ</button>'
-        +'</div>';
+      var d0=dates.length?fmtBE(dates[0]).slice(0,5):'–';
+      var d1=dates.length>1?'–'+fmtBE(dates[dates.length-1]).slice(0,5):'';
+      return '<tr>'
+        +'<td style="color:var(--muted);white-space:nowrap">'+atStr+'</td>'
+        +'<td style="white-space:nowrap">'+d0+d1+'</td>'
+        +'<td class="r" style="color:var(--gold);font-weight:700">'+g.ids.length+'</td>'
+        +'<td><button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑</button></td>'
+        +'</tr>';
     }).join('');
+    el.innerHTML='<table style="width:100%;font-size:11px;border-collapse:collapse">'
+      +'<thead><tr>'
+      +'<th style="text-align:left;color:var(--muted);font-size:10px;padding:4px 6px;border-bottom:1px solid var(--border)">นำเข้า</th>'
+      +'<th style="text-align:left;color:var(--muted);font-size:10px;padding:4px 6px;border-bottom:1px solid var(--border)">วันทราย</th>'
+      +'<th style="text-align:right;color:var(--muted);font-size:10px;padding:4px 6px;border-bottom:1px solid var(--border)">#</th>'
+      +'<th style="border-bottom:1px solid var(--border)"></th>'
+      +'</tr></thead>'
+      +'<tbody>'+rows+'</tbody>'
+      +'</table>';
+    // style rows
+    el.querySelectorAll('tbody tr').forEach(function(tr){
+      tr.querySelectorAll('td').forEach(function(td){ td.style.padding='5px 6px'; td.style.borderBottom='1px solid rgba(26,48,80,.3)'; });
+    });
   }).catch(function(e){
-    el.innerHTML='<p style="color:var(--err);font-size:12px;padding:8px 0">❌ '+e.message+'</p>';
+    el.innerHTML='<p style="color:var(--err);font-size:11px;padding:6px 0">❌ '+e.message+'</p>';
   });
 }
 
