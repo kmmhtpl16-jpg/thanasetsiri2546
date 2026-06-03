@@ -268,6 +268,55 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
 .badge-pending{background:rgba(243,156,18,.15);color:#e67e22;border:1px solid rgba(243,156,18,.4);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700}
 .badge-billed{background:rgba(39,174,96,.15);color:#27ae60;border:1px solid rgba(39,174,96,.4);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700}
 
+/* ── แก้ชื่อลูกค้า + filter Tab1 ── */
+.b-edited{
+  display:inline-flex;align-items:center;gap:3px;
+  background:rgba(52,152,219,.12);color:var(--info);
+  border:1px solid rgba(52,152,219,.3);border-radius:4px;
+  padding:2px 6px;font-size:10px;font-weight:700;cursor:help;
+}
+.btn-edit-cust{
+  padding:3px 8px;font-size:11px;font-family:var(--font);font-weight:700;
+  background:transparent;border:1px solid var(--border);border-radius:4px;
+  color:var(--muted);cursor:pointer;transition:border-color .15s,color .15s;white-space:nowrap;
+}
+.btn-edit-cust:hover{border-color:var(--info);color:var(--info);}
+.t1filter{
+  display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;
+  margin-bottom:10px;padding:10px 12px;
+  background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+}
+.t1filter label{display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+.t1filter input{
+  padding:5px 8px;background:var(--bg2);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);font-size:12px;font-family:var(--font);min-width:100px;
+}
+.t1filter input:focus{outline:none;border-color:var(--gold);}
+.t1filter .clr-btn{
+  padding:5px 10px;background:transparent;border:1px solid var(--border);
+  border-radius:5px;color:var(--muted);font-size:11px;font-family:var(--font);cursor:pointer;align-self:flex-end;
+}
+.t1filter .clr-btn:hover{border-color:var(--err);color:var(--err);}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
+.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:22px 20px 18px;width:min(380px,96vw);box-shadow:0 24px 60px rgba(0,0,0,.6);}
+.modal-title{font-size:14px;font-weight:800;color:var(--gold);margin-bottom:14px;}
+.modal-row{margin-bottom:10px;}
+.modal-row label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;}
+.modal-row input{width:100%;padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);}
+.modal-row input:focus{outline:none;border-color:var(--gold);}
+.modal-row input[readonly]{color:var(--muted);cursor:default;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+.modal-note{font-size:10px;color:var(--warn);margin-top:6px;}
+.modal-conflict{background:rgba(243,156,18,.1);border:1px solid rgba(243,156,18,.3);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--warn);margin-bottom:10px;}
+/* ── ใบจ่ายแยกตามลูกค้า ── */
+.fr-cust-block{border:1px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.fr-cust-hdr{background:var(--bg3);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:3px solid var(--gold);}
+.fr-cust-name{font-size:13px;font-weight:800;color:var(--gold);}
+.fr-cust-rate{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);}
+.fr-cust-rate input{width:80px;padding:5px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;font-family:var(--font);text-align:right;}
+.fr-cust-rate input:focus{outline:none;border-color:var(--gold);}
+.fr-cust-body{padding:12px 14px;}
+
 /* ── Freight Tab 5 ── */
 .fr-group-hdr{
   background:var(--bg3);padding:7px 10px;
@@ -517,13 +566,20 @@ select{color-scheme:dark;}
               <span id="t1cnt" style="font-size:11px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"></span>
               <button class="btn btn-ghost" id="vBtn" onclick="toggleView()" style="margin-left:auto;padding:5px 10px">📋 ทั้งหมด</button>
             </div>
+            <div class="t1filter">
+              <label>ทะเบียน <input type="text" id="f1p" placeholder="เช่น 81-7429" oninput="page1=1;draw1()"></label>
+              <label>ลูกค้า  <input type="text" id="f1c" placeholder="ค้นหา…"      oninput="page1=1;draw1()"></label>
+              <label>วันที่เริ่ม <input type="date" id="f1a" oninput="page1=1;draw1()"></label>
+              <label>ถึง         <input type="date" id="f1b" oninput="page1=1;draw1()"></label>
+              <button class="clr-btn" onclick="clrF1()">✕ ล้าง</button>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead><tr>
                   <th>เลขที่</th><th>ทะเบียน</th><th>วันที่</th><th>เวลา</th>
-                  <th>ลูกค้า</th><th>สินค้า</th><th>นน.(kg)</th><th>คิว</th>
+                  <th>ลูกค้า</th><th>สินค้า</th><th>นน.(kg)</th><th>คิว</th><th></th>
                 </tr></thead>
-                <tbody id="t1b"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px">กำลังเชื่อมต่อ…</td></tr></tbody>
+                <tbody id="t1b"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:32px">กำลังเชื่อมต่อ…</td></tr></tbody>
               </table>
             </div>
             <div id="t1pg" class="pager"></div>
@@ -555,6 +611,24 @@ select{color-scheme:dark;}
           </div>
         </div>
       </div>
+      <!-- Modal: แก้ชื่อลูกค้า -->
+      <div id="editCustModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeEditModal()">
+        <div class="modal-box">
+          <div class="modal-title">✏️ แก้ชื่อลูกค้า</div>
+          <div id="editCustConflict" class="modal-conflict" style="display:none"></div>
+          <div class="modal-row"><label>บิลเลขที่ / วันที่</label><input id="ecMeta" readonly></div>
+          <div class="modal-row"><label>ทะเบียน</label><input id="ecPlate" readonly></div>
+          <div class="modal-row"><label>ชื่อเดิม (จาก Excel)</label><input id="ecOld" readonly></div>
+          <div class="modal-row"><label>แก้เป็น *</label><input id="ecNew" placeholder="ชื่อลูกค้าที่ถูกต้อง"></div>
+          <div class="modal-row"><label>เหตุผล * <span style="color:var(--muted);text-transform:none">(บังคับกรอก)</span></label><input id="ecReason" placeholder="เช่น บิลกระดาษระบุ ธีรนพ"></div>
+          <p class="modal-note">⚠️ ระบบเก็บชื่อเดิมไว้ใน customerOriginal — ไม่ลบทิ้ง</p>
+          <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeEditModal()">ยกเลิก</button>
+            <button class="btn btn-gold"  onclick="confirmEditCust()">💾 บันทึก</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Modal ดูใบจ่ายรถร่วม -->
     </section>
 
@@ -795,15 +869,15 @@ select{color-scheme:dark;}
             </div>
           </div>
           <div id="fr-pay-manbox" style="display:none">
-            <label style="display:block;margin-bottom:10px">ลูกค้า (เลือกได้หลายชื่อ — รวมจ่ายในใบเดียว)
+            <label style="display:block;margin-bottom:10px">ลูกค้า (เลือกได้หลายชื่อ — ระบบจะแยกใบจ่ายตามลูกค้า)
               <div id="fr-man-cust-box" style="margin-top:4px;max-height:200px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 14px"></div>
             </label>
             <div class="frow" style="flex-wrap:wrap;gap:10px;align-items:flex-end">
               <label>ตั้งแต่<input id="fr-man-from" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);"></label>
               <label>ถึง<input id="fr-man-to" type="date" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);"></label>
-              <label>ราคา (บาท/คิว)<input id="fr-man-rate" type="number" step="0.01" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:110px"></label>
               <button class="btn btn-gold" onclick="frManualLoad()">🔍 ดึงเที่ยว</button>
             </div>
+            <p style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">💡 หลังดึงเที่ยว: ระบบจะแยกตามลูกค้า แต่ละลูกค้ากำหนดราคา/คิวได้เอง แล้วออกใบจ่ายแยกตามเจ้าของรถในลูกค้านั้น</p>
           </div>
           <div id="fr-pay-msg" class="smsg" style="margin-top:10px"></div>
           <div id="fr-pay-owners" style="display:none"></div>
@@ -2378,28 +2452,107 @@ function updVBtn(){
 }
 
 function draw1() {
+  var fp=(document.getElementById('f1p')||{value:''}).value||'';
+  var fc=(document.getElementById('f1c')||{value:''}).value||'';
+  var fa=(document.getElementById('f1a')||{value:''}).value||'';
+  var fb=(document.getElementById('f1b')||{value:''}).value||'';
+  fp=fp.toLowerCase().trim(); fc=fc.toLowerCase().trim();
+
   var rows=[].concat(wData);
-  if(vMode==='latest'){
+  if(vMode==='latest' && !fp && !fc && !fa && !fb){
     var ld=rows[0]?rows[0].date:'';
     rows=rows.filter(function(r){return r.date===ld;});
   }
+  if(fp) rows=rows.filter(function(r){return r.plate.toLowerCase().includes(fp);});
+  if(fc) rows=rows.filter(function(r){return (r.customer||'').toLowerCase().includes(fc);});
+  if(fa) rows=rows.filter(function(r){return r.date>=fa;});
+  if(fb) rows=rows.filter(function(r){return r.date<=fb;});
+
   var tot=rows.length;
-  document.getElementById('t1cnt').textContent='รวม '+tot+' รายการ';
+  document.getElementById('t1cnt').textContent='\u0e23\u0e27\u0e21 '+tot+' \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23';
   var paged=rows.slice((page1-1)*PAGE, page1*PAGE);
+  var isAdmin=(curRole==='admin');
 
   document.getElementById('t1b').innerHTML = paged.length===0
-    ? '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
-    : paged.map(function(r,i){
+    ? '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25</td></tr>'
+    : paged.map(function(r){
         var c=(r.kg/KPC).toFixed(3);
+        var wasEdited=r.customerOriginal&&r.customerOriginal!==r.customer;
+        var custCell=wasEdited
+          ? r.customer+' <span class="b-edited" title="\u0e41\u0e01\u0e49\u0e08\u0e32\u0e01: '+r.customerOriginal+'">\u270f\ufe0f \u0e41\u0e01\u0e49\u0e41\u0e25\u0e49\u0e27</span>'
+          : r.customer;
+        var editBtn=isAdmin
+          ? '<button class="btn-edit-cust" onclick="openEditModal(\''+r._id+'\')">\u270f\ufe0f</button>'
+          : '';
         return '<tr><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
-          +'<td style="color:var(--muted)">'+(r.time||'–')+'</td>'
-          +'<td>'+r.customer+'</td><td style="color:var(--muted)">'+r.product+'</td>'
+          +'<td style="color:var(--muted)">'+(r.time||'\u2013')+'</td>'
+          +'<td>'+custCell+'</td><td style="color:var(--muted)">'+r.product+'</td>'
           +'<td class="r">'+r.kg.toLocaleString('th-TH')+'</td>'
-          +'<td class="r gold">'+c+'</td></tr>';
+          +'<td class="r gold">'+c+'</td>'
+          +'<td>'+editBtn+'</td></tr>';
       }).join('');
 
   makePager('t1pg', tot, page1, function(p){ page1=p; draw1(); });
 }
+
+function clrF1(){
+  ['f1p','f1c','f1a','f1b'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  page1=1; draw1();
+}
+
+/* \u2500\u2500 \u0e41\u0e01\u0e49\u0e0a\u0e37\u0e48\u0e2d\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32 (ADMIN ONLY) \u2500\u2500 */
+var _editId=null;
+function openEditModal(id){
+  var r=wData.find(function(w){return w._id===id;});
+  if(!r) return;
+  _editId=id;
+  document.getElementById('ecMeta').value  = '\u0e1a\u0e34\u0e25 #'+r.seq+' / '+r.date;
+  document.getElementById('ecPlate').value = r.plate;
+  document.getElementById('ecOld').value   = r.customerOriginal||r.customer;
+  document.getElementById('ecNew').value   = r.customer;
+  document.getElementById('ecReason').value= '';
+  var conf=document.getElementById('editCustConflict');
+  conf.style.display='none';
+  db.collection('freight_payments')
+    .where('dateFrom','<=',r.date).where('dateTo','>=',r.date)
+    .limit(5).get()
+    .then(function(snap){
+      if(!snap.empty){
+        var docNos=snap.docs.map(function(d){return d.data().docNo||d.id;}).join(', ');
+        conf.textContent='\u26a0\ufe0f \u0e1a\u0e34\u0e25\u0e19\u0e35\u0e49\u0e2d\u0e32\u0e08\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e43\u0e19\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e41\u0e25\u0e49\u0e27 ('+docNos+') \u2014 \u0e41\u0e01\u0e49\u0e44\u0e14\u0e49 \u0e41\u0e15\u0e48\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e40\u0e14\u0e34\u0e21\u0e44\u0e21\u0e48\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e22\u0e49\u0e2d\u0e19\u0e2b\u0e25\u0e31\u0e07';
+        conf.style.display='block';
+      }
+    }).catch(function(){});
+  document.getElementById('editCustModal').style.display='flex';
+  setTimeout(function(){ var n=document.getElementById('ecNew'); if(n) n.focus(); },100);
+}
+function closeEditModal(){
+  document.getElementById('editCustModal').style.display='none';
+  _editId=null;
+}
+function confirmEditCust(){
+  var newCust=document.getElementById('ecNew').value.trim();
+  var reason =document.getElementById('ecReason').value.trim();
+  if(!newCust){ alert('\u0e01\u0e23\u0e38\u0e13\u0e32\u0e01\u0e23\u0e2d\u0e01\u0e0a\u0e37\u0e48\u0e2d\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e16\u0e39\u0e01\u0e15\u0e49\u0e2d\u0e07'); return; }
+  if(!reason) { alert('\u0e01\u0e23\u0e38\u0e13\u0e32\u0e01\u0e23\u0e2d\u0e01\u0e40\u0e2b\u0e15\u0e38\u0e1c\u0e25'); return; }
+  var r=wData.find(function(w){return w._id===_editId;});
+  if(!r) return;
+  if(newCust===r.customer){ closeEditModal(); return; }
+  var original=r.customerOriginal||r.customer;
+  var logEntry={from:r.customer,to:newCust,by:curEmail,at:new Date().toISOString(),reason:reason};
+  var prevLog=Array.isArray(r.editLog)?r.editLog:[];
+  db.collection('weighings').doc(_editId).update({
+    customer:newCust, customerOriginal:original, editLog:prevLog.concat([logEntry])
+  }).then(function(){
+    closeEditModal();
+    setMsg('s1','\u2705 \u0e41\u0e01\u0e49\u0e0a\u0e37\u0e48\u0e2d\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08: '+r.customer+' \u2192 '+newCust,'ok');
+  }).catch(function(e){
+    setMsg('s1','\u274c \u0e41\u0e01\u0e49\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08: '+e.message,'err');
+  });
+}
+
 
 /* ================================================================
    TAB 2 — หักทรายเปียก
@@ -3589,10 +3742,8 @@ function frManualLoad(){
   var custList=checked.map(function(cb){return cb.value;});
   var from=document.getElementById('fr-man-from').value;
   var to=document.getElementById('fr-man-to').value;
-  var rate=parseFloat(document.getElementById('fr-man-rate').value);
   if(!custList.length){ setMsg('fr-pay-msg','\u274C \u0e15\u0e34\u0e4a\u0e01\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e19\u0e49\u0e2d\u0e22 1 \u0e0a\u0e37\u0e48\u0e2d','err'); return; }
   if(!from||!to){ setMsg('fr-pay-msg','\u274C \u0e23\u0e30\u0e1a\u0e38\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','err'); return; }
-  if(!(rate>0)){ setMsg('fr-pay-msg','\u274C \u0e23\u0e30\u0e1a\u0e38\u0e23\u0e32\u0e04\u0e32/\u0e04\u0e34\u0e27','err'); return; }
   var custSet={}; custList.forEach(function(c){custSet[c]=true;});
 
   // ── ตรวจทะเบียนที่ยังไม่มีเจ้าของในฐาน ──
@@ -3607,11 +3758,11 @@ function frManualLoad(){
   var unknowns=Object.keys(unknownSet);
   if(unknowns.length){
     // เก็บ context ไว้ทำต่อหลังเคลียร์ทะเบียนใหม่
-    _pendingManualArgs={custSet:custSet,from:from,to:to,rate:rate,custList:custList};
+    _pendingManualArgs={custSet:custSet,from:from,to:to,custList:custList};
     startPlateResolve(unknowns);
     return;
   }
-  frManualBuild(custSet,from,to,rate,custList);
+  frManualBuild(custSet,from,to,custList);
 }
 
 /* ── จัดการทะเบียนใหม่ทีละคันด้วย popup ── */
@@ -3625,7 +3776,7 @@ function nextPlateResolve(){
     // เสร็จแล้ว — ทำต่อ
     document.getElementById('plate-resolve-dialog').style.display='none';
     var a=_pendingManualArgs; _pendingManualArgs=null;
-    if(a) frManualBuild(a.custSet,a.from,a.to,a.rate,a.custList);
+    if(a) frManualBuild(a.custSet,a.from,a.to,a.custList);
     return;
   }
   var plate=_plateQueue[0];
@@ -3682,83 +3833,129 @@ function plateResolveSkip(){
   nextPlateResolve();
 }
 
-function frManualBuild(custSet,from,to,rate,custList){
-  var ownerMap={};
+function frManualBuild(custSet,from,to,custList){
+  /* แยกข้อมูลตาม customer → owner(canonical) → plate */
+  var custMap={};  /* { customer: { canonical: { plate: netKiu } } } */
   wData.forEach(function(w){
     if(!custSet[w.customer]) return;
     if(w.date<from||w.date>to) return;
+    var net=(w.kg/KPC)-(typeof dData!=='undefined'&&dData[w._id]?dData[w._id]:0);
+    if(net<=0) return;
     var np=normPlate(w.plate);
     var v=lookupVeh(w.plate);
     var canon=(v&&v.canonical)||('\u2753 '+np);
-    var net=(w.kg/KPC)-(typeof dData!=='undefined'&&dData[w._id]?dData[w._id]:0);
-    if(net<=0) return;
-    if(!ownerMap[canon]) ownerMap[canon]={};
-    if(!ownerMap[canon][np]) ownerMap[canon][np]=0;
-    ownerMap[canon][np]+=net;
+    if(!custMap[w.customer]) custMap[w.customer]={};
+    if(!custMap[w.customer][canon]) custMap[w.customer][canon]={};
+    if(!custMap[w.customer][canon][np]) custMap[w.customer][canon][np]=0;
+    custMap[w.customer][canon][np]+=net;
   });
-  var owners=Object.keys(ownerMap).sort(function(a,b){return a.localeCompare(b,'th');});
-  if(!owners.length){ setMsg('fr-pay-msg','\u26A0\uFE0F \u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e02\u0e2d\u0e07\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e43\u0e19\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','warn'); document.getElementById('fr-pay-owners').style.display='none'; return; }
-  var custLabel=custList.length===1?custList[0]:(custList.length+' \u0e0a\u0e37\u0e48\u0e2d\u0e23\u0e27\u0e21');
-  window._frManCtx={cust:custLabel,custList:custList,from:from,to:to,rate:rate,ownerMap:ownerMap};
-  var html=owners.map(function(own){
-    var plates=Object.keys(ownerMap[own]).sort();
-    var trips=plates.map(function(p){return {plate:p,canonical:own,netKiu:ownerMap[own][p]};}).filter(function(t){return t.netKiu>0.0001;});
-    var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
-    var totalAmt=total*rate;
-    var rows=trips.map(function(t){
-      return '<tr><td style="padding-left:20px;color:var(--muted)">\u2514 '+t.plate+'</td>'
-        +'<td class="r">'+fmt3(t.netKiu)+'</td>'
-        +'<td class="r">'+(t.netKiu*rate).toFixed(2)+'</td></tr>';
+  var custs=Object.keys(custMap).sort(function(a,b){return a.localeCompare(b,'th');});
+  if(!custs.length){ setMsg('fr-pay-msg','\u26A0\uFE0F \u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e02\u0e2d\u0e07\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e43\u0e19\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','warn'); document.getElementById('fr-pay-owners').style.display='none'; return; }
+
+  /* เก็บ context ไว้คำนวณ/บันทึก/พิมพ์ — rate เก็บแยกต่อลูกค้า */
+  window._frManCtx={from:from,to:to,custMap:custMap,rates:{}};
+
+  var html=custs.map(function(cust,ci){
+    var safeCust=cust.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    var ownerMap=custMap[cust];
+    var owners=Object.keys(ownerMap).sort(function(a,b){return a.localeCompare(b,'th');});
+    /* รวมคิวทั้งลูกค้า เพื่อโชว์ */
+    var custTotalKiu=0;
+    owners.forEach(function(o){ Object.keys(ownerMap[o]).forEach(function(p){ custTotalKiu+=ownerMap[o][p]; }); });
+
+    var ownerCards=owners.map(function(own){
+      var plates=Object.keys(ownerMap[own]).sort();
+      var trips=plates.map(function(p){return {plate:p,netKiu:ownerMap[own][p]};}).filter(function(t){return t.netKiu>0.0001;});
+      var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
+      var safeOwn=own.replace(/'/g,"\\'");
+      var rows=trips.map(function(t){
+        return '<tr><td style="padding-left:20px;color:var(--muted)">\u2514 '+t.plate+'</td>'
+          +'<td class="r">'+fmt3(t.netKiu)+'</td>'
+          +'<td class="r fr-amt" data-ci="'+ci+'" data-kiu="'+t.netKiu+'">\u2013</td></tr>';
+      }).join('');
+      return '<div class="fr-owner-card"><div class="fr-owner-hdr">'
+        +'<span class="fr-owner-name">\uD83D\uDE9B '+own+'</span>'
+        +'<span class="fr-owner-total"> \u0e23\u0e27\u0e21 '+fmt3(total)+' \u0e04\u0e34\u0e27 | <b class="fr-owner-amt" data-ci="'+ci+'" data-kiu="'+total+'">\u2013</b></span>'
+        +'<button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px;font-size:11px" onclick="frSaveManual(\''+safeCust+'\',\''+safeOwn+'\','+ci+')">\uD83D\uDCBE \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01</button>'
+        +'<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="frPrintManual(\''+safeCust+'\',\''+safeOwn+'\','+ci+')">\uD83D\uDDA8\uFE0F \u0e1e\u0e34\u0e21\u0e1e\u0e4c</button>'
+        +'<div class="table-wrap"><table>'
+        +'<thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th class="r">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th class="r">\u0e40\u0e07\u0e34\u0e19</th></tr></thead>'
+        +'<tbody>'+rows
+        +'<tr style="border-top:1px solid var(--border)"><td><b>\u0e23\u0e27\u0e21</b></td>'
+        +'<td class="r gold"><b>'+fmt3(total)+'</b></td>'
+        +'<td class="r gold fr-owner-amt2" data-ci="'+ci+'" data-kiu="'+total+'"><b>\u2013</b></td></tr>'
+        +'</tbody></table></div></div>';
     }).join('');
-    var safeOwn=own.replace(/'/g,"\\'");
-    return '<div class="fr-owner-card"><div class="fr-owner-hdr">'
-      +'<span class="fr-owner-name">\uD83D\uDE9B '+own+'</span>'
-      +'<span class="fr-owner-total"> \u0e23\u0e27\u0e21 '+fmt3(total)+' \u0e04\u0e34\u0e27 | <b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+' \u0e1a\u0e32\u0e17</b></span>'
-      +'<button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px;font-size:11px" onclick="frSaveManual(\''+safeOwn+'\')">\uD83D\uDCBE \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01</button>'
-      +'<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="frPrintManual(\''+safeOwn+'\')">\uD83D\uDDA8\uFE0F \u0e1e\u0e34\u0e21\u0e1e\u0e4c</button>'
-      +'<div class="table-wrap"><table>'
-      +'<thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th class="r">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th class="r">\u0e40\u0e07\u0e34\u0e19 (\u00D7'+rate+')</th></tr></thead>'
-      +'<tbody>'+rows
-      +'<tr style="border-top:1px solid var(--border)"><td><b>\u0e23\u0e27\u0e21</b></td>'
-      +'<td class="r gold"><b>'+fmt3(total)+'</b></td>'
-      +'<td class="r gold"><b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
-      +'</tbody></table></div></div>';
+
+    return '<div class="fr-cust-block">'
+      +'<div class="fr-cust-hdr">'
+      +'<span class="fr-cust-name">\uD83D\uDC64 '+cust+'</span>'
+      +'<span style="font-size:11px;color:var(--muted)">'+owners.length+' \u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16 | \u0e23\u0e27\u0e21 '+fmt3(custTotalKiu)+' \u0e04\u0e34\u0e27</span>'
+      +'<span class="fr-cust-rate" style="margin-left:auto">\u0e23\u0e32\u0e04\u0e32/\u0e04\u0e34\u0e27 '
+      +'<input type="number" step="0.01" min="0" data-ci="'+ci+'" placeholder="0.00" oninput="frManRate('+ci+',this.value)"></span>'
+      +'</div>'
+      +'<div class="fr-cust-body">'+ownerCards+'</div>'
+      +'</div>';
   }).join('');
+
   var box=document.getElementById('fr-pay-owners');
   box.innerHTML=html; box.style.display='';
-  setMsg('fr-pay-msg','\u2705 \u0e1e\u0e1a '+owners.length+' \u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16','ok');
+  setMsg('fr-pay-msg','\u2705 \u0e1e\u0e1a '+custs.length+' \u0e25\u0e39\u0e01\u0e04\u0e49\u0e32 \u2014 \u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e04\u0e32\u0e41\u0e15\u0e48\u0e25\u0e30\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32 \u0e41\u0e25\u0e49\u0e27\u0e01\u0e14\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e41\u0e22\u0e01\u0e15\u0e32\u0e21\u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16','ok');
 }
 
-function frSaveManual(owner){
+/* อัปเดตเงินสดทุกช่องของลูกค้านั้นเมื่อกรอกราคา */
+function frManRate(ci,val){
+  var rate=parseFloat(val)||0;
+  if(window._frManCtx) window._frManCtx.rates[ci]=rate;
+  /* แถวรายคัน */
+  document.querySelectorAll('.fr-amt[data-ci="'+ci+'"]').forEach(function(el){
+    var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
+    el.textContent=rate>0?(kiu*rate).toLocaleString('th-TH',{minimumFractionDigits:2}):'\u2013';
+  });
+  /* ยอดรวมเจ้าของ(header + แถวรวม) */
+  ['.fr-owner-amt','.fr-owner-amt2'].forEach(function(sel){
+    document.querySelectorAll(sel+'[data-ci="'+ci+'"]').forEach(function(el){
+      var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
+      var txt=rate>0?(kiu*rate).toLocaleString('th-TH',{minimumFractionDigits:2})+' \u0e1a\u0e32\u0e17':'\u2013';
+      el.innerHTML=sel==='.fr-owner-amt2'?'<b>'+txt+'</b>':txt;
+    });
+  });
+}
+
+function frSaveManual(cust,owner,ci){
   var ctx=window._frManCtx;
-  if(!ctx||!ctx.ownerMap[owner]){ setMsg('fr-pay-msg','\u274C \u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25','err'); return; }
-  var plates=Object.keys(ctx.ownerMap[owner]);
-  var trips=plates.map(function(p){return {plate:p,canonical:owner,netKiu:ctx.ownerMap[owner][p]};}).filter(function(t){return t.netKiu>0.0001;});
+  if(!ctx||!ctx.custMap[cust]||!ctx.custMap[cust][owner]){ setMsg('fr-pay-msg','\u274C \u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25','err'); return; }
+  var rate=ctx.rates[ci]||0;
+  if(!(rate>0)){ setMsg('fr-pay-msg','\u274C \u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e04\u0e32/\u0e04\u0e34\u0e27 \u0e02\u0e2d\u0e07\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32 '+cust+' \u0e01\u0e48\u0e2d\u0e19','err'); return; }
+  var plates=Object.keys(ctx.custMap[cust][owner]);
+  var trips=plates.map(function(p){return {plate:p,canonical:owner,netKiu:ctx.custMap[cust][owner][p]};}).filter(function(t){return t.netKiu>0.0001;});
   var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
   nextDocNo().then(function(docNo){
-    var data={docNo:docNo,type:'truck',refInvoice:'',customer:ctx.cust,
-      canonical:owner,dateFrom:ctx.from,dateTo:ctx.to,rateForTruck:ctx.rate,
+    var data={docNo:docNo,type:'truck',refInvoice:'',customer:cust,
+      canonical:owner,dateFrom:ctx.from,dateTo:ctx.to,rateForTruck:rate,
       totalNetKiu:parseFloat(total.toFixed(3)),
-      totalAmount:parseFloat((total*ctx.rate).toFixed(2)),
+      totalAmount:parseFloat((total*rate).toFixed(2)),
       createdAt:new Date().toISOString(),createdBy:curEmail,trips:trips};
     return db.collection('freight_payments').doc(docNo).set(data).then(function(){
-      setMsg('fr-pay-msg','\u2705 \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01 '+owner+' \u0e40\u0e25\u0e02\u0e17\u0e35\u0e48 '+docNo+' \u2014 \u0e14\u0e39\u0e44\u0e14\u0e49\u0e43\u0e19\u0e1b\u0e23\u0e30\u0e27\u0e31\u0e15\u0e34\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e14\u0e49\u0e32\u0e19\u0e25\u0e48\u0e32\u0e07','ok');
+      setMsg('fr-pay-msg','\u2705 \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01 '+owner+' ('+cust+') \u0e40\u0e25\u0e02\u0e17\u0e35\u0e48 '+docNo+' \u2014 \u0e14\u0e39\u0e44\u0e14\u0e49\u0e43\u0e19\u0e1b\u0e23\u0e30\u0e27\u0e31\u0e15\u0e34\u0e14\u0e49\u0e32\u0e19\u0e25\u0e48\u0e32\u0e07','ok');
       loadPayHistory();
     });
   }).catch(function(e){ setMsg('fr-pay-msg','\u274C '+e.message,'err'); });
 }
 
-function frPrintManual(owner){
+function frPrintManual(cust,owner,ci){
   var ctx=window._frManCtx;
-  if(!ctx||!ctx.ownerMap[owner]) return;
-  var plates=Object.keys(ctx.ownerMap[owner]).sort();
-  var trips=plates.map(function(p){return {plate:p,netKiu:ctx.ownerMap[owner][p]};}).filter(function(t){return t.netKiu>0.0001;});
+  if(!ctx||!ctx.custMap[cust]||!ctx.custMap[cust][owner]) return;
+  var rate=ctx.rates[ci]||0;
+  if(!(rate>0)){ setMsg('fr-pay-msg','\u274C \u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e04\u0e32 '+cust+' \u0e01\u0e48\u0e2d\u0e19\u0e1e\u0e34\u0e21\u0e1e\u0e4c','err'); return; }
+  var plates=Object.keys(ctx.custMap[cust][owner]).sort();
+  var trips=plates.map(function(p){return {plate:p,netKiu:ctx.custMap[cust][owner][p]};}).filter(function(t){return t.netKiu>0.0001;});
   var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
-  var totalAmt=total*ctx.rate;
+  var totalAmt=total*rate;
   var rows=trips.map(function(t){
     return '<tr><td>'+t.plate+'</td>'
       +'<td style="text-align:right">'+fmt3(t.netKiu)+'</td>'
-      +'<td style="text-align:right">'+(t.netKiu*ctx.rate).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+      +'<td style="text-align:right">'+(t.netKiu*rate).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
   }).join('')
   +'<tr style="font-weight:700;font-size:14px"><td>\u0e23\u0e27\u0e21</td>'
   +'<td style="text-align:right">'+fmt3(total)+'</td>'
@@ -3771,8 +3968,8 @@ function frPrintManual(owner){
     +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">'
     +'</head><body><h2>\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e23\u0e16\u0e23\u0e48\u0e27\u0e21 \u2014 \u0e2b\u0e08\u0e01.\u0e18\u0e19\u0e40\u0e28\u0e23\u0e29\u0e10\u0e4c\u0e28\u0e34\u0e23\u0e34</h2>'
     +'<p>\u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16: <b>'+owner+'</b></p>'
-    +'<p>\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32: <b>'+ctx.cust+'</b> | \u0e0a\u0e48\u0e27\u0e07: <b>'+ctx.from+' \u0e16\u0e36\u0e07 '+ctx.to+'</b></p>'
-    +'<p>\u0e23\u0e32\u0e04\u0e32: <b>'+ctx.rate+' \u0e1a\u0e32\u0e17/\u0e04\u0e34\u0e27</b></p>'
+    +'<p>\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32: <b>'+cust+'</b> | \u0e0a\u0e48\u0e27\u0e07: <b>'+ctx.from+' \u0e16\u0e36\u0e07 '+ctx.to+'</b></p>'
+    +'<p>\u0e23\u0e32\u0e04\u0e32: <b>'+rate+' \u0e1a\u0e32\u0e17/\u0e04\u0e34\u0e27</b></p>'
     +'<table><thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th style="text-align:right">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th style="text-align:right">\u0e08\u0e33\u0e19\u0e27\u0e19\u0e40\u0e07\u0e34\u0e19</th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table>'
     +'<p style="margin-top:16px;color:#888;font-size:11px">\u0e1e\u0e34\u0e21\u0e1e\u0e4c: '+new Date().toLocaleString('th-TH')+'</p>'
