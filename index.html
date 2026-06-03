@@ -2142,7 +2142,7 @@ function drawBatches(keys, groups) {
     var d0=dates.length?fmtBE(dates[0]).slice(0,5):'–';
     var d1=dates.length>1?' – '+fmtBE(dates[dates.length-1]).slice(0,5):'';
     var delCell=isAdmin
-      ? '<td style="text-align:right"><button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑 ลบ</button></td>'
+      ? '<td style="text-align:right"><button class="btn-red" onclick="deleteBatchByKey(this.getAttribute(\'data-bkey\'))" data-bkey="'+escHtml(k)+'">🗑 ลบ</button></td>'
       : '';
     return '<tr>'
       +'<td class="bc-date">'+dayStr+'</td>'
@@ -2175,6 +2175,11 @@ function drawBatches(keys, groups) {
 }
 
 var _pendingDelete=null;
+function deleteBatchByKey(key){
+  var g=_bGroups[key];
+  if(!g){ alert('ไม่พบข้อมูลชุดนี้ ลองรีเฟรชคลังไฟล์'); return; }
+  deleteBatch(g.ids, g.fileName);
+}
 function deleteBatch(ids, fname) {
   // เก็บข้อมูลรอยืนยัน แล้วเปิด modal (ไม่ใช้ confirm ที่อาจถูกบล็อก)
   _pendingDelete={ids:ids,fname:fname};
@@ -2228,7 +2233,7 @@ function fmtBE(iso) {
   return p[2]+'/'+p[1]+'/'+(parseInt(p[0])+543);
 }
 function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function parseAndSave(rows, fname) {
