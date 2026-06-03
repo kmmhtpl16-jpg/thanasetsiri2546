@@ -543,6 +543,18 @@ select{color-scheme:dark;}
           </div>
         </div>
       </div>
+
+      <!-- Modal ยืนยันลบคลังไฟล์ -->
+      <div id="del-batch-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;align-items:center;justify-content:center">
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:26px;max-width:380px;width:90%">
+          <div style="font-size:17px;font-weight:800;color:var(--err);margin-bottom:14px">🗑️ ยืนยันการลบ</div>
+          <div id="del-batch-msg" style="font-size:15px;color:var(--text);margin-bottom:20px;line-height:1.7"></div>
+          <div class="brow" style="gap:10px">
+            <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="cancelDeleteBatch()">ยกเลิก</button>
+            <button class="btn-red" style="flex:1;justify-content:center;padding:9px" onclick="confirmDeleteBatch()">🗑️ ลบถาวร</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- TAB 2 -->
@@ -2162,11 +2174,26 @@ function drawBatches(keys, groups) {
     +'</table>'+pagerHtml;
 }
 
+var _pendingDelete=null;
 function deleteBatch(ids, fname) {
-  // ── ยืนยันชั้นที่ 1 ──
-  if(!confirm('⚠️ ต้องการลบ '+ids.length+' รายการ\nจากไฟล์ "'+fname+'" ?\n\nจะลบทั้งข้อมูลตาชั่งและตัวหักน้ำหนักที่ผูกกัน\nหลังลบแล้วต้องอัพโหลดไฟล์ใหม่ (และหักน้ำหนักใหม่ถ้ามี)')) return;
-  // ── ยืนยันชั้นที่ 2 ──
-  if(!confirm('❗ ยืนยันอีกครั้ง\n\nการลบนี้ไม่สามารถกู้คืนได้\nกด "ตกลง" เพื่อลบ '+ids.length+' รายการถาวร')) return;
+  // เก็บข้อมูลรอยืนยัน แล้วเปิด modal (ไม่ใช้ confirm ที่อาจถูกบล็อก)
+  _pendingDelete={ids:ids,fname:fname};
+  var dlg=document.getElementById('del-batch-dialog');
+  document.getElementById('del-batch-msg').innerHTML=
+    'ต้องการลบ <b style="color:var(--gold)">'+ids.length+' รายการ</b><br>'
+    +'จากไฟล์ "<b>'+escHtml(fname)+'</b>" ?<br><br>'
+    +'<span style="color:var(--err)">⚠️ จะลบทั้งข้อมูลตาชั่งและตัวหักน้ำหนัก<br>และกู้คืนไม่ได้</span>';
+  dlg.style.display='flex';
+}
+function cancelDeleteBatch(){
+  _pendingDelete=null;
+  document.getElementById('del-batch-dialog').style.display='none';
+}
+function confirmDeleteBatch(){
+  document.getElementById('del-batch-dialog').style.display='none';
+  if(!_pendingDelete) return;
+  var ids=_pendingDelete.ids, fname=_pendingDelete.fname;
+  _pendingDelete=null;
 
   var bl=document.getElementById('batchList');
   if(bl) bl.innerHTML='<p style="color:var(--gold);font-size:13px;padding:10px 0">⏳ กำลังลบ '+ids.length+' รายการ…</p>';
