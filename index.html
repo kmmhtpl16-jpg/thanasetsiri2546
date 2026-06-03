@@ -330,6 +330,13 @@ select{color-scheme:dark;}
   transition:background .15s,border-color .15s;
 }
 .btn-red:hover{background:rgba(231,76,60,.2);border-color:var(--err);}
+.btn-eye{
+  background:transparent;border:1px solid rgba(240,165,0,.5);
+  color:var(--gold);padding:4px 10px;border-radius:5px;cursor:pointer;
+  font-size:12px;font-family:var(--font);white-space:nowrap;
+  transition:background .15s,border-color .15s;
+}
+.btn-eye:hover{background:rgba(240,165,0,.15);border-color:var(--gold);}
 
 /* offline banner */
 #offlineBanner{
@@ -524,7 +531,7 @@ select{color-scheme:dark;}
         </div>
 
         <!-- ขวา: คลังข้อมูล (admin only) -->
-        <div class="tp1-side ta" style="display:none">
+        <div class="tp1-side">
           <div class="card" style="border-radius:var(--r) 0 0 var(--r);border-right:none;">
             <div class="card-title">
               🗄 คลังไฟล์
@@ -2109,6 +2116,7 @@ var _bKeys=[], _bGroups={};
 function drawBatches(keys, groups) {
   if(keys) { _bKeys=keys; _bGroups=groups; bPage=1; }
   var el=document.getElementById('batchList');
+  var isAdmin=(curRole==='admin');
   var paged=_bKeys.slice((bPage-1)*PAGE, bPage*PAGE);
   var rows=paged.map(function(k){
     var g=_bGroups[k];
@@ -2121,12 +2129,15 @@ function drawBatches(keys, groups) {
     var dates=Array.from(g.dates).sort();
     var d0=dates.length?fmtBE(dates[0]).slice(0,5):'–';
     var d1=dates.length>1?' – '+fmtBE(dates[dates.length-1]).slice(0,5):'';
+    var delCell=isAdmin
+      ? '<td style="text-align:right"><button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑 ลบ</button></td>'
+      : '';
     return '<tr>'
       +'<td class="bc-date">'+dayStr+'</td>'
       +'<td class="bc-time">'+timeStr+'</td>'
       +'<td class="bc-date">'+d0+d1+'</td>'
       +'<td class="bc-cnt">'+g.ids.length+'</td>'
-      +'<td style="text-align:right"><button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑 ลบ</button></td>'
+      +delCell
       +'</tr>';
   }).join('');
 
@@ -2145,27 +2156,42 @@ function drawBatches(keys, groups) {
     +'<th>เวลา</th>'
     +'<th>วันที่ทราย</th>'
     +'<th class="r">รายการ</th>'
-    +'<th></th>'
+    +(isAdmin?'<th></th>':'')
     +'</tr></thead>'
     +'<tbody>'+rows+'</tbody>'
     +'</table>'+pagerHtml;
 }
 
 function deleteBatch(ids, fname) {
-  if(!confirm('⚠️ ลบ '+ids.length+' รายการ\nจากไฟล์ "'+fname+'" ?\n\nหลังลบแล้วต้องอัพโหลดไฟล์ที่ถูกต้องใหม่')) return;
+  // ── ยืนยันชั้นที่ 1 ──
+  if(!confirm('⚠️ ต้องการลบ '+ids.length+' รายการ\nจากไฟล์ "'+fname+'" ?\n\nจะลบทั้งข้อมูลตาชั่งและตัวหักน้ำหนักที่ผูกกัน\nหลังลบแล้วต้องอัพโหลดไฟล์ใหม่ (และหักน้ำหนักใหม่ถ้ามี)')) return;
+  // ── ยืนยันชั้นที่ 2 ──
+  if(!confirm('❗ ยืนยันอีกครั้ง\n\nการลบนี้ไม่สามารถกู้คืนได้\nกด "ตกลง" เพื่อลบ '+ids.length+' รายการถาวร')) return;
+
+  var bl=document.getElementById('batchList');
+  if(bl) bl.innerHTML='<p style="color:var(--gold);font-size:13px;padding:10px 0">⏳ กำลังลบ '+ids.length+' รายการ…</p>';
+
   var chunks=[];
   for(var i=0;i<ids.length;i+=500) chunks.push(ids.slice(i,i+500));
   var promises=chunks.map(function(chunk){
     var b=db.batch();
-    chunk.forEach(function(id){ b.delete(db.collection('weighings').doc(id)); });
+    chunk.forEach(function(id){
+      b.delete(db.collection('weighings').doc(id));   // ลบข้อมูลตาชั่ง
+      b.delete(db.collection('deductions').doc(id));  // ลบตัวหักน้ำหนักที่ผูกกัน (id เดียวกัน)
+    });
     return b.commit();
   });
   Promise.all(promises)
     .then(function(){
-      setMsg('s1','✅ ลบ '+ids.length+' รายการจาก "'+fname+'" เรียบร้อย','ok');
-      loadBatches();
+      setMsg('s1','✅ ลบ '+ids.length+' รายการ (รวมตัวหักน้ำหนัก) จาก "'+fname+'" เรียบร้อย','ok');
+      if(bl) bl.innerHTML='<p style="color:var(--ok,#3fb950);font-size:13px;padding:10px 0">✅ ลบ '+ids.length+' รายการแล้ว — กำลังรีเฟรช…</p>';
+      // หน่วงให้ Firestore sync ก่อนโหลดใหม่
+      setTimeout(loadBatches, 800);
     })
-    .catch(function(e){ setMsg('s1','❌ ลบไม่สำเร็จ: '+e.message,'err'); });
+    .catch(function(e){
+      setMsg('s1','❌ ลบไม่สำเร็จ: '+e.message,'err');
+      if(bl) bl.innerHTML='<p style="color:var(--err);font-size:13px;padding:10px 0">❌ ลบไม่สำเร็จ: '+e.message+'<br><button class="btn btn-ghost" onclick="loadBatches()" style="margin-top:8px;padding:5px 10px;font-size:11px">🔄 ลองใหม่</button></p>';
+    });
 }
 
 function fmtBE(iso) {
@@ -2756,7 +2782,18 @@ function frReportRun(){
   var sumDed=trips.reduce(function(s,t){return s+t.ded;},0);
   var sumNet=trips.reduce(function(s,t){return s+t.net;},0);
 
-  _frRptData={plate:plateIn,owner:owner,from:from,to:to,trips:trips,sumKiu:sumKiu,sumDed:sumDed,sumNet:sumNet};
+  // สรุปตามลูกค้า (ใช้คิวสุทธิ)
+  var custAgg={};
+  trips.forEach(function(t){
+    if(!custAgg[t.customer]) custAgg[t.customer]={kiu:0,ded:0,net:0,count:0};
+    custAgg[t.customer].kiu+=t.kiu;
+    custAgg[t.customer].ded+=t.ded;
+    custAgg[t.customer].net+=t.net;
+    custAgg[t.customer].count++;
+  });
+  var custList2=Object.keys(custAgg).sort(function(a,b){return custAgg[b].net-custAgg[a].net;});
+
+  _frRptData={plate:plateIn,owner:owner,from:from,to:to,trips:trips,sumKiu:sumKiu,sumDed:sumDed,sumNet:sumNet,custAgg:custAgg,custList:custList2};
 
   var rows=trips.map(function(t){
     return '<tr>'
@@ -2766,6 +2803,13 @@ function frReportRun(){
       +'<td class="r">'+(t.ded>0?fmt3(t.ded):'–')+'</td>'
       +'<td class="r gold">'+fmt3(t.net)+'</td>'
       +'</tr>';
+  }).join('');
+
+  // ตารางสรุปตามลูกค้า
+  var custRows=custList2.map(function(c){
+    return '<tr><td>'+c+'</td>'
+      +'<td class="r">'+custAgg[c].count+'</td>'
+      +'<td class="r gold">'+fmt3(custAgg[c].net)+'</td></tr>';
   }).join('');
 
   res.innerHTML='<div style="margin-bottom:10px;font-size:14px">'
@@ -2780,6 +2824,15 @@ function frReportRun(){
     +'<td class="r"><b>'+fmt3(sumDed)+'</b></td>'
     +'<td class="r gold"><b>'+fmt3(sumNet)+'</b></td>'
     +'</tr>'
+    +'</tbody></table></div>'
+    // สรุปตามลูกค้า
+    +'<div style="margin-top:18px;font-size:14px;font-weight:700;color:var(--gold)">📊 สรุปตามลูกค้า (คิวสุทธิ)</div>'
+    +'<div class="table-wrap" style="margin-top:6px;max-width:480px"><table>'
+    +'<thead><tr><th>ลูกค้า</th><th class="r">เที่ยว</th><th class="r">คิวสุทธิ</th></tr></thead>'
+    +'<tbody>'+custRows
+    +'<tr style="border-top:2px solid var(--border);font-weight:700">'
+    +'<td><b>ผลรวม</b></td><td class="r"><b>'+trips.length+'</b></td>'
+    +'<td class="r gold"><b>'+fmt3(sumNet)+'</b></td></tr>'
     +'</tbody></table></div>';
   setMsg('fr-rpt-msg','✅ พบ '+trips.length+' เที่ยว','ok');
 }
@@ -2797,6 +2850,10 @@ function frReportPrint(){
   +'<td style="text-align:right">'+fmt3(d.sumKiu)+'</td>'
   +'<td style="text-align:right">'+fmt3(d.sumDed)+'</td>'
   +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td></tr>';
+  var custRows=(d.custList||[]).map(function(c){
+    return '<tr><td>'+c+'</td><td style="text-align:right">'+d.custAgg[c].count+'</td>'
+      +'<td style="text-align:right">'+fmt3(d.custAgg[c].net)+'</td></tr>';
+  }).join('');
   var html='<html><head><meta charset="UTF-8"><title>รายงานทะเบียน '+d.plate+'</title>'
     +'<style>'
     +'@page{size:A4 portrait;margin:15mm}'
@@ -2820,6 +2877,13 @@ function frReportPrint(){
     +'<div class="company"><b>หจก.ธนเศรษฐ์ศิริ 2546</b><br>274 ม.2 ต.ผาตั้ง อ.สังคม<br>จ.หนองคาย 43160<br>โทร 0818714977</div></div>'
     +'<table><thead><tr><th>วันที่</th><th>ลูกค้า</th><th style="text-align:right">คิว</th><th style="text-align:right">หักทรายเปียก</th><th style="text-align:right">คิวสุทธิ</th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table>'
+    +'<h3 style="color:#7a4f00;margin:18px 0 4px">สรุปตามลูกค้า (คิวสุทธิ)</h3>'
+    +'<table style="max-width:120mm"><thead><tr><th>ลูกค้า</th><th style="text-align:right">เที่ยว</th><th style="text-align:right">คิวสุทธิ</th></tr></thead>'
+    +'<tbody>'+custRows
+    +'<tr style="font-weight:700;background:#f5f0e8"><td>ผลรวม</td>'
+    +'<td style="text-align:right">'+d.trips.length+'</td>'
+    +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td></tr>'
+    +'</tbody></table>'
     +'<button onclick="window.print()" style="margin-top:16px;padding:8px 16px;cursor:pointer">🖨️ พิมพ์</button>'
     +'</div></body></html>';
   var w=window.open('','_blank'); w.document.write(html); w.document.close();
@@ -2841,6 +2905,14 @@ function frReportExcel(){
   });
   aoa.push(['รวม '+d.trips.length+' เที่ยว','',
     parseFloat(d.sumKiu.toFixed(3)), parseFloat(d.sumDed.toFixed(3)), parseFloat(d.sumNet.toFixed(3))]);
+  // สรุปตามลูกค้า
+  aoa.push([]);
+  aoa.push(['สรุปตามลูกค้า (คิวสุทธิ)']);
+  aoa.push(['ลูกค้า','เที่ยว','คิวสุทธิ']);
+  (d.custList||[]).forEach(function(c){
+    aoa.push([c, d.custAgg[c].count, parseFloat(d.custAgg[c].net.toFixed(3))]);
+  });
+  aoa.push(['ผลรวม', d.trips.length, parseFloat(d.sumNet.toFixed(3))]);
   var ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=[{wch:12},{wch:24},{wch:10},{wch:14},{wch:10}];
   var wb=XLSX.utils.book_new();
@@ -2870,7 +2942,7 @@ function loadPayHistory(){
         +'<td class="r">'+(p.totalNetKiu||0).toFixed(3)+'</td>'
         +'<td class="r gold">'+(p.totalAmount||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
         +'<td style="color:var(--muted);font-size:11px">'+cStr+'</td>'
-        +'<td><button class="btn-red" onclick="deletePayment('+JSON.stringify(p.docNo)+')">🗑 ลบ</button></td>'
+        +'<td style="white-space:nowrap"><button class="btn-eye" onclick="viewPayment('+JSON.stringify(p.docNo)+')">🔍 ดู</button> <button class="btn-red" onclick="deletePayment('+JSON.stringify(p.docNo)+')">🗑 ลบ</button></td>'
         +'</tr>';
     }).join('');
     el.innerHTML='<div class="table-wrap"><table>'
@@ -2885,6 +2957,48 @@ function deletePayment(docNo){
     setMsg('fr-pay-msg','✅ ลบใบจ่าย '+docNo+' แล้ว','ok');
     loadPayHistory();
   }).catch(function(e){ setMsg('fr-pay-msg','❌ '+e.message,'err'); });
+}
+
+/* ── ดู/พิมพ์ใบจ่ายที่บันทึกไว้ ── */
+function viewPayment(docNo){
+  db.collection('freight_payments').doc(docNo).get().then(function(doc){
+    if(!doc.exists){ alert('ไม่พบเอกสาร '+docNo); return; }
+    var p=doc.data();
+    var trips=p.trips||[];
+    var rate=p.rateForTruck||0;
+    var rows=trips.map(function(t){
+      var net=t.netKiu||0;
+      return '<tr><td>'+(t.plate||'')+'</td>'
+        +'<td style="text-align:right">'+fmt3(net)+'</td>'
+        +'<td style="text-align:right">'+(net*rate).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+    }).join('')
+    +'<tr style="font-weight:700;background:#f5f0e8"><td>รวม</td>'
+    +'<td style="text-align:right">'+fmt3(p.totalNetKiu||0)+'</td>'
+    +'<td style="text-align:right">'+(p.totalAmount||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+    var period=(p.dateFrom&&p.dateTo)?(invDateFmt(p.dateFrom)+' ถึง '+invDateFmt(p.dateTo)):'–';
+    var html='<html><head><meta charset="UTF-8"><title>ใบจ่าย '+docNo+'</title>'
+      +'<style>@page{size:A4 portrait;margin:15mm}*{box-sizing:border-box}'
+      +'body{font-family:Sarabun,sans-serif;font-size:13px;color:#111;margin:0;padding:0}'
+      +'.sheet{width:180mm;margin:0 auto}h2{color:#7a4f00;margin:0 0 4px}p{margin:3px 0}'
+      +'table{width:100%;border-collapse:collapse;margin-top:12px}'
+      +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc;font-size:12px}'
+      +'td{padding:6px 10px;border:1px solid #ddd}'
+      +'.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #7a4f00;padding-bottom:8px;margin-bottom:10px}'
+      +'.company{font-size:11px;color:#555;text-align:right;line-height:1.5}'
+      +'@media print{button{display:none}.sheet{width:auto}}</style>'
+      +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"></head><body>'
+      +'<div class="sheet">'
+      +'<div class="hd"><div><h2>ใบจ่ายค่าเที่ยวรถร่วม</h2>'
+      +'<p>เลขที่: <b>'+docNo+'</b></p>'
+      +'<p>เจ้าของรถ: <b>'+(p.canonical||'')+'</b> | ลูกค้า: <b>'+(p.customer||'')+'</b></p>'
+      +'<p>ช่วงวันที่: <b>'+period+'</b> | ราคา: <b>'+rate+' บาท/คิว</b></p></div>'
+      +'<div class="company"><b>หจก.ธนเศรษฐ์ศิริ 2546</b><br>274 ม.2 ต.ผาตั้ง อ.สังคม<br>จ.หนองคาย 43160<br>โทร 0818714977</div></div>'
+      +'<table><thead><tr><th>ทะเบียน</th><th style="text-align:right">คิวสุทธิ</th><th style="text-align:right">เงิน (×'+rate+')</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table>'
+      +'<button onclick="window.print()" style="margin-top:16px;padding:8px 16px;cursor:pointer">🖨️ พิมพ์</button>'
+      +'</div></body></html>';
+    var w=window.open('','_blank'); w.document.write(html); w.document.close();
+  }).catch(function(e){ alert('❌ '+e.message); });
 }
 
 /* ── สร้าง dropdown ลูกค้าจาก weighings ── */
