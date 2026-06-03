@@ -302,6 +302,9 @@ select{color-scheme:dark;}
 .tp1-split{display:flex;gap:0;align-items:flex-start;margin-left:-16px;margin-right:-16px;}
 .tp1-main{flex:0 0 65%;max-width:65%;min-width:0;padding-right:14px;}
 .tp1-side{flex:0 0 35%;max-width:35%;min-width:0;}
+.tp1-main>.card,.tp1-side>.card{width:100%;}
+.tp1-side #batchList{width:100%;}
+.tp1-side #batchList table{width:100%;table-layout:auto;}
 @media(max-width:700px){.tp1-split{flex-direction:column;margin:0;}.tp1-main{padding-right:0;max-width:100%;}.tp1-main,.tp1-side{flex:none;width:100%;max-width:100%;}}
 
 /* คลังไฟล์ table */
@@ -319,6 +322,7 @@ select{color-scheme:dark;}
 #batchList .bc-time{color:var(--muted);font-size:13px;}
 #batchList .bc-date{color:var(--text);font-weight:600;}
 #batchList .bc-cnt{color:var(--gold);font-weight:800;text-align:right;}
+#batchList table th:last-child,#batchList table td:last-child{width:100%;text-align:right;}
 .btn-red{
   background:transparent;border:1px solid rgba(231,76,60,.4);
   color:var(--err);padding:4px 10px;border-radius:5px;cursor:pointer;
@@ -2073,7 +2077,7 @@ function drawBatches(keys, groups) {
       +'<td class="bc-time">'+timeStr+'</td>'
       +'<td class="bc-date">'+d0+d1+'</td>'
       +'<td class="bc-cnt">'+g.ids.length+'</td>'
-      +'<td style="text-align:center"><button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑 ลบ</button></td>'
+      +'<td style="text-align:right"><button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑 ลบ</button></td>'
       +'</tr>';
   }).join('');
 
