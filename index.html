@@ -3007,7 +3007,10 @@ function loadPayHistory(){
         +'<td class="r">'+(p.totalNetKiu||0).toFixed(3)+'</td>'
         +'<td class="r gold">'+(p.totalAmount||0).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
         +'<td style="color:var(--muted);font-size:11px">'+cStr+'</td>'
-        +'<td style="white-space:nowrap"><button class="btn-eye" onclick="viewPayment('+JSON.stringify(p.docNo)+')">🔍 ดู</button> <button class="btn-red" onclick="deletePayment('+JSON.stringify(p.docNo)+')">🗑 ลบ</button></td>'
+        +'<td style="white-space:nowrap">'
+        +'<button class="btn-eye" data-docno="'+escHtml(p.docNo||'')+'" onclick="viewPayment(this.getAttribute(\'data-docno\'))">🔍 ดู</button> '
+        +'<button class="btn-red" data-docno="'+escHtml(p.docNo||'')+'" onclick="deletePayment(this.getAttribute(\'data-docno\'))">🗑 ลบ</button>'
+        +'</td>'
         +'</tr>';
     }).join('');
     el.innerHTML='<div class="table-wrap"><table>'
