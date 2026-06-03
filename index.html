@@ -303,8 +303,29 @@ select{color-scheme:dark;}
 .tp1-main{flex:0 0 65%;min-width:0;}
 .tp1-side{flex:0 0 calc(35% - 14px);min-width:0;}
 @media(max-width:700px){.tp1-split{flex-direction:column;}.tp1-main,.tp1-side{flex:none;width:100%;}}
-.btn-red{background:rgba(231,76,60,.15);border:1px solid rgba(231,76,60,.35);color:var(--err);padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;font-family:var(--font);white-space:nowrap;transition:background .2s;}
-.btn-red:hover{background:rgba(231,76,60,.3);}
+
+/* คลังไฟล์ table */
+#batchList table{width:100%;border-collapse:collapse;font-size:13px;}
+#batchList thead th{
+  background:var(--bg3);color:var(--muted);
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);
+  white-space:nowrap;
+}
+#batchList thead th.r{text-align:right;}
+#batchList tbody tr{border-bottom:1px solid rgba(26,48,80,.4);transition:background .12s;}
+#batchList tbody tr:hover{background:rgba(240,165,0,.05);}
+#batchList tbody td{padding:9px 10px;font-size:13px;vertical-align:middle;white-space:nowrap;}
+#batchList .bc-time{color:var(--muted);font-size:12px;}
+#batchList .bc-date{color:var(--text);font-weight:600;}
+#batchList .bc-cnt{color:var(--gold);font-weight:800;text-align:right;}
+.btn-red{
+  background:transparent;border:1px solid rgba(231,76,60,.4);
+  color:var(--err);padding:4px 10px;border-radius:5px;cursor:pointer;
+  font-size:13px;font-family:var(--font);white-space:nowrap;
+  transition:background .15s,border-color .15s;
+}
+.btn-red:hover{background:rgba(231,76,60,.2);border-color:var(--err);}
 
 /* offline banner */
 #offlineBanner{
@@ -2003,7 +2024,7 @@ function importFile(evt) {
 ================================================================ */
 function loadBatches() {
   var el=document.getElementById('batchList');
-  el.innerHTML='<p style="color:var(--muted);font-size:11px;padding:6px 0">⏳ กำลังโหลด…</p>';
+  el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:10px 0">⏳ กำลังโหลด…</p>';
   db.collection('weighings').get().then(function(snap) {
     var groups={};
     snap.docs.forEach(function(d) {
@@ -2021,42 +2042,37 @@ function loadBatches() {
     });
     var keys=Object.keys(groups).sort().reverse();
     if(keys.length===0){
-      el.innerHTML='<p style="color:var(--muted);font-size:11px;padding:6px 0">ยังไม่มีข้อมูล</p>';
+      el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:10px 0">ยังไม่มีข้อมูล</p>';
       return;
     }
     var rows=keys.map(function(k){
       var g=groups[k];
       var atDate=g.importedAt?new Date(g.importedAt):null;
-      var atStr=atDate?
-        ('0'+atDate.getDate()).slice(-2)+'/'
-        +('0'+(atDate.getMonth()+1)).slice(-2)+' '
-        +('0'+atDate.getHours()).slice(-2)+':'
-        +('0'+atDate.getMinutes()).slice(-2):'–';
+      var dayStr=atDate?('0'+atDate.getDate()).slice(-2)+'/'
+        +('0'+(atDate.getMonth()+1)).slice(-2):'–';
+      var timeStr=atDate?('0'+atDate.getHours()).slice(-2)+':'
+        +('0'+atDate.getMinutes()).slice(-2):'';
       var dates=Array.from(g.dates).sort();
       var d0=dates.length?fmtBE(dates[0]).slice(0,5):'–';
-      var d1=dates.length>1?'–'+fmtBE(dates[dates.length-1]).slice(0,5):'';
+      var d1=dates.length>1?' – '+fmtBE(dates[dates.length-1]).slice(0,5):'';
       return '<tr>'
-        +'<td style="color:var(--muted);white-space:nowrap">'+atStr+'</td>'
-        +'<td style="white-space:nowrap">'+d0+d1+'</td>'
-        +'<td class="r" style="color:var(--gold);font-weight:700">'+g.ids.length+'</td>'
-        +'<td><button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑</button></td>'
+        +'<td><span class="bc-date">'+dayStr+'</span><br><span class="bc-time">'+timeStr+'</span></td>'
+        +'<td class="bc-date">'+d0+d1+'</td>'
+        +'<td class="bc-cnt">'+g.ids.length+'</td>'
+        +'<td style="text-align:center"><button class="btn-red" onclick="deleteBatch('+JSON.stringify(g.ids)+','+JSON.stringify(g.fileName)+')">🗑 ลบ</button></td>'
         +'</tr>';
     }).join('');
-    el.innerHTML='<table style="width:100%;font-size:11px;border-collapse:collapse">'
+    el.innerHTML='<table>'
       +'<thead><tr>'
-      +'<th style="text-align:left;color:var(--muted);font-size:10px;padding:4px 6px;border-bottom:1px solid var(--border)">นำเข้า</th>'
-      +'<th style="text-align:left;color:var(--muted);font-size:10px;padding:4px 6px;border-bottom:1px solid var(--border)">วันทราย</th>'
-      +'<th style="text-align:right;color:var(--muted);font-size:10px;padding:4px 6px;border-bottom:1px solid var(--border)">#</th>'
-      +'<th style="border-bottom:1px solid var(--border)"></th>'
+      +'<th>นำเข้าเมื่อ</th>'
+      +'<th>วันที่ทราย</th>'
+      +'<th class="r">รายการ</th>'
+      +'<th></th>'
       +'</tr></thead>'
       +'<tbody>'+rows+'</tbody>'
       +'</table>';
-    // style rows
-    el.querySelectorAll('tbody tr').forEach(function(tr){
-      tr.querySelectorAll('td').forEach(function(td){ td.style.padding='5px 6px'; td.style.borderBottom='1px solid rgba(26,48,80,.3)'; });
-    });
   }).catch(function(e){
-    el.innerHTML='<p style="color:var(--err);font-size:11px;padding:6px 0">❌ '+e.message+'</p>';
+    el.innerHTML='<p style="color:var(--err);font-size:13px;padding:10px 0">❌ '+e.message+'</p>';
   });
 }
 
