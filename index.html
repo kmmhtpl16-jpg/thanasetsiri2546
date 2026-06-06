@@ -1106,6 +1106,7 @@ select{color-scheme:dark;}
         <div class="filter-row" style="margin-bottom:16px;align-items:center;">
           <label>เดือน</label>
           <input type="month" id="payHistMonth" class="filter-input" oninput="renderPayHistory()">
+          <button class="btn btn-gold" onclick="exportPayHistoryPDF()" style="margin-left:8px;">🖨️ Export PDF</button>
         </div>
         <div id="payHistContent"></div>
       </div>
@@ -1811,6 +1812,104 @@ async function renderPayHistory() {
   });
 
   el.innerHTML = html;
+}
+
+function exportPayHistoryPDF() {
+  const ym = document.getElementById('payHistMonth').value || currentYM();
+  if (!prWithdrawals.length) { toast('⚠️ ไม่มีข้อมูลในเดือนนี้'); return; }
+
+  const byDate = {};
+  prWithdrawals.forEach(w => {
+    const d = w.date || 'ไม่ระบุ';
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(w);
+  });
+  const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+  const grandTotal = prWithdrawals.reduce((s, w) => s + (w.amount || 0), 0);
+
+  // แปลง ym เป็นชื่อเดือน พ.ศ.
+  const [y, m] = ym.split('-');
+  const thMonths = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  const monthName = thMonths[parseInt(m)] + ' ' + (parseInt(y) + 543);
+
+  let tableRows = '';
+  dates.forEach(date => {
+    const rows = byDate[date];
+    const dayTotal = rows.reduce((s, w) => s + (w.amount || 0), 0);
+    const empAmounts = {};
+    rows.forEach(w => { if (!empAmounts[w.empId]) empAmounts[w.empId] = 0; empAmounts[w.empId] += w.amount || 0; });
+    const sortedEmps = prEmployees.filter(e => empAmounts[e.id] !== undefined).map(e => ({ name: e.nickname, amt: empAmounts[e.id] }));
+
+    const dateLabel = (typeof isoToBE === 'function') ? isoToBE(date) : date;
+    tableRows += `
+      <tr class="date-row">
+        <td colspan="2" class="date-cell">${dateLabel}</td>
+        <td class="amt-cell">${Number(dayTotal).toLocaleString('th-TH', {minimumFractionDigits:2})} ฿</td>
+      </tr>
+      ${sortedEmps.map(({name, amt}) => `
+      <tr class="emp-row">
+        <td class="indent-cell"></td>
+        <td class="name-cell">${name}</td>
+        <td class="amt-cell">${Number(amt).toLocaleString('th-TH', {minimumFractionDigits:2})} ฿</td>
+      </tr>`).join('')}
+      <tr class="subtotal-row">
+        <td colspan="2" class="subtotal-label">รวมจ่ายวันนี้</td>
+        <td class="amt-cell">${Number(dayTotal).toLocaleString('th-TH', {minimumFractionDigits:2})} ฿</td>
+      </tr>`;
+  });
+
+  const html = `<!DOCTYPE html>
+<html lang="th"><head>
+<meta charset="UTF-8">
+<title>ประวัติการจ่ายเงิน ${monthName}</title>
+<style>
+  @page { size: A4 portrait; margin: 20mm 18mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 16px; color: #1a1a1a; background: #fff; }
+  .header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px; }
+  .header h1 { font-size: 22px; font-weight: 800; margin: 0 0 4px 0; }
+  .header p  { font-size: 14px; color: #555; margin: 0; }
+  .summary-box { display: flex; justify-content: space-between; align-items: center;
+    border: 1.5px solid #e0a800; border-radius: 8px; padding: 14px 20px; margin-bottom: 24px; background: #fffbf0; }
+  .summary-box .label { font-size: 14px; color: #666; }
+  .summary-box .total { font-size: 28px; font-weight: 900; color: #c47f00; }
+  .summary-box .meta  { font-size: 13px; color: #888; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; }
+  tr.date-row td { background: #f5f0e8; font-weight: 800; font-size: 17px; padding: 10px 14px; border-top: 2px solid #ccc; }
+  tr.date-row .amt-cell { color: #c47f00; }
+  tr.emp-row td { padding: 9px 14px; font-size: 16px; border-bottom: 1px solid #eee; }
+  tr.emp-row .name-cell { }
+  tr.emp-row .amt-cell { font-weight: 700; color: #333; }
+  tr.subtotal-row td { background: #fafafa; font-weight: 800; font-size: 16px; padding: 10px 14px; border-top: 2px solid #ccc; border-bottom: 3px solid #aaa; }
+  tr.subtotal-row .amt-cell { color: #c47f00; font-size: 18px; }
+  .indent-cell { width: 28px; }
+  .amt-cell { text-align: right; white-space: nowrap; width: 160px; }
+  .subtotal-label { font-weight: 800; }
+  .footer { margin-top: 32px; font-size: 13px; color: #aaa; text-align: right; }
+</style>
+</head><body>
+<div class="header">
+  <h1>ประวัติการจ่ายเงินพนักงาน</h1>
+  <p>หจก.ธนเศรษฐ์ศิริ 2546 &nbsp;|&nbsp; ${monthName}</p>
+</div>
+<div class="summary-box">
+  <div>
+    <div class="label">ยอดเบิกรวมทั้งเดือน</div>
+    <div class="total">${Number(grandTotal).toLocaleString('th-TH', {minimumFractionDigits:2})} ฿</div>
+    <div class="meta">${ym} &nbsp;|&nbsp; ${prWithdrawals.length} รายการ &nbsp;|&nbsp; ${dates.length} ครั้ง</div>
+  </div>
+</div>
+<table>
+  <tbody>${tableRows}</tbody>
+</table>
+<div class="footer">พิมพ์วันที่ ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}</div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 600);
 }
 
 // ══════════════════════════════════════════════════════════
