@@ -1038,6 +1038,7 @@ select{color-scheme:dark;}
         <button class="pr-subtab active" onclick="prSwitch('att')">📅 บันทึกเวลาทำงาน</button>
         <button class="pr-subtab" onclick="prSwitch('wd')">💸 บันทึกเบิกเงิน</button>
         <button class="pr-subtab" onclick="prSwitch('sum')">📋 สรุปรายเดือน</button>
+        <button class="pr-subtab" onclick="prSwitch('pay')">💰 ประวัติการจ่าย</button>
         <button class="pr-subtab" onclick="prSwitch('reg')">🗂️ ทะเบียนพนักงาน</button>
       </div>
 
@@ -1098,6 +1099,15 @@ select{color-scheme:dark;}
           <button class="btn btn-gold" onclick="submitAllWithdrawals()">💾 บันทึกที่ติ๊ก</button>
         </div>
         <div id="wdPanel"></div>
+      </div>
+
+      <!-- PAY: ประวัติการจ่าย -->
+      <div id="pr-pay" class="pr-content">
+        <div class="filter-row" style="margin-bottom:16px;align-items:center;">
+          <label>เดือน</label>
+          <input type="month" id="payHistMonth" class="filter-input" oninput="renderPayHistory()">
+        </div>
+        <div id="payHistContent"></div>
       </div>
 
       <!-- C: สรุปรายเดือน -->
@@ -1720,14 +1730,83 @@ function totalWithdrawn(empId, ym, period) {
 // ══════════════════════════════════════════════════════════
 function prSwitch(tab) {
   document.querySelectorAll('.pr-subtab').forEach((b, i) => {
-    b.classList.toggle('active', ['att','wd','sum','reg'][i] === tab);
+    b.classList.toggle('active', ['att','wd','sum','pay','reg'][i] === tab);
   });
   document.querySelectorAll('.pr-content').forEach(c => c.classList.remove('active'));
   document.getElementById('pr-' + tab)?.classList.add('active');
   if (tab === 'att') renderAttList();
   if (tab === 'wd')  renderWdPanel();
   if (tab === 'sum') renderPayrollSummary();
+  if (tab === 'pay') renderPayHistory();
   if (tab === 'reg') renderEmpRegistry();
+}
+
+async function renderPayHistory() {
+  const ym = document.getElementById('payHistMonth').value || currentYM();
+  if (!document.getElementById('payHistMonth').value) document.getElementById('payHistMonth').value = ym;
+  const el = document.getElementById('payHistContent');
+  el.innerHTML = '<div style="color:var(--text-secondary);font-size:13px;">⏳ กำลังโหลด...</div>';
+
+  await prLoadWithdrawals(ym);
+
+  if (!prWithdrawals.length) {
+    el.innerHTML = '<div style="color:var(--text-secondary);font-size:13px;padding:20px 0;">ไม่มีรายการเบิกในเดือนนี้</div>';
+    return;
+  }
+
+  // จัดกลุ่มตามวันที่
+  const byDate = {};
+  prWithdrawals.forEach(w => {
+    const d = w.date || 'ไม่ระบุ';
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(w);
+  });
+
+  // เรียงวันที่ล่าสุดก่อน
+  const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+  const grandTotal = prWithdrawals.reduce((s, w) => s + (w.amount || 0), 0);
+
+  let html = `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <div style="font-size:12px;color:var(--text-secondary);">ยอดเบิกรวมทั้งเดือน</div>
+      <div style="font-family:var(--font-mono);font-size:22px;font-weight:800;color:var(--accent-amber);">${fmtBaht(grandTotal)} ฿</div>
+      <div style="font-size:11px;color:var(--text-secondary);">${ym} | ${prWithdrawals.length} รายการ | ${dates.length} ครั้ง</div>
+    </div>
+  </div>`;
+
+  dates.forEach(date => {
+    const rows = byDate[date];
+    const dayTotal = rows.reduce((s, w) => s + (w.amount || 0), 0);
+    const empMap = {};
+    rows.forEach(w => {
+      const name = prEmployees.find(e => e.id === w.empId)?.nickname || w.empId;
+      if (!empMap[name]) empMap[name] = 0;
+      empMap[name] += w.amount || 0;
+    });
+
+    html += `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;">
+      <div style="background:var(--bg-surface);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:700;font-size:13px;">${isoToBE ? isoToBE(date) : date}</div>
+        <div style="font-family:var(--font-mono);font-weight:800;color:var(--accent-amber);font-size:14px;">${fmtBaht(dayTotal)} ฿</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <tbody>
+          ${Object.entries(empMap).map(([name, amt]) => `
+          <tr style="border-top:1px solid var(--border);">
+            <td style="padding:7px 16px;color:var(--text-primary);">${name}</td>
+            <td style="padding:7px 16px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent-amber);">${fmtBaht(amt)} ฿</td>
+          </tr>`).join('')}
+          <tr style="border-top:2px solid var(--border);background:var(--bg-surface);">
+            <td style="padding:7px 16px;font-weight:700;color:var(--text-secondary);">รวมจ่ายวันนี้</td>
+            <td style="padding:7px 16px;text-align:right;font-family:var(--font-mono);font-weight:800;color:var(--accent-amber);">${fmtBaht(dayTotal)} ฿</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+  });
+
+  el.innerHTML = html;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2002,7 +2081,32 @@ async function renderWdPanel() {
           </label>` : ''}
         </div>
         <div id="wdwarn_${emp.id}" style="display:none;font-size:11px;color:var(--accent-amber);margin-top:6px;padding:4px 8px;background:rgba(245,158,11,0.1);border-radius:4px;">⚠️ เบิกเกินค่าแรง</div>
-        ${prevWd.length > 0 ? `<div style="margin-top:8px;font-size:11px;color:var(--text-secondary);">ประวัติ: ${prevWd.map(w => '<span style="color:var(--accent-amber);">' + fmtBaht(w.amount) + '฿</span> (' + w.date + ')').join(', ')}</div>` : ''}
+        ${prevWd.length > 0 ? `<div style="margin-top:10px;">
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;font-weight:600;">📋 ประวัติเบิกเงินรอบนี้ (${prevWd.length} ครั้ง)</div>
+          <table style="width:100%;border-collapse:collapse;font-size:11px;">
+            <thead>
+              <tr style="background:var(--bg-surface);">
+                <th style="padding:5px 8px;text-align:left;color:var(--text-secondary);font-weight:600;border-bottom:1px solid var(--border);">วันที่</th>
+                <th style="padding:5px 8px;text-align:right;color:var(--text-secondary);font-weight:600;border-bottom:1px solid var(--border);">จำนวน</th>
+                <th style="padding:5px 8px;text-align:left;color:var(--text-secondary);font-weight:600;border-bottom:1px solid var(--border);">บันทึกโดย</th>
+                <th style="padding:5px 8px;text-align:left;color:var(--text-secondary);font-weight:600;border-bottom:1px solid var(--border);">หมายเหตุ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${prevWd.map(w => `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:5px 8px;color:var(--text-primary);">${w.date || '-'}</td>
+                <td style="padding:5px 8px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent-amber);">${fmtBaht(w.amount)} ฿</td>
+                <td style="padding:5px 8px;color:var(--text-secondary);">${(w.recordedBy || '').replace('@sand.local','')}</td>
+                <td style="padding:5px 8px;color:var(--accent-red);">${w.isOverdrawn ? '⚠️ เกินค่าแรง' : ''}</td>
+              </tr>`).join('')}
+              <tr style="background:var(--bg-surface);">
+                <td style="padding:5px 8px;font-weight:700;color:var(--text-secondary);">รวม</td>
+                <td style="padding:5px 8px;text-align:right;font-family:var(--font-mono);font-weight:800;color:var(--accent-red);">${fmtBaht(withdrawn)} ฿</td>
+                <td colspan="2"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>` : ''}
       </div>`;
     }).join('') + '</div>';
 }
