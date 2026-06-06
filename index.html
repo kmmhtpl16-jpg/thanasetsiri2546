@@ -1778,12 +1778,16 @@ async function renderPayHistory() {
   dates.forEach(date => {
     const rows = byDate[date];
     const dayTotal = rows.reduce((s, w) => s + (w.amount || 0), 0);
-    const empMap = {};
+    // จัดกลุ่มตาม empId
+    const empAmounts = {};
     rows.forEach(w => {
-      const name = prEmployees.find(e => e.id === w.empId)?.nickname || w.empId;
-      if (!empMap[name]) empMap[name] = 0;
-      empMap[name] += w.amount || 0;
+      if (!empAmounts[w.empId]) empAmounts[w.empId] = 0;
+      empAmounts[w.empId] += w.amount || 0;
     });
+    // เรียงตามลำดับใน prEmployees (ตรงกับหน้าอื่น)
+    const sortedEmps = prEmployees
+      .filter(e => empAmounts[e.id] !== undefined)
+      .map(e => ({ name: e.nickname, amt: empAmounts[e.id] }));
 
     html += `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;">
       <div style="background:var(--bg-surface);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
@@ -1792,7 +1796,7 @@ async function renderPayHistory() {
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
         <tbody>
-          ${Object.entries(empMap).map(([name, amt]) => `
+          ${sortedEmps.map(({name, amt}) => `
           <tr style="border-top:1px solid var(--border);">
             <td style="padding:7px 16px;color:var(--text-primary);">${name}</td>
             <td style="padding:7px 16px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent-amber);">${fmtBaht(amt)} ฿</td>
