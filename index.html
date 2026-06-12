@@ -1322,6 +1322,20 @@ select{color-scheme:dark;}
         </div>
       </div>
 
+      <div class="card" id="exCatManager">
+        <div class="card-title">⚙️ จัดการหมวดรายจ่าย</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="text" id="exNewCat" class="form-input" placeholder="ชื่อหมวดใหม่ เช่น ค่าไฟฟ้า" style="max-width:240px;" onkeydown="if(event.key==='Enter'){exAddCat();return false;}">
+          <button class="btn btn-gold" onclick="exAddCat()">➕ เพิ่มหมวด</button>
+          <span id="exCatMsg" style="font-size:.8rem;color:var(--muted);"></span>
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:6px;">หมวดที่เพิ่มเอง (กด × เพื่อลบ):</div>
+          <div id="exCustomCatList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+        <div style="margin-top:8px;font-size:.7rem;color:var(--muted);">หมวดเริ่มต้น (ลบไม่ได้): งวดรถ · น้ำมัน · สัมปทาน · เงินกู้ยืม · ภาษี · ส่วนตัว · อื่นๆ</div>
+      </div>
+
       <div id="exPageImp" class="card">
         <div class="card-title">📥 อัปโหลด Statement ธนาคาร (กสิกร 4778)</div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
@@ -5434,7 +5448,8 @@ function exportFuelExcel() {
    💸 TAB 8 — EXPENSE MODULE (รายจ่ายจาก Statement)  [admin only]
    collections: expenses , expense_rules
 ================================================================ */
-var EX_CATS = ['งวดรถ','น้ำมัน','สัมปทาน','เงินกู้','ภาษี','ส่วนตัว','อื่นๆ'];
+var EX_CATS = ['งวดรถ','น้ำมัน','สัมปทาน','เงินกู้ยืม','ภาษี','ส่วนตัว','อื่นๆ'];
+var gCustomCats = ['อะไหล่ซ่อมรถ','ซื้อของให้ร้านรุ่งชัย'];   // หมวดเพิ่มเอง (โหลดทับจาก Firestore expense_rules/__cats__)
 var gExpenses = [];        // {id,date,time,amount,txType,payeeCode,payeeName,channel,detail,category,source,period}
 var gRules    = {};        // payeeCode -> {category,payeeName}
 var exReviewRows = [];     // staging rows before save
@@ -5483,7 +5498,7 @@ function exDocId(r){
 function exLoadAll(cb){
   var done=0; function fin(){ done++; if(done===2){ exLoaded=true; if(cb)cb(); } }
   db.collection('expense_rules').get().then(function(snap){
-    gRules={}; snap.forEach(function(d){ gRules[d.id]=d.data(); }); fin();
+    gRules={}; snap.forEach(function(d){ if(d.id==='__cats__'){ var cd=d.data(); if(cd&&Array.isArray(cd.list)) gCustomCats=cd.list; } else { gRules[d.id]=d.data(); } }); fin();
   }).catch(function(e){ console.warn('rules',e); fin(); });
   db.collection('expenses').orderBy('date','desc').get().then(function(snap){
     gExpenses=[]; snap.forEach(function(d){ var o=d.data(); o.id=d.id; gExpenses.push(o); }); fin();
@@ -5503,14 +5518,54 @@ function initExpenseTab(){
   if(lock)lock.style.display='none'; if(content)content.style.display='block';
   exFillCatSelect('exBulkCat'); exFillCatSelect('exmCat');
   exFillCatSelect('exRepCat', true);
-  exLoadAll(function(){ exRenderManual(); exFillMonths(); exRenderReport(); });
+  exRenderCustomCatList();
+  exLoadAll(function(){ exRefreshCats(); exRenderManual(); exFillMonths(); exRenderReport(); });
   exSub('imp');
+}
+function exAllCats(){
+  var base = EX_CATS.filter(function(c){ return c!=='อื่นๆ'; });
+  var custom = (gCustomCats||[]).filter(function(c){ return c && base.indexOf(c)<0 && c!=='อื่นๆ'; });
+  return base.concat(custom).concat(['อื่นๆ']);
 }
 function exFillCatSelect(id, withAll){
   var el=document.getElementById(id); if(!el) return;
+  var cats=exAllCats();
   var html = withAll ? '<option value="">ทุกหมวด</option>' : '';
-  html += EX_CATS.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
+  html += cats.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
   el.innerHTML=html;
+}
+/* ---------- จัดการหมวด (เพิ่ม/ลบเอง) — เก็บใน expense_rules/__cats__ (เฉพาะเจ้าของ) ---------- */
+function exCatMsgSet(m){ var el=document.getElementById('exCatMsg'); if(el) el.textContent=m||''; }
+function exRefreshCats(){
+  exFillCatSelect('exBulkCat'); exFillCatSelect('exmCat'); exFillCatSelect('exRepCat', true);
+  exRenderCustomCatList();
+}
+function exRenderCustomCatList(){
+  var el=document.getElementById('exCustomCatList'); if(!el) return;
+  var custom=(gCustomCats||[]).filter(function(c){ return c && EX_CATS.indexOf(c)<0; });
+  if(!custom.length){ el.innerHTML='<span style="color:var(--muted);font-size:.78rem;">— ยังไม่มีหมวดที่เพิ่มเอง —</span>'; return; }
+  el.innerHTML=custom.map(function(c){
+    var safe=String(c).replace(/'/g,"\\'");
+    return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:4px 10px;font-size:.8rem;">'+c+' <span style="cursor:pointer;color:#e06a6a;font-weight:700;" title="ลบหมวดนี้" onclick="exDelCat(\''+safe+'\')">×</span></span>';
+  }).join('');
+}
+function exSaveCats(cb){
+  db.collection('expense_rules').doc('__cats__').set({ list:gCustomCats, updatedAt:new Date().toISOString() })
+    .then(function(){ if(cb)cb(); })
+    .catch(function(e){ exCatMsgSet('❌ บันทึกไม่สำเร็จ: '+e.message); });
+}
+function exAddCat(){
+  var inp=document.getElementById('exNewCat'); if(!inp) return;
+  var name=(inp.value||'').trim();
+  if(!name){ exCatMsgSet('กรอกชื่อหมวดก่อน'); return; }
+  if(exAllCats().indexOf(name)>=0){ exCatMsgSet('⚠️ มีหมวด "'+name+'" อยู่แล้ว'); return; }
+  if(!Array.isArray(gCustomCats)) gCustomCats=[];
+  gCustomCats.push(name);
+  exSaveCats(function(){ inp.value=''; exCatMsgSet('✅ เพิ่มหมวด "'+name+'" แล้ว'); exRefreshCats(); });
+}
+function exDelCat(name){
+  gCustomCats=(gCustomCats||[]).filter(function(c){ return c!==name; });
+  exSaveCats(function(){ exCatMsgSet('ลบหมวด "'+name+'" แล้ว'); exRefreshCats(); });
 }
 function exFillMonths(){
   var ms={}; gExpenses.forEach(function(e){ if(e.date) ms[e.date.slice(0,7)]=1; });
@@ -5595,7 +5650,7 @@ function exRenderReview(){
   var wrap=document.getElementById('exReviewWrap');
   if(!exReviewRows.length){ wrap.style.display='none'; toast('ไม่พบรายการเงินออกในไฟล์'); return; }
   wrap.style.display='block';
-  var opts=EX_CATS.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
+  var opts=exAllCats().map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
   var body=exReviewRows.map(function(r,i){
     var hl = r.category? '' : 'background:rgba(240,165,0,.13);';
     var sel='<select class="form-input" style="padding:3px 6px;font-size:.74rem;" onchange="exReviewRows['+i+'].category=this.value;exReviewSum();">'
@@ -5783,7 +5838,7 @@ function exDraw4(){
   var byCat={}; var tot=0;
   rows.forEach(function(e){ byCat[e.category]=(byCat[e.category]||0)+e.amount; tot+=e.amount; });
   var body='';
-  EX_CATS.forEach(function(k){ if(byCat[k]) body+='<tr><td style="padding-left:14px;color:var(--muted)">'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>'; });
+  exAllCats().forEach(function(k){ if(byCat[k]) body+='<tr><td style="padding-left:14px;color:var(--muted)">'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>'; });
   body+='<tr><td><b>รายจ่ายรวม</b></td><td class="r"><b style="color:#e06a6a">'+exMoney(tot)+'</b></td></tr>';
   var rev=exNum((document.getElementById('ex4Rev')||{}).value);
   if(rev>0){
