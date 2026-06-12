@@ -1388,9 +1388,12 @@ select{color-scheme:dark;}
           <button class="btn btn-ghost" onclick="exExportExcel()">⬇️ Excel</button>
           <button class="btn btn-gold" onclick="exExportPDF()">🖨️ PDF (A4)</button>
         </div>
-        <div id="exRepChartWrap" style="margin-bottom:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;">
-          <div style="font-size:.72rem;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🥧 สัดส่วนรายจ่ายต่อหมวด</div>
-          <canvas id="exRepChart" width="460" height="240" style="max-width:480px;"></canvas>
+        <div id="exRepChartWrap" style="margin-bottom:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;">
+          <div style="font-size:.72rem;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🥧 สัดส่วนรายจ่ายต่อหมวด</div>
+          <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+            <canvas id="exRepChart" width="300" height="300" style="width:300px!important;height:300px!important;flex-shrink:0;"></canvas>
+            <div id="exRepChartLegend" style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:7px;"></div>
+          </div>
         </div>
         <div class="table-wrap" style="max-height:52vh;overflow:auto;">
           <table class="data-table" style="font-size:.8rem;min-width:640px;"><thead><tr><th>วันที่</th><th>หมวด</th><th>ผู้รับ</th><th>รายละเอียด</th><th class="r">จำนวน</th></tr></thead><tbody id="exRepBody"></tbody></table>
@@ -5519,7 +5522,7 @@ function initExpenseTab(){
   exFillCatSelect('exBulkCat'); exFillCatSelect('exmCat');
   exFillCatSelect('exRepCat', true);
   exRenderCustomCatList();
-  exLoadAll(function(){ exRefreshCats(); exRenderManual(); exFillMonths(); exRenderReport(); });
+  exLoadAll(function(){ exFillMonths(); exRefreshCats(); exRenderManual(); exRenderReport(); });
   exSub('imp');
 }
 function exAllCats(){
@@ -5572,9 +5575,17 @@ function exDelCat(name){
 }
 function exFillMonths(){
   var ms={}; gExpenses.forEach(function(e){ if(e.date) ms[e.date.slice(0,7)]=1; });
+  var cur=(typeof currentYM==='function')?currentYM():new Date().toISOString().slice(0,7);
+  ms[cur]=1;  // เดือนปัจจุบันมีในรายการเสมอ
   var keys=Object.keys(ms).sort().reverse();
-  var opt=keys.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') || '<option value="">— ไม่มีข้อมูล —</option>';
-  ['exRepMonth','ex4Month'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML=opt; });
+  var opt='<option value="">ทุกเดือน</option>'+keys.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('');
+  ['exRepMonth','ex4Month'].forEach(function(id){
+    var el=document.getElementById(id); if(!el) return;
+    var prev=el.value, had=el.options.length>0;
+    el.innerHTML=opt;
+    if(had && (prev==='' || keys.indexOf(prev)>=0)) el.value=prev;  // คงค่าที่ผู้ใช้เลือก
+    else el.value=cur;                                              // ครั้งแรก -> เดือนปัจจุบัน
+  });
 }
 
 /* ---------- sub-tab switch ---------- */
@@ -5794,15 +5805,45 @@ function exRenderReport(){
 }
 /* ---------- กราฟสัดส่วนรายจ่ายต่อหมวด (Tab 8) ---------- */
 function exDrawCatChart(byCat){
-  var cv=document.getElementById('exRepChart'); if(!cv) return;
-  if(byCat && Object.keys(byCat).length && typeof drawPie==='function'){
-    drawPie('exRepChart', byCat);
-  } else {
-    var cx=cv.getContext('2d');
-    cx.clearRect(0,0,cv.width,cv.height);
-    cx.fillStyle='#0d1b2a'; cx.fillRect(0,0,cv.width,cv.height);
-    cx.fillStyle='#5a7a9a'; cx.font='13px Sarabun,sans-serif'; cx.textAlign='center';
-    cx.fillText('ไม่มีข้อมูล',cv.width/2,cv.height/2);
+  var cv=document.getElementById('exRepChart');
+  var lg=document.getElementById('exRepChartLegend');
+  if(!cv) return;
+  var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  var keys=byCat?Object.keys(byCat).filter(function(k){return byCat[k]>0;}):[];
+  if(!keys.length){
+    if(lg) lg.innerHTML='<span style="color:var(--muted);font-size:.85rem;">— ไม่มีข้อมูล —</span>';
+    ctx.fillStyle='#5a7a9a'; ctx.font='15px Sarabun,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('ไม่มีข้อมูล', W/2, H/2);
+    return;
+  }
+  keys.sort(function(a,b){ return byCat[b]-byCat[a]; });
+  var total=keys.reduce(function(s,k){ return s+byCat[k]; },0);
+  var COLS=['#f0a500','#e74c3c','#2ecc71','#3498db','#9b59b6','#e67e22','#1abc9c','#fd79a8','#00b894','#a29bfe','#fab1a0','#74b9ff'];
+  var cx=W/2, cy=H/2, rOut=Math.min(cx,cy)-6, rIn=rOut*0.6, ang=-Math.PI/2;
+  keys.forEach(function(k,i){
+    var sl=(byCat[k]/total)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rOut,ang,ang+sl); ctx.closePath();
+    ctx.fillStyle=COLS[i%COLS.length]; ctx.fill();
+    ang+=sl;
+  });
+  var bg=(getComputedStyle(document.documentElement).getPropertyValue('--bg')||'').trim()||'#070e18';
+  ctx.beginPath(); ctx.arc(cx,cy,rIn,0,Math.PI*2); ctx.fillStyle=bg; ctx.fill();
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='#e2eaf4'; ctx.font='700 19px Sarabun,sans-serif';
+  ctx.fillText(exMoney(total), cx, cy-6);
+  ctx.fillStyle='#5a7a9a'; ctx.font='12px Sarabun,sans-serif';
+  ctx.fillText('บาท ('+keys.length+' หมวด)', cx, cy+15);
+  if(lg){
+    lg.innerHTML=keys.map(function(k,i){
+      var pct=byCat[k]/total*100;
+      return '<div style="display:flex;align-items:center;gap:8px;font-size:.85rem;line-height:1.3;">'
+        +'<span style="width:14px;height:14px;border-radius:3px;flex-shrink:0;background:'+COLS[i%COLS.length]+';"></span>'
+        +'<span style="flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+k+'</span>'
+        +'<span style="color:var(--gold);font-weight:700;font-variant-numeric:tabular-nums;">'+exMoney(byCat[k])+'</span>'
+        +'<span style="color:var(--muted);width:46px;text-align:right;">'+pct.toFixed(1)+'%</span>'
+        +'</div>';
+    }).join('');
   }
 }
 function exDispDate(iso){
