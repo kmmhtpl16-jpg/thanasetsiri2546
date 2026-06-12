@@ -5607,7 +5607,7 @@ function exImportFile(ev){
   var reader=new FileReader();
   reader.onload=function(e){
     try{
-      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',raw:true});
       var sheet=wb.Sheets[wb.SheetNames[0]];
       var rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
       exParseRows(rows);
