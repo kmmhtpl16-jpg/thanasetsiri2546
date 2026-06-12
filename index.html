@@ -5754,10 +5754,29 @@ function exFilteredRows(){
     return (!m||e.date.slice(0,7)===m) && (!c||e.category===c);
   }).sort(function(a,b){ return a.date<b.date?-1:1; });
 }
+/* ---------- แก้หมวดในหน้ารายงานได้เลย (บันทึกทันที ไม่ต้อง import ซ้ำ) ---------- */
+function exCatSelectCell(e){
+  var cats=exAllCats();
+  if(e.category && cats.indexOf(e.category)<0) cats=[e.category].concat(cats);
+  var sid=String(e.id).replace(/'/g,"\\'");
+  return '<select class="form-input" style="padding:3px 6px;font-size:.74rem;min-width:120px;" '
+    +'onchange="exUpdateCat(\''+sid+'\',this.value)">'
+    + cats.map(function(c){ return '<option value="'+c+'"'+(c===e.category?' selected':'')+'>'+c+'</option>'; }).join('')
+    + '</select>';
+}
+function exUpdateCat(id, cat){
+  db.collection('expenses').doc(id).update({ category:cat })
+    .then(function(){
+      var e=gExpenses.find(function(x){ return x.id===id; }); if(e) e.category=cat;
+      exRenderReport();
+      toast('✅ เปลี่ยนหมวดเป็น "'+cat+'"');
+    })
+    .catch(function(err){ toast('❌ เปลี่ยนหมวดไม่สำเร็จ: '+err.message); });
+}
 function exRenderReport(){
   var rows=exFilteredRows();
   var body=rows.length? rows.map(function(e){
-    return '<tr><td>'+exDispDate(e.date)+'</td><td>'+e.category+'</td><td>'+(e.payeeName||'')+'</td>'
+    return '<tr><td>'+exDispDate(e.date)+'</td><td>'+exCatSelectCell(e)+'</td><td>'+(e.payeeName||'')+'</td>'
       +'<td style="font-size:.72rem;color:var(--muted)">'+(e.detail||'')+'</td>'
       +'<td class="r">'+exMoney(e.amount)+'</td></tr>';
   }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:18px">ไม่มีข้อมูล</td></tr>';
