@@ -541,6 +541,7 @@ select{color-scheme:dark;}
     <button class="tab-btn" data-tab="7" onclick="goTab(7)">⛽ น้ำมัน</button>
     <button class="tab-btn ta" data-tab="3" onclick="goTab(3)" style="display:none">📄 ใบแจ้งหนี้ลูกค้า</button>
     <button class="tab-btn ta" data-tab="4" onclick="goTab(4)" style="display:none">👑 สรุปผู้บริหาร</button>
+    <button class="tab-btn ta" data-tab="8" onclick="goTab(8)" style="display:none">💸 รายจ่าย</button>
   </nav>
 
   <main class="main-content">
@@ -772,6 +773,15 @@ select{color-scheme:dark;}
           <div id="cmpTable" style="margin-top:12px;max-height:240px;overflow-y:auto;"></div>
         </div>
       </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-title">💸 สรุปรายจ่าย & กำไร/ขาดทุน</div>
+        <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:10px;">
+          <div><label class="form-label">เดือน</label><select id="ex4Month" class="form-input" style="max-width:150px;" onchange="exDraw4()"></select></div>
+          <div><label class="form-label">รายได้เดือนนี้ (กรอกเอง)</label><input type="number" id="ex4Rev" class="form-input" style="max-width:170px;" placeholder="0" oninput="exDraw4()"></div>
+        </div>
+        <div class="table-wrap"><table class="data-table" style="font-size:.82rem;"><tbody id="ex4Body"></tbody></table></div>
+      </div>
+
     </section>
     </section>
 
@@ -1293,6 +1303,89 @@ select{color-scheme:dark;}
       </div>
     </section>
 
+    <section class="tab-pane" id="tp8" style="padding:16px;">
+      <div id="exLock" style="display:none;">
+        <div class="card" style="max-width:340px;margin:40px auto;text-align:center;">
+          <div class="card-title" style="justify-content:center;">🔒 หน้ารายจ่าย — ใส่รหัสเจ้าของ</div>
+          <input type="password" id="exPin" class="form-input" inputmode="numeric" placeholder="รหัส" style="text-align:center;letter-spacing:4px;font-size:1.1rem;margin:10px 0;" onkeydown="if(event.key==='Enter')exTryUnlock()">
+          <div id="exPinErr" style="color:#e06a6a;font-size:.8rem;min-height:18px;"></div>
+          <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="exTryUnlock()">🔓 ปลดล็อก</button>
+        </div>
+      </div>
+      <div id="exContent">
+      <div class="card" style="padding:14px 16px;">
+        <div class="card-title">💸 รายจ่าย <span style="font-size:.7rem;color:var(--muted);font-weight:400;">(เฉพาะเจ้าของ)</span></div>
+        <div class="brow" style="gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button class="btn btn-gold"  id="exTabImp" onclick="exSub('imp')">📥 ดึงจาก Statement</button>
+          <button class="btn btn-ghost" id="exTabMan" onclick="exSub('man')">✍️ กรอกมือ</button>
+          <button class="btn btn-ghost" id="exTabRep" onclick="exSub('rep')">📊 รายงาน / Export</button>
+        </div>
+      </div>
+
+      <div id="exPageImp" class="card">
+        <div class="card-title">📥 อัปโหลด Statement ธนาคาร (กสิกร 4778)</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+          <input type="text" id="exPeriod" class="form-input" placeholder="งวด เช่น พ.ค. 2026" style="max-width:200px;">
+          <label class="btn btn-gold" style="cursor:pointer;">📂 เลือกไฟล์ (.csv/.xls/.xlsx)
+            <input type="file" accept=".csv,.xls,.xlsx" onchange="exImportFile(event)" style="display:none;">
+          </label>
+          <span id="exImpInfo" style="color:var(--muted);font-size:.85rem;"></span>
+        </div>
+        <div id="exReviewWrap" style="display:none;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+            <select id="exBulkCat" class="form-input" style="max-width:170px;"></select>
+            <button class="btn btn-ghost" onclick="exBulkApply()">⬇️ ตั้งหมวดให้แถวที่ติ๊ก</button>
+            <span style="flex:1;"></span>
+            <button class="btn btn-gold" onclick="exSaveImport()">💾 บันทึกเข้าระบบ</button>
+          </div>
+          <div class="table-wrap" style="max-height:58vh;overflow:auto;">
+            <table class="data-table" style="font-size:.8rem;min-width:760px;">
+              <thead><tr>
+                <th style="width:34px;"><input type="checkbox" id="exChkAll" onchange="exToggleAll(this)"></th>
+                <th>วันที่</th><th>ผู้รับ</th><th class="r">จำนวน</th><th>รายละเอียด</th><th style="width:130px;">หมวด</th>
+              </tr></thead>
+              <tbody id="exReviewBody"></tbody>
+            </table>
+          </div>
+          <div id="exReviewSum" style="margin-top:10px;font-size:.85rem;color:var(--muted);"></div>
+        </div>
+      </div>
+
+      <div id="exPageMan" class="card" style="display:none;">
+        <div class="card-title">✍️ กรอกรายจ่ายเอง</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+          <div><label class="form-label">วันที่</label><input type="date" id="exmDate" class="form-input"></div>
+          <div><label class="form-label">จำนวน (บาท)</label><input type="number" id="exmAmt" class="form-input" step="0.01" placeholder="0.00"></div>
+          <div><label class="form-label">หมวด</label><select id="exmCat" class="form-input"></select></div>
+          <div style="grid-column:1/-1;"><label class="form-label">รายละเอียด / ผู้รับ</label><input type="text" id="exmDetail" class="form-input" placeholder="เช่น ค่าซ่อมเรือ"></div>
+        </div>
+        <div class="brow" style="margin-top:12px;"><button class="btn btn-gold" onclick="exSaveManual()">💾 บันทึก</button></div>
+        <div class="table-wrap" style="margin-top:14px;max-height:42vh;overflow:auto;">
+          <table class="data-table" style="font-size:.8rem;"><thead><tr><th>วันที่</th><th>หมวด</th><th>รายละเอียด</th><th class="r">จำนวน</th><th style="width:48px;"></th></tr></thead><tbody id="exManBody"></tbody></table>
+        </div>
+      </div>
+
+      <div id="exPageRep" class="card" style="display:none;">
+        <div class="card-title">📊 รายงานรายจ่าย</div>
+        <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:10px;">
+          <div><label class="form-label">เดือน</label><select id="exRepMonth" class="form-input" style="max-width:150px;" onchange="exRenderReport()"></select></div>
+          <div><label class="form-label">หมวด</label><select id="exRepCat" class="form-input" style="max-width:150px;" onchange="exRenderReport()"></select></div>
+          <span style="flex:1;"></span>
+          <button class="btn btn-ghost" onclick="exExportExcel()">⬇️ Excel</button>
+          <button class="btn btn-gold" onclick="exExportPDF()">🖨️ PDF (A4)</button>
+        </div>
+        <div id="exRepChartWrap" style="margin-bottom:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;">
+          <div style="font-size:.72rem;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🥧 สัดส่วนรายจ่ายต่อหมวด</div>
+          <canvas id="exRepChart" width="460" height="240" style="max-width:480px;"></canvas>
+        </div>
+        <div class="table-wrap" style="max-height:52vh;overflow:auto;">
+          <table class="data-table" style="font-size:.8rem;min-width:640px;"><thead><tr><th>วันที่</th><th>หมวด</th><th>ผู้รับ</th><th>รายละเอียด</th><th class="r">จำนวน</th></tr></thead><tbody id="exRepBody"></tbody></table>
+        </div>
+        <div id="exRepSum" style="margin-top:10px;"></div>
+      </div>
+      </div><!-- /exContent -->
+    </section>
+
   </main>
 </div>
 
@@ -1522,7 +1615,7 @@ function listenFS() {
    TAB SWITCHING
 ================================================================ */
 function goTab(n) {
-  if((n===3||n===4) && curRole!=='admin') return;
+  if((n===3||n===4||n===8) && curRole!=='admin') return;
   document.querySelectorAll('.tab-btn').forEach(function(b){
     b.classList.toggle('active', parseInt(b.dataset.tab)===n);
   });
@@ -1532,6 +1625,7 @@ function goTab(n) {
   if(n===5){ listenVeh(); frSetType('invoice'); }
   if(n===6) initPayrollTab();
   if(n===7) initFuelTab();
+  if(n===8) initExpenseTab();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3119,6 +3213,7 @@ function draw4() {
   });
   drawPie('p4', bc);
   renderCmpChart();
+  if(typeof exReady==='function') exReady();
 }
 
 /* ================================================================
@@ -5332,6 +5427,378 @@ function exportFuelExcel() {
 
 /* ── END TAB 7 FUEL MODULE ── */
 
+</script>
+
+<script>
+/* ================================================================
+   💸 TAB 8 — EXPENSE MODULE (รายจ่ายจาก Statement)  [admin only]
+   collections: expenses , expense_rules
+================================================================ */
+var EX_CATS = ['งวดรถ','น้ำมัน','สัมปทาน','เงินกู้','ภาษี','ส่วนตัว','อื่นๆ'];
+var gExpenses = [];        // {id,date,time,amount,txType,payeeCode,payeeName,channel,detail,category,source,period}
+var gRules    = {};        // payeeCode -> {category,payeeName}
+var exReviewRows = [];     // staging rows before save
+var exLoaded  = false;
+
+function exMoney(n){ return Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function exPad(s){ s=String(s||'').trim(); return s.length<2?('0'+s):s; }
+
+function exNormDate(v){
+  if(v===null||v===undefined) return '';
+  if(typeof v==='number' && v>20000){ // excel serial
+    var d=new Date(Math.round((v-25569)*86400*1000));
+    return d.getFullYear()+'-'+exPad(d.getMonth()+1)+'-'+exPad(d.getDate());
+  }
+  var s=String(v).trim(); if(!s) return '';
+  var p=s.split(/[\/\-.]/);
+  if(p.length>=3){
+    var d=p[0], m=p[1], y=p[2];
+    if(y.length===2) y='20'+y;            // ค.ศ. 26 -> 2026
+    if(d.length===4){ var t=d; d=y; y=t; } // YYYY-MM-DD already
+    return y+'-'+exPad(m)+'-'+exPad(d);
+  }
+  return s;
+}
+function exNum(v){
+  if(typeof v==='number') return v;
+  var s=String(v||'').replace(/[, ฿]/g,'').trim();
+  var n=parseFloat(s); return isNaN(n)?0:n;
+}
+function exPayee(detail){
+  var d=String(detail||'').replace(/\+\+/g,' ').trim();
+  var m=d.match(/X([0-9A-Za-z]{4})/);
+  var code=m?('X'+m[1]):'';
+  var name=d;
+  if(m){ name=d.slice(m.index+m[0].length).trim(); }
+  name=name.replace(/\s+/g,' ').trim();
+  if(!name) name=d;
+  return {code:code,name:name.slice(0,60)};
+}
+function exDocId(r){
+  var t=String(r.time||'').replace(/\D/g,'');
+  return 'st_'+r.date+'_'+t+'_'+Math.round(r.amount*100)+'_'+Math.round((r.balance||0)*100);
+}
+
+/* ---------- load ---------- */
+function exLoadAll(cb){
+  var done=0; function fin(){ done++; if(done===2){ exLoaded=true; if(cb)cb(); } }
+  db.collection('expense_rules').get().then(function(snap){
+    gRules={}; snap.forEach(function(d){ gRules[d.id]=d.data(); }); fin();
+  }).catch(function(e){ console.warn('rules',e); fin(); });
+  db.collection('expenses').orderBy('date','desc').get().then(function(snap){
+    gExpenses=[]; snap.forEach(function(d){ var o=d.data(); o.id=d.id; gExpenses.push(o); }); fin();
+  }).catch(function(e){ console.warn('expenses',e); fin(); });
+}
+
+var exUnlocked=false;
+function exOwnerPin(){ try{ for(var k in PINS){ if(PINS[k].role==='admin') return k; } }catch(e){} return '8881'; }
+function exTryUnlock(){
+  var v=(document.getElementById('exPin').value||'').trim();
+  if(v===exOwnerPin()){ exUnlocked=true; document.getElementById('exPin').value=''; document.getElementById('exPinErr').textContent=''; initExpenseTab(); }
+  else { document.getElementById('exPinErr').textContent='รหัสไม่ถูกต้อง'; document.getElementById('exPin').value=''; var p=document.getElementById('exPin'); if(p)p.focus(); }
+}
+function initExpenseTab(){
+  var lock=document.getElementById('exLock'), content=document.getElementById('exContent');
+  if(!exUnlocked){ if(lock)lock.style.display='block'; if(content)content.style.display='none'; var pin=document.getElementById('exPin'); if(pin)pin.focus(); return; }
+  if(lock)lock.style.display='none'; if(content)content.style.display='block';
+  exFillCatSelect('exBulkCat'); exFillCatSelect('exmCat');
+  exFillCatSelect('exRepCat', true);
+  exLoadAll(function(){ exRenderManual(); exFillMonths(); exRenderReport(); });
+  exSub('imp');
+}
+function exFillCatSelect(id, withAll){
+  var el=document.getElementById(id); if(!el) return;
+  var html = withAll ? '<option value="">ทุกหมวด</option>' : '';
+  html += EX_CATS.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
+  el.innerHTML=html;
+}
+function exFillMonths(){
+  var ms={}; gExpenses.forEach(function(e){ if(e.date) ms[e.date.slice(0,7)]=1; });
+  var keys=Object.keys(ms).sort().reverse();
+  var opt=keys.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('') || '<option value="">— ไม่มีข้อมูล —</option>';
+  ['exRepMonth','ex4Month'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML=opt; });
+}
+
+/* ---------- sub-tab switch ---------- */
+function exSub(which){
+  var map={imp:'exPageImp',man:'exPageMan',rep:'exPageRep'};
+  for(var k in map){ var el=document.getElementById(map[k]); if(el) el.style.display=(k===which?'block':'none'); }
+  ['imp','man','rep'].forEach(function(k){
+    var b=document.getElementById('exTab'+k.charAt(0).toUpperCase()+k.slice(1));
+    if(b) b.className = (k===which?'btn btn-gold':'btn btn-ghost');
+  });
+  if(which==='rep'){ exFillMonths(); exRenderReport(); }
+  if(which==='man') exRenderManual();
+}
+
+/* ---------- import & parse ---------- */
+function exImportFile(ev){
+  var file=ev.target.files[0]; if(!file) return;
+  document.getElementById('exImpInfo').textContent='กำลังอ่านไฟล์...';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      var sheet=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
+      exParseRows(rows);
+    }catch(err){ toast('❌ อ่านไฟล์ไม่ได้: '+err.message); document.getElementById('exImpInfo').textContent=''; }
+  };
+  reader.readAsArrayBuffer(file);
+  ev.target.value='';
+}
+function exParseRows(rows){
+  // find header row
+  var hi=-1, col={};
+  for(var i=0;i<rows.length;i++){
+    var r=rows[i].map(function(c){return String(c).trim();});
+    if(r.indexOf('วันที่')>=0 && r.some(function(c){return c.indexOf('ถอนเงิน')>=0;})){
+      hi=i;
+      r.forEach(function(c,idx){
+        if(c==='วันที่') col.date=idx;
+        else if(c.indexOf('เวลา')>=0) col.time=idx;
+        else if(c==='รายการ') col.type=idx;
+        else if(c.indexOf('ถอนเงิน')>=0) col.wd=idx;
+        else if(c.indexOf('ฝากเงิน')>=0) col.dep=idx;
+        else if(c.indexOf('ยอดคงเหลือ')>=0) col.bal=idx;
+        else if(c.indexOf('ช่องทาง')>=0) col.ch=idx;
+        else if(c.indexOf('รายละเอียด')>=0) col.detail=idx;
+      });
+      break;
+    }
+  }
+  if(hi<0 || col.wd===undefined){ toast('❌ ไม่พบหัวตาราง (วันที่/ถอนเงิน) — ตรวจรูปแบบไฟล์'); document.getElementById('exImpInfo').textContent=''; return; }
+  var out=[];
+  for(var j=hi+1;j<rows.length;j++){
+    var row=rows[j]; if(!row) continue;
+    var typ=String(row[col.type]||'').trim();
+    if(typ.indexOf('ยอดยก')>=0) continue;
+    var amt=exNum(row[col.wd]);
+    if(!(amt>0)) continue;                 // เฉพาะเงินออก
+    var date=exNormDate(row[col.date]); if(!date) continue;
+    var detail=String(row[col.detail]||'').trim();
+    var p=exPayee(detail);
+    var rule=gRules[p.code];
+    out.push({
+      date:date, time:String(row[col.time]||'').trim(), amount:amt,
+      txType:typ, payeeCode:p.code, payeeName:p.name,
+      channel:String(row[col.ch]||'').trim(), detail:detail,
+      balance:exNum(row[col.bal]),
+      category:(rule?rule.category:''), _chk:true
+    });
+  }
+  exReviewRows=out;
+  document.getElementById('exImpInfo').textContent='พบรายจ่าย '+out.length+' รายการ';
+  exRenderReview();
+}
+function exRenderReview(){
+  var wrap=document.getElementById('exReviewWrap');
+  if(!exReviewRows.length){ wrap.style.display='none'; toast('ไม่พบรายการเงินออกในไฟล์'); return; }
+  wrap.style.display='block';
+  var opts=EX_CATS.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
+  var body=exReviewRows.map(function(r,i){
+    var hl = r.category? '' : 'background:rgba(240,165,0,.13);';
+    var sel='<select class="form-input" style="padding:3px 6px;font-size:.74rem;" onchange="exReviewRows['+i+'].category=this.value;exReviewSum();">'
+      +'<option value="">— เลือก —</option>'+opts+'</select>';
+    return '<tr style="'+hl+'">'
+      +'<td><input type="checkbox" '+(r._chk?'checked':'')+' onchange="exReviewRows['+i+']._chk=this.checked"></td>'
+      +'<td>'+exDispDate(r.date)+'</td>'
+      +'<td>'+(r.payeeName||'')+(r.payeeCode?' <span style="color:var(--muted)">('+r.payeeCode+')</span>':'')+'</td>'
+      +'<td class="r">'+exMoney(r.amount)+'</td>'
+      +'<td style="font-size:.72rem;color:var(--muted)">'+r.detail+'</td>'
+      +'<td>'+sel+'</td></tr>';
+  }).join('');
+  document.getElementById('exReviewBody').innerHTML=body;
+  // set selected values
+  exReviewRows.forEach(function(r,i){
+    var s=document.querySelectorAll('#exReviewBody select')[i]; if(s&&r.category) s.value=r.category;
+  });
+  exReviewSum();
+}
+function exReviewSum(){
+  var tot=0,done=0;
+  exReviewRows.forEach(function(r){ tot+=r.amount; if(r.category)done++; });
+  document.getElementById('exReviewSum').innerHTML='รวม <b style="color:var(--gold)">'+exMoney(tot)
+    +'</b> บาท · จัดหมวดแล้ว '+done+'/'+exReviewRows.length+(done<exReviewRows.length?' <span style="color:#e0a500">(แถวพื้นเหลือง = ยังไม่จัด)</span>':'');
+}
+function exToggleAll(cb){ exReviewRows.forEach(function(r){r._chk=cb.checked;}); exRenderReview(); }
+function exBulkApply(){
+  var c=document.getElementById('exBulkCat').value;
+  exReviewRows.forEach(function(r){ if(r._chk) r.category=c; });
+  exRenderReview();
+}
+function exSaveImport(){
+  var rows=exReviewRows.filter(function(r){return r._chk;});
+  if(!rows.length){ toast('ยังไม่ได้ติ๊กรายการ'); return; }
+  var noCat=rows.filter(function(r){return !r.category;}).length;
+  var period=document.getElementById('exPeriod').value.trim();
+  var chunks=[],cur=db.batch(),cnt=0;
+  rows.forEach(function(r){
+    var cat=r.category||'อื่นๆ';
+    var id=exDocId(r);
+    cur.set(db.collection('expenses').doc(id),{
+      date:r.date, time:r.time, amount:r.amount, txType:r.txType,
+      payeeCode:r.payeeCode, payeeName:r.payeeName, channel:r.channel, detail:r.detail,
+      category:cat, source:'statement', period:period,
+      importedAt:new Date().toISOString(), importedBy:(typeof curEmail!=='undefined'?curEmail:'admin')
+    },{merge:true}); cnt++;
+    if(r.payeeCode){ cur.set(db.collection('expense_rules').doc(r.payeeCode),{
+      payeeCode:r.payeeCode, payeeName:r.payeeName, category:cat, updatedAt:new Date().toISOString()
+    }); cnt++; }
+    if(cnt>=400){ chunks.push(cur); cur=db.batch(); cnt=0; }
+  });
+  chunks.push(cur);
+  Promise.all(chunks.map(function(b){return b.commit();})).then(function(){
+    toast('✅ บันทึก '+rows.length+' รายการแล้ว'+(noCat>0?' ('+noCat+' รายการเป็นหมวดอื่นๆ)':''));
+    document.getElementById('exReviewWrap').style.display='none';
+    document.getElementById('exImpInfo').textContent='';
+    exReviewRows=[];
+    exLoadAll(function(){ exFillMonths(); exRenderReport(); });
+  }).catch(function(e){ toast('❌ บันทึกไม่สำเร็จ: '+e.message); });
+}
+
+/* ---------- manual entry ---------- */
+function exSaveManual(){
+  var date=document.getElementById('exmDate').value;
+  var amt=exNum(document.getElementById('exmAmt').value);
+  var cat=document.getElementById('exmCat').value;
+  var detail=document.getElementById('exmDetail').value.trim();
+  if(!date||!(amt>0)){ toast('กรอกวันที่และจำนวนให้ถูกต้อง'); return; }
+  var id='man_'+Date.now();
+  db.collection('expenses').doc(id).set({
+    date:date, time:'', amount:amt, txType:'กรอกมือ', payeeCode:'', payeeName:detail,
+    channel:'manual', detail:detail, category:cat, source:'manual', period:'',
+    importedAt:new Date().toISOString(), importedBy:(typeof curEmail!=='undefined'?curEmail:'admin')
+  }).then(function(){
+    toast('✅ บันทึกแล้ว');
+    document.getElementById('exmAmt').value=''; document.getElementById('exmDetail').value='';
+    exLoadAll(function(){ exRenderManual(); exFillMonths(); exRenderReport(); });
+  }).catch(function(e){ toast('❌ '+e.message); });
+}
+function exRenderManual(){
+  var list=gExpenses.filter(function(e){return e.source==='manual';}).slice(0,50);
+  var body=list.length? list.map(function(e){
+    return '<tr><td>'+exDispDate(e.date)+'</td><td>'+e.category+'</td><td>'+(e.detail||'')+'</td>'
+      +'<td class="r">'+exMoney(e.amount)+'</td>'
+      +'<td><button class="btn btn-ghost" style="padding:2px 8px;font-size:.7rem;" onclick="exDelManual(\''+e.id+'\',this)">ลบ</button></td></tr>';
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:18px">ยังไม่มีรายการกรอกมือ</td></tr>';
+  document.getElementById('exManBody').innerHTML=body;
+}
+function exDelManual(id,btn){
+  if(btn && btn.getAttribute('data-cf')!=='1'){ btn.setAttribute('data-cf','1'); btn.textContent='ยืนยัน?'; btn.style.color='#e06a6a'; setTimeout(function(){ if(btn){ btn.setAttribute('data-cf','0'); btn.textContent='ลบ'; btn.style.color=''; } },3000); return; }
+  db.collection('expenses').doc(id).delete().then(function(){
+    toast('ลบแล้ว'); exLoadAll(function(){ exRenderManual(); exFillMonths(); exRenderReport(); });
+  });
+}
+
+/* ---------- report + export ---------- */
+function exFilteredRows(){
+  var m=document.getElementById('exRepMonth').value;
+  var c=document.getElementById('exRepCat').value;
+  return gExpenses.filter(function(e){
+    return (!m||e.date.slice(0,7)===m) && (!c||e.category===c);
+  }).sort(function(a,b){ return a.date<b.date?-1:1; });
+}
+function exRenderReport(){
+  var rows=exFilteredRows();
+  var body=rows.length? rows.map(function(e){
+    return '<tr><td>'+exDispDate(e.date)+'</td><td>'+e.category+'</td><td>'+(e.payeeName||'')+'</td>'
+      +'<td style="font-size:.72rem;color:var(--muted)">'+(e.detail||'')+'</td>'
+      +'<td class="r">'+exMoney(e.amount)+'</td></tr>';
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:18px">ไม่มีข้อมูล</td></tr>';
+  document.getElementById('exRepBody').innerHTML=body;
+  var byCat={}; var tot=0;
+  rows.forEach(function(e){ byCat[e.category]=(byCat[e.category]||0)+e.amount; tot+=e.amount; });
+  var chips=Object.keys(byCat).sort().map(function(k){
+    return '<span style="display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:4px 10px;margin:3px;font-size:.78rem;">'+k+': <b style="color:var(--gold)">'+exMoney(byCat[k])+'</b></span>';
+  }).join('');
+  document.getElementById('exRepSum').innerHTML=chips+'<div style="margin-top:8px;font-size:.95rem;">รวมทั้งสิ้น: <b style="color:var(--gold)">'+exMoney(tot)+'</b> บาท ('+rows.length+' รายการ)</div>';
+  exDrawCatChart(byCat);
+}
+/* ---------- กราฟสัดส่วนรายจ่ายต่อหมวด (Tab 8) ---------- */
+function exDrawCatChart(byCat){
+  var cv=document.getElementById('exRepChart'); if(!cv) return;
+  if(byCat && Object.keys(byCat).length && typeof drawPie==='function'){
+    drawPie('exRepChart', byCat);
+  } else {
+    var cx=cv.getContext('2d');
+    cx.clearRect(0,0,cv.width,cv.height);
+    cx.fillStyle='#0d1b2a'; cx.fillRect(0,0,cv.width,cv.height);
+    cx.fillStyle='#5a7a9a'; cx.font='13px Sarabun,sans-serif'; cx.textAlign='center';
+    cx.fillText('ไม่มีข้อมูล',cv.width/2,cv.height/2);
+  }
+}
+function exDispDate(iso){
+  if(!iso) return '';
+  var p=iso.split('-'); if(p.length<3) return iso;
+  return p[2]+'/'+p[1]+'/'+(parseInt(p[0])+543); // พ.ศ.
+}
+function exExportExcel(){
+  var rows=exFilteredRows();
+  if(!rows.length){ toast('ไม่มีข้อมูลให้ export'); return; }
+  var aoa=[['วันที่','เวลา','หมวด','ผู้รับ','รายละเอียด','ช่องทาง','จำนวน (บาท)']];
+  var tot=0;
+  rows.forEach(function(e){ aoa.push([exDispDate(e.date),e.time||'',e.category,e.payeeName||'',e.detail||'',e.channel||'',e.amount]); tot+=e.amount; });
+  aoa.push(['','','','','','รวม',tot]);
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:12},{wch:7},{wch:10},{wch:24},{wch:40},{wch:12},{wch:14}];
+  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'รายจ่าย');
+  var m=document.getElementById('exRepMonth').value||'all';
+  XLSX.writeFile(wb,'รายจ่าย_'+m+'.xlsx');
+}
+function exExportPDF(){
+  var rows=exFilteredRows();
+  if(!rows.length){ toast('ไม่มีข้อมูลให้พิมพ์'); return; }
+  var m=document.getElementById('exRepMonth').value||'ทั้งหมด';
+  var c=document.getElementById('exRepCat').value||'ทุกหมวด';
+  var tot=0; var byCat={};
+  var tr=rows.map(function(e){ tot+=e.amount; byCat[e.category]=(byCat[e.category]||0)+e.amount;
+    return '<tr><td>'+exDispDate(e.date)+'</td><td>'+e.category+'</td><td>'+(e.payeeName||'')+'</td><td class="d">'+(e.detail||'')+'</td><td class="r">'+exMoney(e.amount)+'</td></tr>';
+  }).join('');
+  var catRows=Object.keys(byCat).sort().map(function(k){ return '<tr><td>'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>';}).join('');
+  var html='<html><head><meta charset="UTF-8"><title>รายงานรายจ่าย</title><style>'
+    +'@page{size:A4;margin:14mm;}*{font-family:"Sarabun","TH Sarabun New",sans-serif;}'
+    +'body{color:#111;font-size:13px;}h2{margin:0 0 2px;}'
+    +'table{width:100%;border-collapse:collapse;margin-top:10px;}'
+    +'th,td{border:1px solid #999;padding:4px 6px;}th{background:#eee;}'
+    +'.r{text-align:right;white-space:nowrap;}.d{font-size:11px;color:#555;}'
+    +'.sum{width:auto;margin-top:14px;}.muted{color:#666;font-size:12px;}'
+    +'@media print{button{display:none;}}</style></head><body>'
+    +'<h2>หจก. ธนเศรษฐ์ศิริ 2546 — รายงานรายจ่าย</h2>'
+    +'<div class="muted">เดือน: '+m+' · หมวด: '+c+' · บัญชีกสิกร 4778</div>'
+    +'<table><thead><tr><th>วันที่</th><th>หมวด</th><th>ผู้รับ</th><th>รายละเอียด</th><th class="r">จำนวน (บาท)</th></tr></thead>'
+    +'<tbody>'+tr+'</tbody>'
+    +'<tfoot><tr><th colspan="4" class="r">รวมทั้งสิ้น</th><th class="r">'+exMoney(tot)+'</th></tr></tfoot></table>'
+    +'<table class="sum"><thead><tr><th>สรุปตามหมวด</th><th class="r">บาท</th></tr></thead><tbody>'+catRows+'</tbody></table>'
+    +'<button onclick="window.print()" style="margin-top:16px;padding:8px 18px;cursor:pointer">🖨️ พิมพ์ / บันทึก PDF</button>'
+    +'</body></html>';
+  var w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); setTimeout(function(){w.print();},500); }
+}
+
+/* ---------- Tab4 integration: profit/loss ---------- */
+function exDraw4(){
+  var sel=document.getElementById('ex4Month'); if(!sel) return;
+  var m=sel.value;
+  var rows=gExpenses.filter(function(e){ return m && e.date.slice(0,7)===m; });
+  var byCat={}; var tot=0;
+  rows.forEach(function(e){ byCat[e.category]=(byCat[e.category]||0)+e.amount; tot+=e.amount; });
+  var body='';
+  EX_CATS.forEach(function(k){ if(byCat[k]) body+='<tr><td style="padding-left:14px;color:var(--muted)">'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>'; });
+  body+='<tr><td><b>รายจ่ายรวม</b></td><td class="r"><b style="color:#e06a6a">'+exMoney(tot)+'</b></td></tr>';
+  var rev=exNum((document.getElementById('ex4Rev')||{}).value);
+  if(rev>0){
+    var profit=rev-tot;
+    body='<tr><td>รายได้ (กรอกเอง)</td><td class="r" style="color:#4ec98a">'+exMoney(rev)+'</td></tr>'+body
+      +'<tr><td><b>กำไร / ขาดทุน</b></td><td class="r"><b style="color:'+(profit>=0?'#4ec98a':'#e06a6a')+'">'+exMoney(profit)+'</b></td></tr>';
+  }
+  var el=document.getElementById('ex4Body');
+  if(el) el.innerHTML = rows.length||rev>0 ? body : '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">ยังไม่มีรายจ่ายเดือนนี้</td></tr>';
+}
+
+function exReady(){
+  if(!exLoaded){ exLoadAll(function(){ exFillMonths(); exDraw4(); }); }
+  else { exFillMonths(); exDraw4(); }
+}
 </script>
 
 </body>
