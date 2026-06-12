@@ -5539,6 +5539,9 @@ function exCatMsgSet(m){ var el=document.getElementById('exCatMsg'); if(el) el.t
 function exRefreshCats(){
   exFillCatSelect('exBulkCat'); exFillCatSelect('exmCat'); exFillCatSelect('exRepCat', true);
   exRenderCustomCatList();
+  // อัปเดตหมวดในทุกจุดที่เปิดค้างอยู่ (คงค่าที่เลือกไว้)
+  if(typeof exReviewRows!=='undefined' && exReviewRows && exReviewRows.length) exRenderReview();
+  if(document.getElementById('exRepBody')) exRenderReport();
 }
 function exRenderCustomCatList(){
   var el=document.getElementById('exCustomCatList'); if(!el) return;
