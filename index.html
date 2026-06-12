@@ -5449,7 +5449,7 @@ function exportFuelExcel() {
    collections: expenses , expense_rules
 ================================================================ */
 var EX_CATS = ['งวดรถ','น้ำมัน','สัมปทาน','เงินกู้ยืม','ภาษี','ส่วนตัว','อื่นๆ'];
-var gCustomCats = ['อะไหล่ซ่อมรถ','ซื้อของให้ร้านรุ่งชัย'];   // หมวดเพิ่มเอง (โหลดทับจาก Firestore expense_rules/__cats__)
+var gCustomCats = ['อะไหล่ซ่อมรถ','ซื้อของให้ร้านรุ่งชัย'];   // หมวดเพิ่มเอง (โหลดทับจาก Firestore expense_rules/_categories)
 var gExpenses = [];        // {id,date,time,amount,txType,payeeCode,payeeName,channel,detail,category,source,period}
 var gRules    = {};        // payeeCode -> {category,payeeName}
 var exReviewRows = [];     // staging rows before save
@@ -5498,7 +5498,7 @@ function exDocId(r){
 function exLoadAll(cb){
   var done=0; function fin(){ done++; if(done===2){ exLoaded=true; if(cb)cb(); } }
   db.collection('expense_rules').get().then(function(snap){
-    gRules={}; snap.forEach(function(d){ if(d.id==='__cats__'){ var cd=d.data(); if(cd&&Array.isArray(cd.list)) gCustomCats=cd.list; } else { gRules[d.id]=d.data(); } }); fin();
+    gRules={}; snap.forEach(function(d){ if(d.id==='_categories'){ var cd=d.data(); if(cd&&Array.isArray(cd.list)) gCustomCats=cd.list; } else { gRules[d.id]=d.data(); } }); fin();
   }).catch(function(e){ console.warn('rules',e); fin(); });
   db.collection('expenses').orderBy('date','desc').get().then(function(snap){
     gExpenses=[]; snap.forEach(function(d){ var o=d.data(); o.id=d.id; gExpenses.push(o); }); fin();
@@ -5534,7 +5534,7 @@ function exFillCatSelect(id, withAll){
   html += cats.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
   el.innerHTML=html;
 }
-/* ---------- จัดการหมวด (เพิ่ม/ลบเอง) — เก็บใน expense_rules/__cats__ (เฉพาะเจ้าของ) ---------- */
+/* ---------- จัดการหมวด (เพิ่ม/ลบเอง) — เก็บใน expense_rules/_categories (เฉพาะเจ้าของ) ---------- */
 function exCatMsgSet(m){ var el=document.getElementById('exCatMsg'); if(el) el.textContent=m||''; }
 function exRefreshCats(){
   exFillCatSelect('exBulkCat'); exFillCatSelect('exmCat'); exFillCatSelect('exRepCat', true);
@@ -5550,7 +5550,7 @@ function exRenderCustomCatList(){
   }).join('');
 }
 function exSaveCats(cb){
-  db.collection('expense_rules').doc('__cats__').set({ list:gCustomCats, updatedAt:new Date().toISOString() })
+  db.collection('expense_rules').doc('_categories').set({ list:gCustomCats, updatedAt:new Date().toISOString() })
     .then(function(){ if(cb)cb(); })
     .catch(function(e){ exCatMsgSet('❌ บันทึกไม่สำเร็จ: '+e.message); });
 }
