@@ -5279,7 +5279,7 @@ async function saveFuelOut() {
     await prDb().collection('fuel_out').add(data);
     toast('✅ บันทึกเบิกออก '+liters+' ลิตร แล้ว');
     var remainAfter = (stock.remaining||0) - liters;
-    if(remainAfter < 1000){ tgNotify('⚠️ <b>น้ำมันใกล้หมด</b>\nคงเหลือโดยประมาณ '+Math.max(0,Math.round(remainAfter)).toLocaleString()+' ลิตร (หลังเบิก '+liters+' ลิตร)'); }
+    if(remainAfter < 500){ tgNotify('⚠️ <b>น้ำมันใกล้หมด</b>\nคงเหลือโดยประมาณ '+Math.max(0,Math.round(remainAfter)).toLocaleString()+' ลิตร (หลังเบิก '+liters+' ลิตร)'); }
     ['fOutMachineId','fOutLiters','fOutNote'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     document.getElementById('fOutType').value='';
   } catch(e) { toast('❌ '+e.message); }
@@ -6013,7 +6013,8 @@ function exDrawCatChart(byCat){
   var bg=(getComputedStyle(document.documentElement).getPropertyValue('--bg')||'').trim()||'#070e18';
   ctx.beginPath(); ctx.arc(cx,cy,rIn,0,Math.PI*2); ctx.fillStyle=bg; ctx.fill();
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillStyle='#e2eaf4'; ctx.font='700 19px Sarabun,sans-serif';
+  var ink=(getComputedStyle(document.documentElement).getPropertyValue('--text')||'').trim()||'#14202e';
+  ctx.fillStyle=ink; ctx.font='800 20px Sarabun,sans-serif';
   ctx.fillText(exMoney(total), cx, cy-6);
   ctx.fillStyle='#5a7a9a'; ctx.font='12px Sarabun,sans-serif';
   ctx.fillText('บาท ('+keys.length+' หมวด)', cx, cy+15);
