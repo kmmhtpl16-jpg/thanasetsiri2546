@@ -804,6 +804,10 @@ select{color-scheme:light;}
 
 <!-- TAB 4 -->
     <section class="tab-pane" id="tp4">
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div class="card-title" style="margin:0;">📲 แจ้งเตือน Telegram</div>
+        <button class="btn btn-gold" onclick="tgSendDailyNow()">📤 ส่งสรุปวันนี้เข้า Telegram</button>
+      </div>
       <div class="tp4-grid">
         <!-- ซ้ายบน: 7 วันล่าสุด -->
         <div class="card"><div class="card-title">📈 7 วันล่าสุด</div><canvas id="c4" width="460" height="220"></canvas></div>
@@ -1667,6 +1671,83 @@ function showApp() {
   applyRole();
   goTab(1);
   listenFS();
+  setTimeout(function(){ try{ tgCheckDailySummary(); }catch(e){} }, 8000);
+}
+
+/* ================================================================
+   TELEGRAM แจ้งเตือน (ส่งผ่าน /api/notify — token ซ่อนฝั่งเซิร์ฟเวอร์)
+================================================================ */
+var TG_DAILY_HOUR = 18; // ส่งสรุปประจำวันอัตโนมัติหลังเวลานี้ (เวลาเครื่อง)
+
+function tgNotify(text){
+  try{
+    return fetch('/api/notify', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text: text })
+    }).catch(function(e){ console.warn('tgNotify', e); });
+  }catch(e){ console.warn('tgNotify', e); }
+}
+
+async function tgCheckDailySummary(){
+  try{
+    if(typeof prDb!=='function') return;
+    if(new Date().getHours() < TG_DAILY_HOUR) return;
+    var today = todayYMD();
+    var ref = prDb().collection('app_meta').doc('notify_daily');
+    var go = await prDb().runTransaction(async function(tx){
+      var doc = await tx.get(ref);
+      if(doc.exists && doc.data().lastSent === today) return false;
+      tx.set(ref, { lastSent: today, sentAt: new Date().toISOString() }, {merge:true});
+      return true;
+    });
+    if(!go) return;
+    var text = await tgBuildDailySummary(today);
+    var resp = await tgNotify(text);
+    // ส่งไม่สำเร็จ (ยังไม่ตั้งค่า token ฯลฯ) → คืนสถานะให้ลองใหม่รอบเปิดถัดไป
+    if(!resp || resp.ok === false || (resp.status && resp.status >= 400)){
+      await ref.set({ lastSent:'' }, {merge:true}).catch(function(){});
+    }
+  }catch(e){
+    console.warn('tgCheckDailySummary', e);
+    try{ await prDb().collection('app_meta').doc('notify_daily').set({lastSent:''},{merge:true}); }catch(_){}
+  }
+}
+
+async function tgBuildDailySummary(today){
+  var d = prDb();
+  var empty = { forEach:function(){} };
+  var res = await Promise.all([
+    d.collection('withdrawals').where('date','==',today).get().catch(function(){return empty;}),
+    d.collection('expenses').where('date','==',today).get().catch(function(){return empty;}),
+    d.collection('fuel_in').where('date','==',today).get().catch(function(){return empty;}),
+    d.collection('fuel_expense').where('date','==',today).get().catch(function(){return empty;}),
+    d.collection('invoices').where('createdAt','>=',today).where('createdAt','<',today+'').get().catch(function(){return empty;})
+  ]);
+  var wdTot=0,wdN=0; res[0].forEach(function(x){var v=x.data();wdTot+=(v.amount||0);wdN++;});
+  var exTot=0,exN=0; res[1].forEach(function(x){var v=x.data();exTot+=(v.amount||0);exN++;});
+  var fiL=0;        res[2].forEach(function(x){fiL+=(x.data().liters||0);});
+  var feTot=0,feN=0; res[3].forEach(function(x){feTot+=(x.data().total_amount||0);feN++;});
+  var invN=0,invTot=0; res[4].forEach(function(x){invN++;invTot+=(x.data().grandTotal||0);});
+  var L=[];
+  L.push('📊 <b>สรุปประจำวัน '+isoToBE(today)+'</b>');
+  L.push('————————————');
+  L.push('👷 เบิกเงินเดือน: '+fmtBaht(wdTot)+' ฿ ('+wdN+' รายการ)');
+  L.push('💸 รายจ่าย: '+fmtBaht(exTot)+' ฿ ('+exN+' รายการ)');
+  L.push('⛽ ค่าน้ำมันรถ: '+fmtBaht(feTot)+' ฿ ('+feN+' ครั้ง)');
+  L.push('🛢️ รับน้ำมันเข้า: '+fmtBaht(fiL)+' ลิตร');
+  L.push('🧾 ใบแจ้งหนี้ใหม่: '+invN+' ใบ ('+fmtBaht(invTot)+' ฿)');
+  return L.join('\n');
+}
+
+// ส่งสรุปวันนี้แบบกดเอง (บังคับส่งทันที)
+async function tgSendDailyNow(){
+  try{
+    toast('⏳ กำลังส่งสรุปเข้า Telegram...');
+    var text = await tgBuildDailySummary(todayYMD());
+    await tgNotify(text);
+    toast('✅ ส่งสรุปวันนี้เข้า Telegram แล้ว');
+  }catch(e){ toast('❌ ส่งไม่สำเร็จ: '+e.message); }
 }
 
 function applyRole() {
@@ -2412,10 +2493,12 @@ async function submitAllWithdrawals() {
 
   toast('⏳ กำลังบันทึก...');
   let count = 0;
+  let totalAmt = 0;
   try {
     for (const emp of checked) {
       const amt = parseFloat(document.getElementById('wdamt_' + emp.id)?.value) || 0;
       if (amt <= 0) continue;
+      totalAmt += amt;
       const earned = calcPeriodEarned(emp.id, ym, period);
       const isSocial = emp.socialSecurity && period === '16-end';
       const socEl = document.getElementById('wdsoc_' + emp.id);
@@ -2431,6 +2514,7 @@ async function submitAllWithdrawals() {
     }
     await renderWdPanel();
     toast('✅ บันทึก ' + count + ' คนแล้ว');
+    if(count>0){ tgNotify('👷 <b>เบิกเงินเดือน</b>\nวันที่ '+isoToBE(todayYMD())+'\nจำนวน '+count+' คน รวม '+fmtBaht(totalAmt)+' ฿'); }
   } catch(e) {
     toast('❌ ' + e.message);
   }
@@ -4727,6 +4811,7 @@ function doSaveInvoice(sandType, price, vatType, balFwd, remark, totalNetKiu, gr
   };
   prDb().collection('invoices').doc(docNo).set(rec)
     .then(function(){
+      tgNotify('🧾 <b>ใบแจ้งหนี้ใหม่</b>\nเลขที่ '+docNo+'\nลูกค้า: '+custName+'\nยอดรวม: '+fmtBaht(grandTotal)+' ฿');
       document.getElementById('inv-modal').style.display='none';
       alert('✅ บันทึกใบแจ้งหนี้แล้ว (เลขที่ '+docNo+')\nสถานะ: รอวางบิล\n\nดูในประวัติใบแจ้งหนี้ด้านบนได้เลย');
       var card=document.getElementById('invhist-inline');
@@ -5165,6 +5250,7 @@ async function saveFuelIn() {
   try {
     await prDb().collection('fuel_in').add(data);
     toast('✅ บันทึกรับน้ำมันเข้าแล้ว '+liters.toLocaleString()+' ลิตร');
+    tgNotify('🛢️ <b>รับน้ำมันเข้า</b>\nวันที่ '+isoToBE(date)+'\nปั๊ม/แหล่ง: '+(source||'-')+'\nจำนวน: '+liters.toLocaleString()+' ลิตร\nรวมเงิน: '+fmtBaht(total)+' ฿');
     ['fInSource','fInLiters','fInPricePerL','fInTotal','fInInvoiceNo','fInPumpName'].forEach(function(id){
       var el=document.getElementById(id); if(el) el.value='';
     });
@@ -5192,6 +5278,8 @@ async function saveFuelOut() {
   try {
     await prDb().collection('fuel_out').add(data);
     toast('✅ บันทึกเบิกออก '+liters+' ลิตร แล้ว');
+    var remainAfter = (stock.remaining||0) - liters;
+    if(remainAfter < 1000){ tgNotify('⚠️ <b>น้ำมันใกล้หมด</b>\nคงเหลือโดยประมาณ '+Math.max(0,Math.round(remainAfter)).toLocaleString()+' ลิตร (หลังเบิก '+liters+' ลิตร)'); }
     ['fOutMachineId','fOutLiters','fOutNote'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     document.getElementById('fOutType').value='';
   } catch(e) { toast('❌ '+e.message); }
@@ -5809,8 +5897,10 @@ function exSaveImport(){
     if(cnt>=400){ chunks.push(cur); cur=db.batch(); cnt=0; }
   });
   chunks.push(cur);
+  var impTot = rows.reduce(function(s,r){return s+(r.amount||0);},0);
   Promise.all(chunks.map(function(b){return b.commit();})).then(function(){
     toast('✅ บันทึก '+rows.length+' รายการแล้ว'+(noCat>0?' ('+noCat+' รายการเป็นหมวดอื่นๆ)':''));
+    tgNotify('📥 <b>นำเข้ารายจ่าย</b>\n'+rows.length+' รายการ รวม '+fmtBaht(impTot)+' ฿');
     document.getElementById('exReviewWrap').style.display='none';
     document.getElementById('exImpInfo').textContent='';
     exReviewRows=[];
@@ -5832,6 +5922,7 @@ function exSaveManual(){
     importedAt:new Date().toISOString(), importedBy:(typeof curEmail!=='undefined'?curEmail:'admin')
   }).then(function(){
     toast('✅ บันทึกแล้ว');
+    tgNotify('💸 <b>บันทึกรายจ่ายใหม่</b>\nวันที่ '+isoToBE(date)+'\nหมวด: '+cat+'\nจำนวน: '+fmtBaht(amt)+' ฿'+(detail?('\nรายละเอียด: '+detail):''));
     document.getElementById('exmAmt').value=''; document.getElementById('exmDetail').value='';
     exLoadAll(function(){ exRenderManual(); exFillMonths(); exRenderReport(); });
   }).catch(function(e){ toast('❌ '+e.message); });
