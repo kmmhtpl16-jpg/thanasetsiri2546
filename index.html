@@ -636,6 +636,13 @@ select{color-scheme:dark;}
 
     <!-- TAB 2 -->
     <section class="tab-pane" id="tp2">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <span style="font-size:13px;color:var(--muted);">📅 ดูข้อมูลเดือน:</span>
+        <input type="month" id="t2Month" onchange="t2SetMonth(this.value)"
+          style="padding:6px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:var(--font);">
+        <button class="btn btn-ghost" id="t2AllBtn" onclick="t2SetAll()" style="padding:5px 12px;font-size:12px;">ทั้งหมด</button>
+        <span id="t2PeriodLabel" style="font-size:13px;color:var(--gold);font-weight:600;"></span>
+      </div>
       <div class="kpi-row">
         <div class="kpi-card"><div class="kpi-label">📦 ปริมาตรรวม</div><div id="kT">–</div></div>
         <div class="kpi-card"><div class="kpi-label">💧 หักทรายเปียก</div><div id="kD">–</div></div>
@@ -1467,13 +1474,16 @@ select{color-scheme:dark;}
    🔧 STEP 1 — Firebase Config
    คัดลอกจาก Firebase Console > Project Settings > SDK snippet
 ================================================================ */
+// ⬇️ บ้านใหม่ (asia-southeast3 / Bangkok) — สลับ go-live 13 มิ.ย. 2569
+// config เก่า (US/nam5) สำรองไว้ที่ index_backup_ก่อนสลับ_US_2569-06-13.html
 var FB_CFG = {
-  apiKey:            "AIzaSyDjeec1gYypCCHPXJKWwX_FEnb9J8RffuE",
-  authDomain:        "thanasetsiri2546.firebaseapp.com",
-  projectId:         "thanasetsiri2546",
-  storageBucket:     "thanasetsiri2546.firebasestorage.app",
-  messagingSenderId: "583880441495",
-  appId:             "1:583880441495:web:30da4fbb276a3f289d33d2"
+  apiKey:            "AIzaSyAaxKbw-MKrsVnCEw6IY_cYkiWsp1Ql8SA",
+  authDomain:        "thanasetsiri2546-20cb6.firebaseapp.com",
+  projectId:         "thanasetsiri2546-20cb6",
+  storageBucket:     "thanasetsiri2546-20cb6.firebasestorage.app",
+  messagingSenderId: "1084804762783",
+  appId:             "1:1084804762783:web:6a82b10785e0d6a1e166aa",
+  measurementId:     "G-FHCDB112WN"
 };
 
 /* ================================================================
@@ -1513,6 +1523,11 @@ var pinBuf   = '';
 try {
   firebase.initializeApp(FB_CFG);
   db   = firebase.firestore();
+
+  // ⬇️ เปิด offline persistence — อ่านจาก cache ในเครื่องก่อน ไม่ต้องวิ่งไป US ทุกครั้ง (กลุ่ม 1.1)
+  db.enablePersistence({ synchronizeTabs: true })
+    .catch(function(err){ console.warn('persistence:', err.code); });
+
   auth = firebase.auth();
 } catch(e) {
   alert('Firebase init error: ' + e.message);
@@ -3040,17 +3055,36 @@ function confirmEditCust(){
 /* ================================================================
    TAB 2 — หักทรายเปียก
 ================================================================ */
+/* ── ตัวเลือกเดือน/ปี (Tab 2 หักน้ำหนัก) ── */
+function curMonthStr(){ var d=new Date(); var m=d.getMonth()+1; return d.getFullYear()+'-'+(m<10?'0':'')+m; }
+var t2Month = curMonthStr();   // 'YYYY-MM' ที่เลือก; '' = ทั้งหมด
+function t2MonthLabelTH(ym){
+  if(!ym) return 'ทั้งหมด (ทุกเดือน)';
+  var M=['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  var p=ym.split('-'); return M[parseInt(p[1],10)]+' '+(parseInt(p[0],10)+543);
+}
+function t2SyncUI(){
+  var inp=document.getElementById('t2Month');
+  if(inp && inp.value!==(t2Month||'')) inp.value=t2Month||'';
+  var lbl=document.getElementById('t2PeriodLabel');
+  if(lbl) lbl.textContent='📊 '+t2MonthLabelTH(t2Month);
+}
+function t2SetMonth(v){ t2Month=v||''; t2SyncUI(); draw2(); }
+function t2SetAll(){ t2Month=''; t2SyncUI(); draw2(); }
 function draw2() {
   var f = unit==='cubic'?1:1.5;
   var u = unit==='cubic'?'คิว':'ตัน';
   var q = (document.getElementById('t2search')||{}).value||'';
   q = q.trim().toLowerCase();
   var onlyDed = (document.getElementById('t2filterDed')||{}).checked;
+  t2SyncUI();
   var rows = wData;
+  // ค้นเลขบิล = ค้นทุกเดือน / ไม่ค้น = กรองตามเดือนที่เลือก ('' = ทั้งหมด)
   if (q) rows = rows.filter(function(r){ return r.seq && r.seq.toLowerCase().includes(q); });
+  else if (t2Month) rows = rows.filter(function(r){ return (r.date||'').slice(0,7)===t2Month; });
   if (onlyDed) rows = rows.filter(function(r){ return (dData[r._id]||0) > 0; });
   document.getElementById('t2b').innerHTML = rows.length===0
-    ? '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">'+(wData.length===0?'ยังไม่มีข้อมูล':onlyDed?'ไม่มีรายการที่หักแล้ว':'ไม่พบเลขที่บิล')+'</td></tr>'
+    ? '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">'+(wData.length===0?'ยังไม่มีข้อมูล':onlyDed?'ไม่มีรายการที่หักแล้ว':q?'ไม่พบเลขที่บิล':'ไม่มีข้อมูลในเดือนที่เลือก')+'</td></tr>'
     : rows.map(function(r){
         var g=r.kg/KPC, d=dData[r._id]||0, n=Math.max(0,g-d), has=d>0;
         return '<tr class="'+(has?'ded':'')+'"><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
@@ -3071,11 +3105,14 @@ function fmt3(n){
 function fmtB(n){ return Math.round(n).toLocaleString('th-TH'); }
 
 function kpi() {
-  var g=0, d=0;
-  wData.forEach(function(r){ g+=r.kg/KPC; d+=dData[r._id]||0; });
+  var g=0, d=0, cnt=0;
+  wData.forEach(function(r){
+    if(t2Month && (r.date||'').slice(0,7)!==t2Month) return;
+    g+=r.kg/KPC; d+=dData[r._id]||0; cnt++;
+  });
   var f=unit==='cubic'?1:1.5, u=unit==='cubic'?'คิว':'ตัน';
   sk('kT',fmt3(g*f),u); sk('kD',fmt3(d*f),u);
-  sk('kN',fmt3((g-d)*f),u); sk('kC',wData.length,'เที่ยว');
+  sk('kN',fmt3((g-d)*f),u); sk('kC',cnt,'เที่ยว');
 }
 function sk(id,v,u){
   var el=document.getElementById(id);
