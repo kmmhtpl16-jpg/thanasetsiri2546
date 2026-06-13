@@ -1454,6 +1454,10 @@ select{color-scheme:light;}
           <button class="btn btn-ghost" onclick="exExportExcel()">⬇️ Excel</button>
           <button class="btn btn-gold" onclick="exExportPDF()">🖨️ PDF (A4)</button>
         </div>
+        <div class="card" id="exVarCostCard" style="margin-bottom:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;">
+          <div style="font-size:.72rem;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📐 ต้นทุนผันแปร <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">— ดูอย่างเดียว แก้/กรอกที่หน้าน้ำมัน</span></div>
+          <div id="exVarCostBody" style="font-size:.85rem;color:var(--muted);">—</div>
+        </div>
         <div id="exRepChartWrap" style="margin-bottom:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;">
           <div style="font-size:.72rem;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🥧 สัดส่วนรายจ่ายต่อหมวด</div>
           <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
@@ -5985,6 +5989,34 @@ function exRenderReport(){
   }).join('');
   document.getElementById('exRepSum').innerHTML=chips+'<div style="margin-top:8px;font-size:.95rem;">รวมทั้งสิ้น: <b style="color:var(--gold)">'+exMoney(tot)+'</b> บาท ('+rows.length+' รายการ)</div>';
   exDrawCatChart(byCat);
+  exRenderVarCost();
+}
+function exRenderVarCost(){
+  var body=document.getElementById('exVarCostBody'); if(!body) return;
+  var ym=(document.getElementById('exRepMonth')||{}).value||'';
+  if(!ym){ body.innerHTML='<span style="color:var(--muted)">เลือกเดือนเฉพาะ (ไม่ใช่ ทุกเดือน) เพื่อดูต้นทุนผันแปร/คิว</span>'; return; }
+  body.innerHTML='<span style="color:var(--muted)">กำลังโหลด...</span>';
+  db.collection('fuel_monthly').doc(ym).get().then(function(snap){
+    if(!snap.exists){ body.innerHTML='<span style="color:var(--muted)">— ยังไม่มีข้อมูลต้นทุนเดือนนี้ (กรอกที่หน้าน้ำมัน › ต้นทุนรายเดือน) —</span>'; return; }
+    var r=snap.data();
+    var total=(r.rent_cost||0)+(r.repair_cost||0)+(r.other_cost||0)+(r.labor_cost||0)+(r.tank_fuel_cost||0)+(r.exp_fuel_cost||0);
+    var kiu=0;
+    try{
+      if(typeof wData!=='undefined' && wData){
+        var totalKg=wData.filter(function(x){return x.date&&x.date.indexOf(ym)===0;}).reduce(function(s,x){return s+(x.kg||0);},0);
+        var dedKiu=(typeof dData!=='undefined'&&dData)?Object.entries(dData).reduce(function(s,kv){var rec=wData.find(function(x){return x._id===kv[0];}); if(rec&&rec.date&&rec.date.indexOf(ym)===0) return s+(kv[1]||0); return s;},0):0;
+        kiu=Math.max(0, totalKg/1500 - dedKiu);
+      }
+    }catch(e){}
+    var perKiu=kiu>0? total/kiu : 0;
+    function fmt(n,d){ return Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); }
+    body.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">'
+      +'<span style="background:rgba(239,83,80,.08);border-radius:8px;padding:8px 12px;">ต้นทุนรวม <b style="color:#ef5350;font-size:1.05rem;">'+fmt(total,0)+'</b> บาท</span>'
+      +(kiu>0?'<span style="background:rgba(21,128,61,.08);border-radius:8px;padding:8px 12px;">ทรายขายได้ <b style="color:var(--gold);">'+fmt(kiu,2)+'</b> คิว</span>'
+      +'<span style="background:rgba(129,199,132,.12);border-radius:8px;padding:8px 12px;">ต้นทุนผันแปร/คิว <b style="color:#2e7d32;font-size:1.15rem;">'+fmt(perKiu,2)+'</b> บาท/คิว</span>':'')
+      +'</div>'
+      +'<div style="font-size:.72rem;color:var(--muted);margin-top:8px;">น้ำมันถัง '+fmt(r.tank_fuel_cost)+' · น้ำมันรถ '+fmt(r.exp_fuel_cost)+' · ค่าแรง '+fmt(r.labor_cost)+' · เช่า '+fmt(r.rent_cost)+' · ซ่อม '+fmt(r.repair_cost)+' · อื่นๆ '+fmt(r.other_cost)+' <span style="color:#4a90b8;">(ก่อน VAT)</span></div>';
+  }).catch(function(e){ body.innerHTML='<span style="color:#e06a6a">โหลดไม่ได้: '+e.message+'</span>'; });
 }
 /* ---------- กราฟสัดส่วนรายจ่ายต่อหมวด (Tab 8) ---------- */
 function exDrawCatChart(byCat){
