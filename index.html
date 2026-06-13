@@ -23,20 +23,21 @@
    DESIGN TOKENS
 ============================================================ */
 :root {
-  --bg:     #070e18;
-  --bg2:    #0d1b2a;
-  --bg3:    #132439;
-  --border: #1a3050;
-  --gold:   #f0a500;
-  --gold2:  #c47800;
-  --text:   #e2eaf4;
-  --muted:  #5a7a9a;
-  --ok:     #27ae60;
-  --err:    #e74c3c;
-  --warn:   #f39c12;
-  --info:   #3498db;
+  --bg:     #eef1f6;
+  --bg2:    #ffffff;
+  --bg3:    #f3f6fa;
+  --border: #d4dce6;
+  --gold:   #15803d;
+  --gold2:  #0f5f2e;
+  --text:   #14202e;
+  --muted:  #5b6b7d;
+  --ok:     #1e9e54;
+  --err:    #d93b2b;
+  --warn:   #d98200;
+  --info:   #2a7fc4;
   --r:      10px;
   --font:   'Sarabun','Noto Sans Thai',sans-serif;
+  --font-mono: 'Sarabun','Noto Sans Thai',sans-serif;
 }
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -48,13 +49,13 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 #pinScreen{
   display:flex;align-items:center;justify-content:center;
   min-height:100vh;
-  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(240,165,0,.07) 0%,transparent 70%),var(--bg);
+  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(21,128,61,.07) 0%,transparent 70%),var(--bg);
 }
 #pinBox{
   background:var(--bg2);border:1px solid var(--border);
   border-radius:20px;padding:36px 32px 28px;
   width:min(320px,88vw);
-  box-shadow:0 32px 80px rgba(0,0,0,.65),0 0 0 1px rgba(240,165,0,.07);
+  box-shadow:0 32px 80px rgba(0,0,0,.65),0 0 0 1px rgba(21,128,61,.07);
   position:relative;overflow:hidden;
 }
 #pinBox::before{
@@ -66,7 +67,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
 
 .pin-logo{text-align:center;margin-bottom:24px;}
-.pin-logo .ico{font-size:48px;display:block;margin-bottom:8px;filter:drop-shadow(0 0 18px rgba(240,165,0,.4));}
+.pin-logo .ico{font-size:48px;display:block;margin-bottom:8px;filter:drop-shadow(0 0 18px rgba(21,128,61,.4));}
 .pin-logo h1{font-size:20px;font-weight:800;color:var(--gold);}
 .pin-logo p{font-size:12px;color:var(--muted);margin-top:3px;}
 
@@ -78,7 +79,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   border:2px solid var(--border);background:transparent;
   transition:all .15s;
 }
-.pin-dot.on {background:var(--gold);border-color:var(--gold);box-shadow:0 0 10px rgba(240,165,0,.5);}
+.pin-dot.on {background:var(--gold);border-color:var(--gold);box-shadow:0 0 10px rgba(21,128,61,.5);}
 .pin-dot.err{background:var(--err);border-color:var(--err);}
 
 #pinErr{text-align:center;font-size:12px;color:var(--err);font-weight:700;min-height:18px;margin-bottom:14px;}
@@ -92,8 +93,8 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   user-select:none;-webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
 }
-.nk:hover {background:#1a2f48;border-color:#2a4060;}
-.nk:active{background:rgba(240,165,0,.15);border-color:var(--gold);transform:scale(.93);}
+.nk:hover {background:#e3e9f1;border-color:var(--gold);}
+.nk:active{background:rgba(21,128,61,.15);border-color:var(--gold);transform:scale(.93);}
 .nk.del  {color:var(--muted);font-size:18px;}
 .nk.clr  {color:var(--err);font-size:16px;}
 
@@ -111,7 +112,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
   background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--gold2) 70%,transparent);
 }
-.topbar-ico{font-size:22px;filter:drop-shadow(0 0 8px rgba(240,165,0,.4));}
+.topbar-ico{font-size:22px;filter:drop-shadow(0 0 8px rgba(21,128,61,.4));}
 .topbar-title{font-size:15px;font-weight:800;color:var(--gold);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #topbarRole{font-size:12px;font-weight:700;white-space:nowrap;}
 .out-btn{
@@ -134,7 +135,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   transition:color .2s,background .2s;position:relative;white-space:nowrap;
   -webkit-tap-highlight-color:transparent;
 }
-.tab-btn:hover{color:var(--text);background:rgba(255,255,255,.03);}
+.tab-btn:hover{color:var(--text);background:rgba(0,0,0,.05);}
 .tab-btn.active{color:var(--gold);background:var(--bg3);}
 .tab-btn.active::after{
   content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
@@ -171,7 +172,7 @@ thead th{
   white-space:nowrap;border-bottom:1px solid var(--border);
 }
 tbody tr{border-bottom:1px solid rgba(26,48,80,.4);transition:background .12s;}
-tbody tr:hover{background:rgba(240,165,0,.04);}
+tbody tr:hover{background:rgba(21,128,61,.04);}
 tbody td{padding:8px 10px;white-space:nowrap;vertical-align:middle;}
 td.r{text-align:right;font-variant-numeric:tabular-nums;}
 td.gold{color:var(--gold);font-weight:700;}
@@ -210,7 +211,7 @@ tr.ded{background:rgba(243,156,18,.05)!important;border-left:3px solid var(--war
   padding:28px 20px;text-align:center;cursor:pointer;
   transition:border-color .2s,background .2s;position:relative;
 }
-.drop-zone:hover{border-color:var(--gold);background:rgba(240,165,0,.03);}
+.drop-zone:hover{border-color:var(--gold);background:rgba(21,128,61,.03);}
 .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
 .drop-zone .dico{font-size:36px;margin-bottom:8px;opacity:.7;}
 .drop-zone p{color:var(--muted);font-size:12px;line-height:1.7;}
@@ -336,8 +337,8 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
 .fr-owner-total{font-size:12px;color:var(--text);}
 .fr-owner-body{padding:0;}
 .badge-canonical{
-  background:rgba(240,165,0,.12);color:var(--gold);
-  border:1px solid rgba(240,165,0,.3);border-radius:4px;
+  background:rgba(21,128,61,.12);color:var(--gold);
+  border:1px solid rgba(21,128,61,.3);border-radius:4px;
   padding:2px 7px;font-size:10px;font-weight:700;
 }
 .badge-warn{
@@ -345,7 +346,7 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
   border:1px solid rgba(243,156,18,.4);border-radius:4px;
   padding:2px 7px;font-size:10px;font-weight:700;
 }
-select{color-scheme:dark;}
+select{color-scheme:light;}
 
 /* batch list & split layout */
 .tp1-split{display:flex;gap:0;align-items:flex-start;margin-left:-16px;margin-right:-16px;}
@@ -366,7 +367,7 @@ select{color-scheme:dark;}
 }
 #batchList thead th.r{text-align:right;}
 #batchList tbody tr{border-bottom:1px solid rgba(26,48,80,.4);transition:background .12s;}
-#batchList tbody tr:hover{background:rgba(240,165,0,.05);}
+#batchList tbody tr:hover{background:rgba(21,128,61,.05);}
 #batchList tbody td{padding:8px 10px;font-size:12px;vertical-align:middle;white-space:nowrap;}
 #batchList .bc-time{color:var(--muted);font-size:12px;}
 #batchList .bc-date{color:var(--text);font-weight:600;}
@@ -380,12 +381,12 @@ select{color-scheme:dark;}
 }
 .btn-red:hover{background:rgba(231,76,60,.2);border-color:var(--err);}
 .btn-eye{
-  background:transparent;border:1px solid rgba(240,165,0,.5);
+  background:transparent;border:1px solid rgba(21,128,61,.5);
   color:var(--gold);padding:4px 10px;border-radius:5px;cursor:pointer;
   font-size:12px;font-family:var(--font);white-space:nowrap;
   transition:background .15s,border-color .15s;
 }
-.btn-eye:hover{background:rgba(240,165,0,.15);border-color:var(--gold);}
+.btn-eye:hover{background:rgba(21,128,61,.15);border-color:var(--gold);}
 
 /* offline banner */
 #offlineBanner{
@@ -404,7 +405,7 @@ select{color-scheme:dark;}
   --text-secondary:var(--muted);
   --text-muted:    #3a5070;
   --accent-amber:  var(--gold);
-  --accent-amber-dim: rgba(240,165,0,.12);
+  --accent-amber-dim: rgba(21,128,61,.12);
   --accent-blue:   var(--info);
   --accent-blue-dim: rgba(52,152,219,.12);
   --accent-green:  var(--ok);
@@ -420,21 +421,21 @@ select{color-scheme:dark;}
 .pr-subtabs{display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap;}
 .pr-subtab{padding:8px 18px;border:1px solid var(--border);border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-secondary);background:var(--bg-card);transition:all 0.2s;font-family:var(--font);}
 .pr-subtab:hover{color:var(--text-primary);border-color:var(--border-light);}
-.pr-subtab.active{background:var(--accent-amber-dim);border-color:rgba(240,165,0,.5);color:var(--accent-amber);}
+.pr-subtab.active{background:var(--accent-amber-dim);border-color:rgba(21,128,61,.5);color:var(--accent-amber);}
 .pr-content{display:none;}
 .pr-content.active{display:block;}
 .emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:20px;}
 .emp-att-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;transition:border-color 0.2s;}
 .emp-att-card:hover{border-color:var(--border-light);}
 .emp-att-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-.emp-avatar-sm{width:34px;height:34px;border-radius:8px;background:var(--accent-amber-dim);border:1px solid rgba(240,165,0,.3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:var(--accent-amber);font-family:var(--font-mono);flex-shrink:0;}
+.emp-avatar-sm{width:34px;height:34px;border-radius:8px;background:var(--accent-amber-dim);border:1px solid rgba(21,128,61,.3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:var(--accent-amber);font-family:var(--font-mono);flex-shrink:0;}
 .emp-att-name{font-size:14px;font-weight:700;}
 .emp-att-sub{font-size:11px;color:var(--text-secondary);}
 .att-type-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
 .att-btn{padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;background:var(--bg-surface);color:var(--text-secondary);font-family:var(--font);transition:all 0.15s;}
 .att-btn:hover{border-color:var(--border-light);color:var(--text-primary);}
 .att-btn.sel-full{background:rgba(39,174,96,.15);border-color:var(--accent-green);color:var(--accent-green);}
-.att-btn.sel-half{background:rgba(240,165,0,.15);border-color:var(--accent-amber);color:var(--accent-amber);}
+.att-btn.sel-half{background:rgba(21,128,61,.15);border-color:var(--accent-amber);color:var(--accent-amber);}
 .att-btn.sel-hours{background:rgba(52,152,219,.15);border-color:var(--accent-blue);color:var(--accent-blue);}
 .att-btn.sel-absent{background:rgba(231,76,60,.15);border-color:var(--accent-red);color:var(--accent-red);}
 .hrs-input{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:13px;width:70px;}
@@ -451,8 +452,8 @@ select{color-scheme:dark;}
 .wd-input-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .wd-input{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 14px;color:var(--text-primary);font-family:var(--font-mono);font-size:15px;font-weight:700;width:160px;}
 .wd-input:focus{outline:none;border-color:var(--accent-amber);}
-.wd-overdraw-warn{background:rgba(240,165,0,.12);border:1px solid rgba(240,165,0,.35);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--accent-amber);margin-top:8px;display:none;}
-.badge-overdraw{background:rgba(240,165,0,.2);color:var(--accent-amber);border:1px solid rgba(240,165,0,.4);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;}
+.wd-overdraw-warn{background:rgba(21,128,61,.12);border:1px solid rgba(21,128,61,.35);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--accent-amber);margin-top:8px;display:none;}
+.badge-overdraw{background:rgba(21,128,61,.2);color:var(--accent-amber);border:1px solid rgba(21,128,61,.4);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;}
 .badge-ok{background:var(--accent-green-dim);color:var(--accent-green);border:1px solid rgba(39,174,96,.3);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;}
 .pr-sum-table{width:100%;border-collapse:collapse;}
 .pr-sum-table th{background:var(--bg-surface);color:var(--text-secondary);font-size:11px;font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap;}
@@ -473,10 +474,64 @@ select{color-scheme:dark;}
 .form-input:focus{outline:none;border-color:var(--accent-amber);}
 .type-toggle{display:flex;gap:8px;}
 .type-btn{flex:1;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;background:var(--bg-surface);color:var(--text-secondary);transition:all 0.15s;}
-.type-btn.active{background:var(--accent-amber-dim);border-color:rgba(240,165,0,.5);color:var(--accent-amber);}
+.type-btn.active{background:var(--accent-amber-dim);border-color:rgba(21,128,61,.5);color:var(--accent-amber);}
 .filter-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
 .filter-input{padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);}
 .filter-input:focus{outline:none;border-color:var(--gold);}
+
+/* ============================================================
+   DESKTOP — ขยายตัวอักษร/ปุ่มให้อ่านง่ายสำหรับผู้สูงอายุ (จอคอม ≥1024px)
+============================================================ */
+@media(min-width:1024px){
+  html,body{font-size:18px;}
+
+  /* แถบบน */
+  .topbar{height:62px;}
+  .topbar-ico{font-size:27px;}
+  .topbar-title{font-size:20px;}
+  #topbarRole{font-size:15px;}
+  .out-btn{font-size:15px;padding:8px 16px;}
+
+  /* แท็บเมนู */
+  .tab-btn{font-size:16px;padding:11px 20px;}
+
+  /* การ์ด & หัวข้อ */
+  .tab-pane{padding:22px;gap:18px;}
+  .card{padding:18px 22px;}
+  .card-title{font-size:15px;}
+
+  /* KPI ตัวเลขสรุป */
+  .kpi-label{font-size:13px;}
+  .kpi-val{font-size:30px;}
+  .kpi-unit{font-size:14px;}
+
+  /* ตาราง */
+  table{font-size:16px;}
+  thead th{font-size:13px;padding:11px 14px;}
+  tbody td{padding:11px 14px;}
+
+  /* ปุ่ม & ช่องกรอก */
+  .btn{font-size:16px;padding:11px 18px;}
+  .btn-red,.btn-eye,.btn-edit-cust{font-size:15px;padding:7px 14px;}
+  input,select,textarea{font-size:16px;}
+  .frow input,.t1filter input,.filter-input,.modal-row input,.form-input{font-size:16px;padding:9px 12px;}
+  .frow label,.t1filter label,.modal-row label{font-size:13px;}
+  .t1filter .clr-btn{font-size:14px;}
+
+  /* อื่นๆ */
+  .smsg{font-size:15px;}
+  .modal-title{font-size:18px;}
+  .badge-pending,.badge-billed{font-size:13px;padding:3px 10px;}
+  .drop-zone p{font-size:15px;}
+}
+@media(min-width:1600px){
+  html,body{font-size:19px;}
+  table{font-size:17px;}
+  thead th{font-size:14px;}
+  .kpi-val{font-size:34px;}
+  .tab-btn{font-size:17px;}
+  .btn{font-size:17px;}
+}
 </style>
 </head>
 <body>
@@ -1158,11 +1213,11 @@ select{color-scheme:dark;}
         <button class="pr-tab-btn" id="fuelBtn3" onclick="fuelSubTab(3)">📊 ต้นทุนรายเดือน</button>
         <button class="pr-tab-btn" id="fuelBtn4" onclick="fuelSubTab(4)">📋 รายงาน</button>
       </div>
-      <div class="card" style="background:linear-gradient(135deg,rgba(245,166,35,.12),rgba(245,166,35,.04));border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div class="card" style="background:linear-gradient(135deg,rgba(21,128,61,.12),rgba(21,128,61,.04));border:1px solid rgba(21,128,61,.3);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
         <div>
-          <div style="font-size:.7rem;color:#a07830;font-family:monospace;letter-spacing:.05em;">TANK LEVEL</div>
+          <div style="font-size:.7rem;color:#137a3a;font-family:'Sarabun','Noto Sans Thai',sans-serif;letter-spacing:.05em;">TANK LEVEL</div>
           <div id="fuelStockDisplay" style="font-size:1.4rem;font-weight:800;color:var(--gold);">— ลิตร</div>
-          <div id="fuelStockAvgPrice" style="font-size:.72rem;color:#a07830;">ราคาเฉลี่ย (ก่อน VAT): — บาท/ลิตร</div>
+          <div id="fuelStockAvgPrice" style="font-size:.72rem;color:#137a3a;">ราคาเฉลี่ย (ก่อน VAT): — บาท/ลิตร</div>
         </div>
         <div style="text-align:right;">
           <div id="fuelStockValue" style="font-size:.85rem;color:var(--gold);font-weight:600;">มูลค่า: — บาท</div>
@@ -1998,16 +2053,16 @@ function exportPayHistoryPDF() {
   .summary-box { display: flex; justify-content: space-between; align-items: center;
     border: 1.5px solid #e0a800; border-radius: 8px; padding: 14px 20px; margin-bottom: 24px; background: #fffbf0; }
   .summary-box .label { font-size: 14px; color: #666; }
-  .summary-box .total { font-size: 28px; font-weight: 900; color: #c47f00; }
+  .summary-box .total { font-size: 28px; font-weight: 900; color: #137a3a; }
   .summary-box .meta  { font-size: 13px; color: #888; margin-top: 2px; }
   table { width: 100%; border-collapse: collapse; }
   tr.date-row td { background: #f5f0e8; font-weight: 800; font-size: 17px; padding: 10px 14px; border-top: 2px solid #ccc; }
-  tr.date-row .amt-cell { color: #c47f00; }
+  tr.date-row .amt-cell { color: #137a3a; }
   tr.emp-row td { padding: 9px 14px; font-size: 16px; border-bottom: 1px solid #eee; }
   tr.emp-row .name-cell { }
   tr.emp-row .amt-cell { font-weight: 700; color: #333; }
   tr.subtotal-row td { background: #fafafa; font-weight: 800; font-size: 16px; padding: 10px 14px; border-top: 2px solid #ccc; border-bottom: 3px solid #aaa; }
-  tr.subtotal-row .amt-cell { color: #c47f00; font-size: 18px; }
+  tr.subtotal-row .amt-cell { color: #137a3a; font-size: 18px; }
   .indent-cell { width: 28px; }
   .amt-cell { text-align: right; white-space: nowrap; width: 160px; }
   .subtotal-label { font-weight: 800; }
@@ -2513,7 +2568,7 @@ function exportPayrollPDF() {
       <th style="text-align:right">รับสุทธิ (฿)</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td colspan="5" style="font-weight:700">รวมรายจ่ายบริษัท</td>
-      <td style="text-align:right;font-weight:700;color:#c47800">${totalAll.toLocaleString('th-TH')}</td></tr></tfoot>
+      <td style="text-align:right;font-weight:700;color:#137a3a">${totalAll.toLocaleString('th-TH')}</td></tr></tfoot>
     </table>
     <p style="margin-top:16px;color:#999;font-size:11px">พิมพ์เมื่อ ${new Date().toLocaleString('th-TH')}</p>
     <button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#6c63b6;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ พิมพ์</button>
@@ -3358,20 +3413,20 @@ function drawBar(id, labels, vals) {
   var pad={t:32,r:14,b:44,l:48};
   var max=Math.max.apply(null,vals.map(Number))*1.15||1;
   ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#0d1b2a'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
   var n=labels.length||1, sw=(W-pad.l-pad.r)/n, bw=sw*0.55;
   labels.forEach(function(lb,i){
     var v=parseFloat(vals[i])||0, bh=(v/max)*(H-pad.t-pad.b);
     var x=pad.l+i*sw+sw*0.225, y=H-pad.b-bh;
     var g=ctx.createLinearGradient(0,y,0,H-pad.b);
-    g.addColorStop(0,'#f0a500'); g.addColorStop(1,'#7a4f00');
+    g.addColorStop(0,'#15803d'); g.addColorStop(1,'#0c5226');
     ctx.fillStyle=g;
     ctx.beginPath(); ctx.roundRect(x,y,bw,Math.max(bh,2),3); ctx.fill();
-    ctx.fillStyle='#fff'; ctx.font='11px Sarabun,sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle='#1f2b3a'; ctx.font='bold 11px Sarabun,sans-serif'; ctx.textAlign='center';
     if(bh>14) ctx.fillText(v.toFixed(1),x+bw/2,y-3);
-    ctx.fillStyle='#8ba5be'; ctx.fillText(lb,x+bw/2,H-pad.b+13);
+    ctx.fillStyle='#5b6b7d'; ctx.fillText(lb,x+bw/2,H-pad.b+13);
   });
-  ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1;
+  ctx.strokeStyle='rgba(0,0,0,.09)'; ctx.lineWidth=1;
   for(var j=0;j<=4;j++){
     var yy=H-pad.b-(j/4)*(H-pad.t-pad.b);
     ctx.beginPath(); ctx.moveTo(pad.l,yy); ctx.lineTo(W-pad.r,yy); ctx.stroke();
@@ -3383,22 +3438,22 @@ function drawBar(id, labels, vals) {
 function drawPie(id, data) {
   var cv=document.getElementById(id); if(!cv) return;
   var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
-  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0d1b2a'; ctx.fillRect(0,0,W,H);
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
   var keys=Object.keys(data), total=Object.values(data).reduce(function(a,b){return a+b;},0)||1;
-  var COLS=['#f0a500','#e74c3c','#2ecc71','#3498db','#9b59b6','#e67e22','#1abc9c'];
+  var COLS=['#15803d','#e74c3c','#2ecc71','#3498db','#9b59b6','#e67e22','#1abc9c'];
   var cx=W/2-36, cy=H/2, r=Math.min(cx,cy)-20, ang=-Math.PI/2;
   keys.forEach(function(k,i){
     var sl=(data[k]/total)*Math.PI*2;
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,ang,ang+sl); ctx.closePath();
     ctx.fillStyle=COLS[i%COLS.length]; ctx.fill();
-    ctx.strokeStyle='#0d1b2a'; ctx.lineWidth=2; ctx.stroke();
+    ctx.strokeStyle='#ffffff'; ctx.lineWidth=2; ctx.stroke();
     ang+=sl;
   });
-  ctx.beginPath(); ctx.arc(cx,cy,r*.42,0,Math.PI*2); ctx.fillStyle='#0d1b2a'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,r*.42,0,Math.PI*2); ctx.fillStyle='#ffffff'; ctx.fill();
   keys.forEach(function(k,i){
     var y=14+i*20;
     ctx.fillStyle=COLS[i%COLS.length]; ctx.fillRect(W-124,y,11,11);
-    ctx.fillStyle='#cdd'; ctx.font='10px Sarabun,sans-serif'; ctx.textAlign='left';
+    ctx.fillStyle='#3a4858'; ctx.font='10px Sarabun,sans-serif'; ctx.textAlign='left';
     ctx.fillText(k.slice(0,13)+' '+((data[k]/total)*100).toFixed(1)+'%',W-109,y+9);
   });
 }
@@ -3601,12 +3656,12 @@ function frReportPrint(){
     +'*{box-sizing:border-box}'
     +'body{font-family:Sarabun,sans-serif;font-size:13px;color:#111;margin:0;padding:0}'
     +'.sheet{width:180mm;margin:0 auto}'
-    +'h2{color:#7a4f00;margin:0 0 4px}'
+    +'h2{color:#0c5226;margin:0 0 4px}'
     +'p{margin:3px 0}'
     +'table{width:100%;border-collapse:collapse;margin-top:12px}'
     +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc;font-size:12px}'
     +'td{padding:6px 10px;border:1px solid #ddd}'
-    +'.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #7a4f00;padding-bottom:8px;margin-bottom:10px}'
+    +'.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0c5226;padding-bottom:8px;margin-bottom:10px}'
     +'.company{font-size:11px;color:#555;text-align:right;line-height:1.5}'
     +'@media print{button{display:none}.sheet{width:auto}}'
     +'</style>'
@@ -3618,7 +3673,7 @@ function frReportPrint(){
     +'<div class="company"><b>หจก.ธนเศรษฐ์ศิริ 2546</b><br>274 ม.2 ต.ผาตั้ง อ.สังคม<br>จ.หนองคาย 43160<br>โทร 0818714977</div></div>'
     +'<table><thead><tr><th>วันที่</th><th>ลูกค้า</th><th style="text-align:right">คิว</th><th style="text-align:right">หักทรายเปียก</th><th style="text-align:right">คิวสุทธิ</th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table>'
-    +'<h3 style="color:#7a4f00;margin:18px 0 4px">สรุปตามลูกค้า (คิวสุทธิ)</h3>'
+    +'<h3 style="color:#0c5226;margin:18px 0 4px">สรุปตามลูกค้า (คิวสุทธิ)</h3>'
     +'<table style="max-width:120mm"><thead><tr><th>ลูกค้า</th><th style="text-align:right">เที่ยว</th><th style="text-align:right">คิวสุทธิ</th></tr></thead>'
     +'<tbody>'+custRows
     +'<tr style="font-weight:700;background:#f5f0e8"><td>ผลรวม</td>'
@@ -3725,11 +3780,11 @@ function viewPayment(docNo){
     _viewPayPrintHtml='<html><head><meta charset="UTF-8"><title>ใบจ่าย '+docNo+'</title>'
       +'<style>@page{size:A4 portrait;margin:15mm}*{box-sizing:border-box}'
       +'body{font-family:Sarabun,sans-serif;font-size:13px;color:#111;margin:0;padding:0}'
-      +'.sheet{width:180mm;margin:0 auto}h2{color:#7a4f00;margin:0 0 4px}p{margin:3px 0}'
+      +'.sheet{width:180mm;margin:0 auto}h2{color:#0c5226;margin:0 0 4px}p{margin:3px 0}'
       +'table{width:100%;border-collapse:collapse;margin-top:12px}'
       +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc;font-size:12px}'
       +'td{padding:6px 10px;border:1px solid #ddd}'
-      +'.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #7a4f00;padding-bottom:8px;margin-bottom:10px}'
+      +'.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0c5226;padding-bottom:8px;margin-bottom:10px}'
       +'.company{font-size:11px;color:#555;text-align:right;line-height:1.5}'
       +'@media print{button{display:none}.sheet{width:auto}}</style>'
       +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"></head><body>'
@@ -4089,16 +4144,16 @@ function frPrintInvoice(){
     var gross=totalNetKiu*rates.rateFromCustomer, w=gross*rates.withholdingTax;
     sumRow='<tr><td colspan="2"><b>รวม</b></td><td style="text-align:right"><b>'+fmt3(totalNetKiu)+'</b></td><td style="text-align:right"><b>'+gross.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
       +'<tr><td colspan="3" style="text-align:right">หัก ณ ที่จ่าย 1%</td><td style="text-align:right;color:red">−'+w.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>'
-      +'<tr><td colspan="3" style="text-align:right"><b>ยอดสุทธิ</b></td><td style="text-align:right;color:#c47800;font-size:15px"><b>'+(gross-w).toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>';
+      +'<tr><td colspan="3" style="text-align:right"><b>ยอดสุทธิ</b></td><td style="text-align:right;color:#137a3a;font-size:15px"><b>'+(gross-w).toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>';
   } else {
     var p=rates.sellingPriceWithVat, bv=p/1.07, total=totalNetKiu*p;
     sumRow='<tr><td colspan="2"><b>รวม</b></td><td style="text-align:right"><b>'+fmt3(totalNetKiu)+'</b></td><td style="text-align:right"><b>'+total.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
       +'<tr><td colspan="3" style="text-align:right">VAT 7%</td><td style="text-align:right">'+Math.round(totalNetKiu*(p-bv)).toLocaleString()+'</td></tr>'
-      +'<tr><td colspan="3" style="text-align:right"><b>ยอดก่อน VAT</b></td><td style="text-align:right;color:#c47800;font-size:15px"><b>'+Math.round(totalNetKiu*bv).toLocaleString()+'</b></td></tr>';
+      +'<tr><td colspan="3" style="text-align:right"><b>ยอดก่อน VAT</b></td><td style="text-align:right;color:#137a3a;font-size:15px"><b>'+Math.round(totalNetKiu*bv).toLocaleString()+'</b></td></tr>';
   }
   var html='<html><head><meta charset="UTF-8"><title>ใบแจ้งหนี้ค่าขนส่ง</title>'
     +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
-    +'h2{color:#7a4f00}table{width:100%;border-collapse:collapse;margin-top:12px}'
+    +'h2{color:#0c5226}table{width:100%;border-collapse:collapse;margin-top:12px}'
     +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc}'
     +'td{padding:6px 10px;border:1px solid #ddd}@media print{button{display:none}}</style>'
     +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">'
@@ -4107,7 +4162,7 @@ function frPrintInvoice(){
     +'<table><thead><tr><th>เจ้าของรถ</th><th>ทะเบียน</th><th style="text-align:right">คิวสุทธิ</th><th style="text-align:right">จำนวนเงิน</th></tr></thead>'
     +'<tbody>'+rows+sumRow+'</tbody></table>'
     +'<p style="margin-top:16px;color:#888;font-size:11px">พิมพ์: '+new Date().toLocaleString('th-TH')+'</p>'
-    +'<button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#c47800;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ พิมพ์</button>'
+    +'<button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#137a3a;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ พิมพ์</button>'
     +'</body></html>';
   var invDocNo = 'FR'+new Date().toISOString().slice(0,10).replace(/-/g,'')+String(Math.floor(Math.random()*900+100));
   var invDoc = {
@@ -4480,10 +4535,10 @@ function frPrintManual(cust,owner,ci){
   }).join('')
   +'<tr style="font-weight:700;font-size:14px"><td>\u0e23\u0e27\u0e21</td>'
   +'<td style="text-align:right">'+fmt3(total)+'</td>'
-  +'<td style="text-align:right;color:#c47800">'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+  +'<td style="text-align:right;color:#137a3a">'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
   var html='<html><head><meta charset="UTF-8"><title>\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27</title>'
     +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
-    +'h2{color:#7a4f00}table{width:100%;border-collapse:collapse;margin-top:12px}'
+    +'h2{color:#0c5226}table{width:100%;border-collapse:collapse;margin-top:12px}'
     +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc}'
     +'td{padding:6px 10px;border:1px solid #ddd}@media print{button{display:none}}</style>'
     +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">'
@@ -4494,7 +4549,7 @@ function frPrintManual(cust,owner,ci){
     +'<table><thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th style="text-align:right">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th style="text-align:right">\u0e08\u0e33\u0e19\u0e27\u0e19\u0e40\u0e07\u0e34\u0e19</th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table>'
     +'<p style="margin-top:16px;color:#888;font-size:11px">\u0e1e\u0e34\u0e21\u0e1e\u0e4c: '+new Date().toLocaleString('th-TH')+'</p>'
-    +'<button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#c47800;color:#fff;border:none;border-radius:6px;cursor:pointer">\uD83D\uDDA8\uFE0F \u0e1e\u0e34\u0e21\u0e1e\u0e4c</button>'
+    +'<button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#137a3a;color:#fff;border:none;border-radius:6px;cursor:pointer">\uD83D\uDDA8\uFE0F \u0e1e\u0e34\u0e21\u0e1e\u0e4c</button>'
     +'</body></html>';
   var w=window.open('','_blank'); w.document.write(html); w.document.close();
 }
@@ -4570,10 +4625,10 @@ function frPrintPayment(refInvoice,canonical){
     }).join('')
     +'<tr style="font-weight:700;font-size:14px"><td>รวม</td>'
     +'<td style="text-align:right">'+fmt3(totalNetKiu)+'</td>'
-    +'<td style="text-align:right;color:#c47800">'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+    +'<td style="text-align:right;color:#137a3a">'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
     var html='<html><head><meta charset="UTF-8"><title>ใบจ่ายค่าเที่ยว</title>'
       +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
-      +'h2{color:#7a4f00}table{width:100%;border-collapse:collapse;margin-top:12px}'
+      +'h2{color:#0c5226}table{width:100%;border-collapse:collapse;margin-top:12px}'
       +'th{background:#f5f0e8;padding:7px 10px;text-align:left;border:1px solid #ccc}'
       +'td{padding:6px 10px;border:1px solid #ddd}@media print{button{display:none}}</style>'
       +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">'
@@ -4585,7 +4640,7 @@ function frPrintPayment(refInvoice,canonical){
       +'<table><thead><tr><th>ทะเบียน</th><th style="text-align:right">คิวสุทธิ</th><th style="text-align:right">จำนวนเงิน</th></tr></thead>'
       +'<tbody>'+rows+'</tbody></table>'
       +'<p style="margin-top:16px;color:#888;font-size:11px">พิมพ์: '+new Date().toLocaleString('th-TH')+'</p>'
-      +'<button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#c47800;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ พิมพ์</button>'
+      +'<button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#137a3a;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ พิมพ์</button>'
       +'</body></html>';
     var w=window.open('','_blank'); w.document.write(html); w.document.close();
   });
@@ -5190,7 +5245,7 @@ function drawFuelInList() {
       +'<td>'+fuelSourceLabel(r.source, r.pump_name)+'</td>'
       +'<td style="text-align:right;color:#81c784;">'+((r.liters||0).toLocaleString('th-TH',{minimumFractionDigits:0}))+'</td>'
       +'<td style="text-align:right;">'+((r.price_per_liter||0).toFixed(2))+'</td>'
-      +'<td style="text-align:right;color:#f5a623;">'+((r.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2}))+'</td>'
+      +'<td style="text-align:right;color:#15803d;">'+((r.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2}))+'</td>'
       +'<td style="color:#6b7280;font-size:.7rem;">'+(r.invoice_no||'—')+'</td>'
       +'<td><button onclick="delFuelDoc(\'fuel_in\',\''+r._id+'\')" style="background:none;border:none;color:#ef5350;cursor:pointer;font-size:.85rem;">🗑️</button></td>'
       +'</tr>';
@@ -5221,7 +5276,7 @@ function drawFuelExpList() {
       +'<td>'+fuelSourceLabel(r.pump, r.pump_name)+'</td>'
       +'<td style="text-align:right;color:#ce93d8;">'+((r.liters||0).toLocaleString('th-TH',{minimumFractionDigits:0}))+'</td>'
       +'<td style="text-align:right;">'+((r.price_per_liter||0).toFixed(2))+'</td>'
-      +'<td style="text-align:right;color:#f5a623;">'+((r.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2}))+'</td>'
+      +'<td style="text-align:right;color:#15803d;">'+((r.total_amount||0).toLocaleString('th-TH',{minimumFractionDigits:2}))+'</td>'
       +'<td style="color:#6b7280;font-size:.7rem;">'+(r.odometer||'—')+'</td>'
       +'<td><button onclick="delFuelDoc(\'fuel_expense\',\''+r._id+'\')" style="background:none;border:none;color:#ef5350;cursor:pointer;font-size:.85rem;">🗑️</button></td>'
       +'</tr>';
@@ -5303,7 +5358,7 @@ function calcAndShowFuelCost(ym) {
   var ec = document.getElementById('fuelCostResultContent');
   if(el) el.style.display='';
   if(ec) ec.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 0;">'
-    +'<div style="background:rgba(245,166,35,.08);border-radius:8px;padding:10px;"><div style="font-size:.68rem;color:#a07830;margin-bottom:4px;">ทรายขายได้</div><div style="font-size:1.2rem;font-weight:700;color:var(--gold);">'+kiu.toLocaleString('th-TH',{minimumFractionDigits:2})+' คิว</div></div>'
+    +'<div style="background:rgba(21,128,61,.08);border-radius:8px;padding:10px;"><div style="font-size:.68rem;color:#137a3a;margin-bottom:4px;">ทรายขายได้</div><div style="font-size:1.2rem;font-weight:700;color:var(--gold);">'+kiu.toLocaleString('th-TH',{minimumFractionDigits:2})+' คิว</div></div>'
     +'<div style="background:rgba(239,83,80,.08);border-radius:8px;padding:10px;"><div style="font-size:.68rem;color:#a05050;margin-bottom:4px;">ต้นทุนรวม</div><div style="font-size:1.2rem;font-weight:700;color:#ef5350;">'+total.toLocaleString('th-TH',{minimumFractionDigits:0})+' บาท</div></div>'
     +'<div style="background:rgba(129,199,132,.08);border-radius:8px;padding:10px;grid-column:1/-1;"><div style="font-size:.68rem;color:#3a7a3a;margin-bottom:4px;">ต้นทุนผันแปร/คิว</div><div style="font-size:1.6rem;font-weight:800;color:#81c784;">'+perKiu.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท/คิว</div></div>'
     +'<div style="grid-column:1/-1;font-size:.72rem;color:#6b7280;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;">'
@@ -5348,7 +5403,7 @@ async function loadFuelMonthlyHistory() {
         +'<td style="text-align:right;">'+(r.exp_fuel_cost||0).toLocaleString()+'</td>'
         +'<td style="text-align:right;">'+(r.labor_cost||0).toLocaleString()+'</td>'
         +'<td style="text-align:right;">'+(r.rent_cost||0).toLocaleString()+'</td>'
-        +'<td style="text-align:right;color:#f5a623;font-weight:600;">'+total.toLocaleString()+'</td>'
+        +'<td style="text-align:right;color:#15803d;font-weight:600;">'+total.toLocaleString()+'</td>'
         +'<td><button onclick="document.getElementById(\'fCostMonth\').value=\''+r.month+'\';loadFuelMonthly();" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:4px;color:#4fc3f7;cursor:pointer;padding:2px 8px;font-size:.7rem;">ดู</button></td>'
         +'</tr>';
     });
@@ -5703,7 +5758,7 @@ function exRenderReview(){
   wrap.style.display='block';
   var opts=exAllCats().map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
   var body=exReviewRows.map(function(r,i){
-    var hl = r.category? '' : 'background:rgba(240,165,0,.13);';
+    var hl = r.category? '' : 'background:rgba(21,128,61,.13);';
     var sel='<select class="form-input" style="padding:3px 6px;font-size:.74rem;" onchange="exReviewRows['+i+'].category=this.value;exReviewSum();">'
       +'<option value="">— เลือก —</option>'+opts+'</select>';
     return '<tr style="'+hl+'">'
@@ -5725,7 +5780,7 @@ function exReviewSum(){
   var tot=0,done=0;
   exReviewRows.forEach(function(r){ tot+=r.amount; if(r.category)done++; });
   document.getElementById('exReviewSum').innerHTML='รวม <b style="color:var(--gold)">'+exMoney(tot)
-    +'</b> บาท · จัดหมวดแล้ว '+done+'/'+exReviewRows.length+(done<exReviewRows.length?' <span style="color:#e0a500">(แถวพื้นเหลือง = ยังไม่จัด)</span>':'');
+    +'</b> บาท · จัดหมวดแล้ว '+done+'/'+exReviewRows.length+(done<exReviewRows.length?' <span style="color:#15803d">(แถวพื้นเหลือง = ยังไม่จัด)</span>':'');
 }
 function exToggleAll(cb){ exReviewRows.forEach(function(r){r._chk=cb.checked;}); exRenderReview(); }
 function exBulkApply(){
@@ -5856,7 +5911,7 @@ function exDrawCatChart(byCat){
   }
   keys.sort(function(a,b){ return byCat[b]-byCat[a]; });
   var total=keys.reduce(function(s,k){ return s+byCat[k]; },0);
-  var COLS=['#f0a500','#e74c3c','#2ecc71','#3498db','#9b59b6','#e67e22','#1abc9c','#fd79a8','#00b894','#a29bfe','#fab1a0','#74b9ff'];
+  var COLS=['#15803d','#e74c3c','#2ecc71','#3498db','#9b59b6','#e67e22','#1abc9c','#fd79a8','#00b894','#a29bfe','#fab1a0','#74b9ff'];
   var cx=W/2, cy=H/2, rOut=Math.min(cx,cy)-6, rIn=rOut*0.6, ang=-Math.PI/2;
   keys.forEach(function(k,i){
     var sl=(byCat[k]/total)*Math.PI*2;
@@ -5888,73 +5943,4 @@ function exDispDate(iso){
   var p=iso.split('-'); if(p.length<3) return iso;
   return p[2]+'/'+p[1]+'/'+(parseInt(p[0])+543); // พ.ศ.
 }
-function exExportExcel(){
-  var rows=exFilteredRows();
-  if(!rows.length){ toast('ไม่มีข้อมูลให้ export'); return; }
-  var aoa=[['วันที่','เวลา','หมวด','ผู้รับ','รายละเอียด','ช่องทาง','จำนวน (บาท)']];
-  var tot=0;
-  rows.forEach(function(e){ aoa.push([exDispDate(e.date),e.time||'',e.category,e.payeeName||'',e.detail||'',e.channel||'',e.amount]); tot+=e.amount; });
-  aoa.push(['','','','','','รวม',tot]);
-  var ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:12},{wch:7},{wch:10},{wch:24},{wch:40},{wch:12},{wch:14}];
-  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'รายจ่าย');
-  var m=document.getElementById('exRepMonth').value||'all';
-  XLSX.writeFile(wb,'รายจ่าย_'+m+'.xlsx');
-}
-function exExportPDF(){
-  var rows=exFilteredRows();
-  if(!rows.length){ toast('ไม่มีข้อมูลให้พิมพ์'); return; }
-  var m=document.getElementById('exRepMonth').value||'ทั้งหมด';
-  var c=document.getElementById('exRepCat').value||'ทุกหมวด';
-  var tot=0; var byCat={};
-  var tr=rows.map(function(e){ tot+=e.amount; byCat[e.category]=(byCat[e.category]||0)+e.amount;
-    return '<tr><td>'+exDispDate(e.date)+'</td><td>'+e.category+'</td><td>'+(e.payeeName||'')+'</td><td class="d">'+(e.detail||'')+'</td><td class="r">'+exMoney(e.amount)+'</td></tr>';
-  }).join('');
-  var catRows=Object.keys(byCat).sort().map(function(k){ return '<tr><td>'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>';}).join('');
-  var html='<html><head><meta charset="UTF-8"><title>รายงานรายจ่าย</title><style>'
-    +'@page{size:A4;margin:14mm;}*{font-family:"Sarabun","TH Sarabun New",sans-serif;}'
-    +'body{color:#111;font-size:13px;}h2{margin:0 0 2px;}'
-    +'table{width:100%;border-collapse:collapse;margin-top:10px;}'
-    +'th,td{border:1px solid #999;padding:4px 6px;}th{background:#eee;}'
-    +'.r{text-align:right;white-space:nowrap;}.d{font-size:11px;color:#555;}'
-    +'.sum{width:auto;margin-top:14px;}.muted{color:#666;font-size:12px;}'
-    +'@media print{button{display:none;}}</style></head><body>'
-    +'<h2>หจก. ธนเศรษฐ์ศิริ 2546 — รายงานรายจ่าย</h2>'
-    +'<div class="muted">เดือน: '+m+' · หมวด: '+c+' · บัญชีกสิกร 4778</div>'
-    +'<table><thead><tr><th>วันที่</th><th>หมวด</th><th>ผู้รับ</th><th>รายละเอียด</th><th class="r">จำนวน (บาท)</th></tr></thead>'
-    +'<tbody>'+tr+'</tbody>'
-    +'<tfoot><tr><th colspan="4" class="r">รวมทั้งสิ้น</th><th class="r">'+exMoney(tot)+'</th></tr></tfoot></table>'
-    +'<table class="sum"><thead><tr><th>สรุปตามหมวด</th><th class="r">บาท</th></tr></thead><tbody>'+catRows+'</tbody></table>'
-    +'<button onclick="window.print()" style="margin-top:16px;padding:8px 18px;cursor:pointer">🖨️ พิมพ์ / บันทึก PDF</button>'
-    +'</body></html>';
-  var w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); setTimeout(function(){w.print();},500); }
-}
-
-/* ---------- Tab4 integration: profit/loss ---------- */
-function exDraw4(){
-  var sel=document.getElementById('ex4Month'); if(!sel) return;
-  var m=sel.value;
-  var rows=gExpenses.filter(function(e){ return m && e.date.slice(0,7)===m; });
-  var byCat={}; var tot=0;
-  rows.forEach(function(e){ byCat[e.category]=(byCat[e.category]||0)+e.amount; tot+=e.amount; });
-  var body='';
-  exAllCats().forEach(function(k){ if(byCat[k]) body+='<tr><td style="padding-left:14px;color:var(--muted)">'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>'; });
-  body+='<tr><td><b>รายจ่ายรวม</b></td><td class="r"><b style="color:#e06a6a">'+exMoney(tot)+'</b></td></tr>';
-  var rev=exNum((document.getElementById('ex4Rev')||{}).value);
-  if(rev>0){
-    var profit=rev-tot;
-    body='<tr><td>รายได้ (กรอกเอง)</td><td class="r" style="color:#4ec98a">'+exMoney(rev)+'</td></tr>'+body
-      +'<tr><td><b>กำไร / ขาดทุน</b></td><td class="r"><b style="color:'+(profit>=0?'#4ec98a':'#e06a6a')+'">'+exMoney(profit)+'</b></td></tr>';
-  }
-  var el=document.getElementById('ex4Body');
-  if(el) el.innerHTML = rows.length||rev>0 ? body : '<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:14px">ยังไม่มีรายจ่ายเดือนนี้</td></tr>';
-}
-
-function exReady(){
-  if(!exLoaded){ exLoadAll(function(){ exFillMonths(); exDraw4(); }); }
-  else { exFillMonths(); exDraw4(); }
-}
-</script>
-
-</body>
-</html>
+function exExp
