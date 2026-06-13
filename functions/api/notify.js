@@ -1,3 +1,4 @@
+const GROUP_CHAT_ID = '-5450363615';
 export async function onRequestPost(context) {
   const { request, env } = context;
   try {
@@ -5,8 +6,8 @@ export async function onRequestPost(context) {
     const text = (body && body.text || '').toString().trim();
     if (!text) return json({ ok: false, error: 'no text' }, 400);
     const token = env.TELEGRAM_BOT_TOKEN;
-    const chatId = env.TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return json({ ok: false, error: 'not configured' }, 500);
+    const chatId = GROUP_CHAT_ID;
+    if (!token) return json({ ok: false, error: 'no token' }, 500);
     const tgRes = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
