@@ -6002,7 +6002,7 @@ function exDrawCatChart(byCat){
   }
   keys.sort(function(a,b){ return byCat[b]-byCat[a]; });
   var total=keys.reduce(function(s,k){ return s+byCat[k]; },0);
-  var COLS=['#15803d','#e74c3c','#2ecc71','#3498db','#9b59b6','#e67e22','#1abc9c','#fd79a8','#00b894','#a29bfe','#fab1a0','#74b9ff'];
+  var COLS=['#f0a500','#e74c3c','#2ecc71','#3498db','#9b59b6','#e67e22','#1abc9c','#fd79a8','#00b894','#a29bfe','#fab1a0','#74b9ff'];
   var cx=W/2, cy=H/2, rOut=Math.min(cx,cy)-6, rIn=rOut*0.6, ang=-Math.PI/2;
   keys.forEach(function(k,i){
     var sl=(byCat[k]/total)*Math.PI*2;
@@ -6034,4 +6034,69 @@ function exDispDate(iso){
   var p=iso.split('-'); if(p.length<3) return iso;
   return p[2]+'/'+p[1]+'/'+(parseInt(p[0])+543); // พ.ศ.
 }
-function exExp
+function exExportExcel(){
+  var rows=exFilteredRows();
+  if(!rows.length){ toast('ไม่มีข้อมูลให้ export'); return; }
+  var aoa=[['วันที่','เวลา','หมวด','ผู้รับ','รายละเอียด','ช่องทาง','จำนวน (บาท)']];
+  var tot=0;
+  rows.forEach(function(e){ aoa.push([exDispDate(e.date),e.time||'',e.category,e.payeeName||'',e.detail||'',e.channel||'',e.amount]); tot+=e.amount; });
+  aoa.push(['','','','','','รวม',tot]);
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:12},{wch:7},{wch:10},{wch:24},{wch:40},{wch:12},{wch:14}];
+  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'รายจ่าย');
+  var m=document.getElementById('exRepMonth').value||'all';
+  XLSX.writeFile(wb,'รายจ่าย_'+m+'.xlsx');
+}
+function exExportPDF(){
+  var rows=exFilteredRows();
+  if(!rows.length){ toast('ไม่มีข้อมูลให้พิมพ์'); return; }
+  var m=document.getElementById('exRepMonth').value||'ทั้งหมด';
+  var c=document.getElementById('exRepCat').value||'ทุกหมวด';
+  var tot=0; var byCat={};
+  var tr=rows.map(function(e){ tot+=e.amount; byCat[e.category]=(byCat[e.category]||0)+e.amount;
+    return '<tr><td>'+exDispDate(e.date)+'</td><td>'+e.category+'</td><td>'+(e.payeeName||'')+'</td><td class="d">'+(e.detail||'')+'</td><td class="r">'+exMoney(e.amount)+'</td></tr>';
+  }).join('');
+  var catRows=Object.keys(byCat).sort().map(function(k){ return '<tr><td>'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>';}).join('');
+  var html='<html><head><meta charset="UTF-8"><title>รายงานรายจ่าย</title><style>'
+    +'@page{size:A4;margin:14mm;}*{font-family:"Sarabun","TH Sarabun New",sans-serif;}'
+    +'body{color:#111;font-size:13px;}h2{margin:0 0 2px;}'
+    +'table{width:100%;border-collapse:collapse;margin-top:10px;}'
+    +'th,td{border:1px solid #999;padding:4px 6px;}th{background:#eee;}'
+    +'.r{text-align:right;white-space:nowrap;}.d{font-size:11px;color:#555;}'
+    +'.sum{width:auto;margin-top:14px;}.muted{color:#666;font-size:12px;}'
+    +'@media print{button{display:none;}}</style></head><body>'
+    +'<h2>หจก. ธนเศรษฐ์ศิริ 2546 — รายงานรายจ่าย</h2>'
+    +'<div class="muted">เดือน: '+m+' · หมวด: '+c+' · บัญชีกสิกร 4778</div>'
+    +'<table><thead><tr><th>วันที่</th><th>หมวด</th><th>ผู้รับ</th><th>รายละเอียด</th><th class="r">จำนวน (บาท)</th></tr></thead>'
+    +'<tbody>'+tr+'</tbody>'
+    +'<tfoot><tr><th colspan="4" class="r">รวมทั้งสิ้น</th><th class="r">'+exMoney(tot)+'</th></tr></tfoot></table>'
+    +'<table class="sum"><thead><tr><th>สรุปตามหมวด</th><th class="r">บาท</th></tr></thead><tbody>'+catRows+'</tbody></table>'
+    +'<button onclick="window.print()" style="margin-top:16px;padding:8px 18px;cursor:pointer">🖨️ พิมพ์ / บันทึก PDF</button>'
+    +'</body></html>';
+  var w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); setTimeout(function(){w.print();},500); }
+}
+
+/* ---------- Tab4 integration: profit/loss ---------- */
+
+/* ---------- Tab4 integration: profit/loss ---------- */
+function exDraw4(){
+  var sel=document.getElementById('ex4Month'); if(!sel) return;
+  var m=sel.value;
+  var rows=gExpenses.filter(function(e){ return m && e.date.slice(0,7)===m; });
+  var byCat={}; var tot=0;
+  rows.forEach(function(e){ byCat[e.category]=(byCat[e.category]||0)+e.amount; tot+=e.amount; });
+  var body='';
+  exAllCats().forEach(function(k){ if(byCat[k]) body+='<tr><td style="padding-left:14px;color:var(--muted)">'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>'; });
+  body+='<tr><td><b>รายจ่ายรวม</b></td><td class="r"><b style="color:#e06a6a">'+exMoney(tot)+'</b></td></tr>';
+  var rev=exNum((document.getElementById('ex4Rev')||{}).value);
+  if(rev>0){
+    var profit=rev-tot;
+    body='<tr><td>รายได้ (กรอกเอง)</td><td class="r" style="color:#4ec98a">'+exMoney(rev)+'</td></tr>'+body
+      +'<tr><td><b>กำไร / ขาดทุน</b></td><td class="r"><b style="color:'+(profit>=0?'#4ec98a':'#e06a6a')+'">'+exMoney(profit)+'</b></td></tr>';
+  }
+  var el=document.getElementById('ex4Body');
+  if(el) el.innerHTML = rows.length||rev>0 ? '<table class="data-table" style="width:100%;font-size:.85rem;"><tbody>'+body+'</tbody></table>' : '<div style="text-align:center;color:var(--muted);padding:18px">— เลือกเดือนเพื่อดูสรุปรายจ่าย —</div>';
+}
+</script>
+</body>
+</html>
