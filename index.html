@@ -5279,7 +5279,7 @@ async function saveFuelOut() {
     await prDb().collection('fuel_out').add(data);
     toast('✅ บันทึกเบิกออก '+liters+' ลิตร แล้ว');
     var remainAfter = (stock.remaining||0) - liters;
-    if(remainAfter < 500){ tgNotify('⚠️ <b>น้ำมันใกล้หมด</b>\nคงเหลือโดยประมาณ '+Math.max(0,Math.round(remainAfter)).toLocaleString()+' ลิตร (หลังเบิก '+liters+' ลิตร)'); }
+    if(remainAfter < 1000){ tgNotify('⚠️ <b>น้ำมันใกล้หมด</b>\nคงเหลือโดยประมาณ '+Math.max(0,Math.round(remainAfter)).toLocaleString()+' ลิตร (หลังเบิก '+liters+' ลิตร)'); }
     ['fOutMachineId','fOutLiters','fOutNote'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     document.getElementById('fOutType').value='';
   } catch(e) { toast('❌ '+e.message); }
