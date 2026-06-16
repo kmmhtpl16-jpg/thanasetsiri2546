@@ -2587,7 +2587,7 @@ async function renderPayrollSummary() {
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:8px;">
         <div class="emp-avatar-sm" style="width:28px;height:28px;font-size:12px;">${emp.nickname.charAt(0)}</div>
-        <span>${emp.nickname}</span>
+        <span onclick="openEmpDetail('${emp.id}','${ym}')" style="cursor:pointer;border-bottom:1px dashed var(--accent-blue);color:var(--accent-blue);" title="ดูรายละเอียดรายคน">${emp.nickname}</span>
       </div></td>
       <td class="mono">${wDays} วัน</td>
       <td class="num-amber">${fmtBaht(e1)} ฿</td>
@@ -2722,6 +2722,17 @@ function cycleBuildRows(ym, period){
   return rows;
 }
 var _cycInit = false;
+var prSettlements = {};
+function cycleKey(ym, period){ return ym+'__'+period; }
+function isCycleSettled(ym, period){ return !!prSettlements[cycleKey(ym,period)]; }
+async function prLoadSettlements(ym){
+  try{
+    const snap = await prDb().collection('settlements').where('ym','==',ym).get();
+    prSettlements = {};
+    snap.docs.forEach(d=>{ prSettlements[d.id] = {fsId:d.id, ...d.data()}; });
+  }catch(e){ console.warn('prLoadSettlements error:', e); prSettlements = {}; }
+}
+
 async function renderCycleSummary(){
   const ymEl = document.getElementById('cycMonth');
   const perEl = document.getElementById('cycPeriodSel');
@@ -2737,10 +2748,12 @@ async function renderCycleSummary(){
 
   await prLoadAttendance(ym);
   await prLoadWithdrawals(ym);
+  await prLoadSettlements(ym);
 
   const rows = cycleBuildRows(ym, period);
   const periodLabel = period==='1-15' ? 'รอบที่ 1 (1–15)' : 'รอบที่ 2 (16–สิ้นเดือน)';
   const payNote = period==='1-15' ? 'จ่ายกลางเดือน (วันที่ 16)' : 'จ่ายสิ้นเดือน';
+  const settled = prSettlements[cycleKey(ym,period)] || null;
 
   if(!rows.length){
     el.innerHTML = '<div style="color:var(--text-secondary);font-size:13px;padding:20px 0;">ยังไม่มีข้อมูลค่าแรงในงวดนี้</div>';
@@ -2757,27 +2770,37 @@ async function renderCycleSummary(){
   const body = rows.map(r=>`<tr>
       <td><div style="display:flex;align-items:center;gap:8px;">
         <div class="emp-avatar-sm" style="width:28px;height:28px;font-size:12px;">${r.emp.nickname.charAt(0)}</div>
-        <span>${r.emp.nickname}</span>
+        <span onclick="openEmpDetail('${r.emp.id}','${ym}')" style="cursor:pointer;border-bottom:1px dashed var(--accent-blue);color:var(--accent-blue);" title="ดูรายละเอียดรายคน">${r.emp.nickname}</span>
       </div></td>
       <td class="mono">${r.wDays} วัน</td>
       <td class="num-amber">${fmtBaht(r.earned)} ฿</td>
       <td style="font-family:var(--font-mono);color:var(--accent-purple);">${r.special>0?fmtBaht(r.special)+' ฿':'–'}</td>
       <td class="num-red">${r.social>0?'875 ฿':'–'}</td>
       <td style="font-family:var(--font-mono);color:var(--accent-blue);">${r.withdrawn>0?fmtBaht(r.withdrawn)+' ฿':'–'}</td>
-      <td style="font-family:var(--font-mono);font-weight:800;color:${r.pending<0?'var(--accent-red)':'var(--accent-green)'};">${fmtBaht(r.pending)} ฿</td>
+      <td style="font-family:var(--font-mono);font-weight:800;color:${r.pending<0?'var(--accent-red)':(r.pending===0?'var(--text-secondary)':'var(--accent-green)')};">${fmtBaht(r.pending)} ฿</td>
     </tr>`).join('');
+
+  const settleBar = settled
+    ? `<div style="background:rgba(16,185,129,0.12);border:1px solid var(--accent-green);border-radius:var(--radius-sm);padding:12px 16px;margin-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+         <div style="font-size:13px;color:var(--accent-green);font-weight:700;">✅ ปิดงวดแล้ว — จ่ายยอดรอรับ ${fmtBaht(settled.total)} ฿ (${settled.count} คน) เมื่อ ${isoToBE((settled.settledAt||'').slice(0,10))}</div>
+         <button class="btn btn-ghost" style="font-size:12px;" onclick="unsettleCycle()">🔓 ยกเลิกปิดงวด</button>
+       </div>`
+    : `<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;background:var(--bg-card);border:1px dashed var(--border-light);border-radius:var(--radius-sm);padding:12px 16px;">
+         <div style="font-size:12px;color:var(--text-secondary);">จ่ายเงินงวดนี้แล้วให้กดยืนยัน — ระบบจะบันทึกการจ่าย <b style="color:var(--accent-green);">${fmtBaht(cashToPay)} ฿</b> แล้วล็อกงวด (ยอดรอรับเป็น 0 กันจ่ายซ้ำ/จ่ายเกินรอบหน้า)</div>
+         <button class="btn btn-gold" onclick="settleCycle()">✅ ยืนยันจ่าย & ปิดงวดนี้</button>
+       </div>`;
 
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
-      <div class="kpi-card amber">
-        <div class="kpi-icon">💰</div>
-        <div class="kpi-label">เงินสดต้องเตรียมจ่ายงวดนี้</div>
-        <div class="kpi-value">${fmtBaht(cashToPay)}<span class="kpi-unit"> ฿</span></div>
+      <div class="kpi-card ${settled?'green':'amber'}">
+        <div class="kpi-icon">${settled?'✅':'💰'}</div>
+        <div class="kpi-label">${settled?'จ่ายปิดงวดแล้ว':'เงินสดต้องเตรียมจ่ายงวดนี้'}</div>
+        <div class="kpi-value">${fmtBaht(settled?settled.total:cashToPay)}<span class="kpi-unit"> ฿</span></div>
         <div class="kpi-change">${ym} · ${periodLabel} · ${rows.length} คน</div>
       </div>
     </div>
     <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text-secondary);line-height:1.6;">
-      📌 <b style="color:var(--accent-green);">รอรับงวดนี้</b> = ค่าแรงงวด ${period==='16-end'?'− ปกส ':''}− เบิกที่จ่ายล่วงหน้าไปแล้ว &nbsp;•&nbsp; เป็นยอด <b>รอรับตามงวดจ่าย</b> (${payNote}) — ไม่ใช่ยอดเบิก
+      📌 <b style="color:var(--accent-green);">รอรับงวดนี้</b> = ค่าแรงงวด ${period==='16-end'?'− ปกส ':''}− เบิกที่จ่ายล่วงหน้าไปแล้ว &nbsp;•&nbsp; เป็นยอด <b>รอรับตามงวดจ่าย</b> (${payNote}) — ไม่ใช่ยอดเบิก &nbsp;•&nbsp; 👆 กดชื่อพนักงานเพื่อดูรายละเอียด
       ${negCount>0?`<br>⚠️ มี ${negCount} คนยอดติดลบ (เบิกเกินค่าแรงงวดนี้) — ไม่นับรวมในเงินสดที่ต้องเตรียม`:''}
     </div>
     <div class="table-wrap">
@@ -2800,8 +2823,136 @@ async function renderCycleSummary(){
           </tfoot>
         </table>
       </div>
-    </div>`;
+    </div>
+    ${settleBar}`;
 }
+
+async function settleCycle(){
+  const ym = document.getElementById('cycMonth').value || currentYM();
+  const period = document.getElementById('cycPeriodSel').value;
+  const periodLabel = period==='1-15' ? 'รอบที่ 1 (1–15)' : 'รอบที่ 2 (16–สิ้นเดือน)';
+  if(isCycleSettled(ym,period)){ toast('⚠️ งวดนี้ปิดแล้ว'); return; }
+  const rows = cycleBuildRows(ym, period).filter(r=> r.pending>0);
+  if(!rows.length){ toast('⚠️ ไม่มียอดรอรับให้จ่าย'); return; }
+  const total = rows.reduce((s,r)=> s + r.pending, 0);
+  if(!confirm('ยืนยันจ่ายยอดรอรับ '+periodLabel+'\nรวม '+fmtBaht(total)+' ฿ ('+rows.length+' คน)\n\nระบบจะบันทึกการจ่ายและปิดงวด — ยอดรอรับจะเป็น 0 และกันการจ่ายซ้ำ')) return;
+  toast('⏳ กำลังบันทึกการจ่าย...');
+  try{
+    const entries=[];
+    for(const r of rows){
+      await prSaveWithdrawal({
+        empId:r.emp.id, period, month:ym, date:todayYMD(),
+        amount:r.pending, kind:'settle', note:'จ่ายปิดงวด '+periodLabel,
+        earnedAtTime:r.earned, socialDeducted:false, isOverdrawn:false,
+        recordedBy: typeof curEmail!=='undefined'?curEmail:'admin'
+      });
+      entries.push({empId:r.emp.id, amount:r.pending});
+    }
+    const doc = { ym, period, settledAt:new Date().toISOString(),
+      settledBy: typeof curEmail!=='undefined'?curEmail:'admin',
+      total, count:rows.length, entries };
+    await prDb().collection('settlements').doc(cycleKey(ym,period)).set(doc);
+    prSettlements[cycleKey(ym,period)] = {fsId:cycleKey(ym,period), ...doc};
+    await renderCycleSummary();
+    toast('✅ ปิดงวดแล้ว จ่ายรวม '+fmtBaht(total)+' ฿');
+    if(typeof tgNotify==='function') tgNotify('💰 <b>จ่ายเงินเดือน (ปิดงวด)</b>\n'+periodLabel+' · '+ym+'\n'+rows.length+' คน รวม '+fmtBaht(total)+' ฿');
+  }catch(e){ toast('❌ '+e.message); }
+}
+
+async function unsettleCycle(){
+  const ym = document.getElementById('cycMonth').value || currentYM();
+  const period = document.getElementById('cycPeriodSel').value;
+  const key = cycleKey(ym,period);
+  if(!prSettlements[key]){ toast('งวดนี้ยังไม่ได้ปิด'); return; }
+  if(!confirm('ยกเลิกการปิดงวดนี้?\nระบบจะลบรายการ "จ่ายปิดงวด" ที่บันทึกไว้ (ยอดรอรับจะกลับมาแสดง)')) return;
+  toast('⏳ กำลังยกเลิก...');
+  try{
+    await prLoadWithdrawals(ym);
+    const settleWds = prWithdrawals.filter(w=> w.month===ym && w.period===period && w.kind==='settle');
+    for(const w of settleWds){ if(w.fsId) await prDb().collection('withdrawals').doc(w.fsId).delete(); }
+    await prDb().collection('settlements').doc(key).delete();
+    delete prSettlements[key];
+    await renderCycleSummary();
+    toast('↩️ ยกเลิกปิดงวดแล้ว');
+  }catch(e){ toast('❌ '+e.message); }
+}
+
+// ── รายละเอียดรายคน (กดชื่อ) ──
+function _typeLabel(r){
+  if(!r||!r.type||r.type==='absent') return 'ขาด';
+  if(r.type==='full') return 'เต็มวัน';
+  if(r.type==='half') return 'ครึ่งวัน';
+  if(r.type==='hours') return (r.hours? r.hours+' ชม':'รายชั่วโมง (0 ชม)');
+  return r.type;
+}
+function _effHours(r){
+  if(!r||!r.type||r.type==='absent') return 0;
+  if(r.type==='full') return 8;
+  if(r.type==='half') return 4;
+  if(r.type==='hours') return r.hours||0;
+  return 0;
+}
+function openEmpDetail(empId, ym){
+  const emp = prEmployees.find(e=>e.id===empId);
+  if(!emp) return;
+  const total = daysInMonth(ym);
+  function stat(period){
+    const earned = calcPeriodEarned(empId, ym, period);
+    const special = cyclePeriodSpecial(empId, ym, period);
+    const days = cyclePeriodDays(empId, ym, period);
+    const social = (period==='16-end' && emp.socialSecurity)?875:0;
+    const wds = getPeriodWithdrawals(empId, ym, period);
+    const advance = wds.filter(w=>w.kind!=='settle').reduce((s,w)=>s+(w.amount||0),0);
+    const settle  = wds.filter(w=>w.kind==='settle').reduce((s,w)=>s+(w.amount||0),0);
+    const withdrawn = advance+settle;
+    let hrs=0; const [s,e]=cyclePeriodRange(ym,period);
+    for(let d=s;d<=e;d++){ hrs += _effHours(prAttendance[ym+'-'+String(d).padStart(2,'0')+'_'+empId]); }
+    const pending = Math.round((earned - social - withdrawn)*100)/100;
+    return {earned,special,days,social,advance,settle,withdrawn,hrs,pending};
+  }
+  const s1=stat('1-15'), s2=stat('16-end');
+  let daily='';
+  for(let d=1; d<=total; d++){
+    const ds = ym+'-'+String(d).padStart(2,'0');
+    const r = prAttendance[ds+'_'+empId];
+    if(!r) continue;
+    const sp = (r.specialWork||[]).map(x=>x.name+' '+fmtBaht(x.amount)+'฿').join(', ');
+    daily += `<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${isoToBE(ds)}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${_typeLabel(r)}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);color:var(--accent-purple);">${sp||'–'}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono);">${fmtBaht(calcEarned(emp,ds))} ฿</td></tr>`;
+  }
+  const monthWds = prWithdrawals.filter(w=>w.empId===empId && w.month===ym).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const wdList = monthWds.length ? monthWds.map(w=>`<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${isoToBE(w.date)}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${w.period==='1-15'?'รอบ1':'รอบ2'}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${w.kind==='settle'?'<span style="color:var(--accent-green);">จ่ายปิดงวด</span>':'เบิกล่วงหน้า'}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono);">${fmtBaht(w.amount)} ฿</td></tr>`).join('') : '<tr><td colspan="4" style="padding:8px;color:var(--text-secondary);">— ไม่มีรายการ —</td></tr>';
+  function pcard(label, st){
+    return `<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;flex:1;min-width:210px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent-amber);margin-bottom:6px;">${label}</div>
+      <div style="font-size:12px;line-height:1.95;color:var(--text-secondary);">
+        วันทำงาน: <b style="color:var(--text-primary);">${st.days} วัน</b> · รวม ${st.hrs} ชม.<br>
+        ค่าแรง: <b style="color:var(--text-primary);">${fmtBaht(st.earned)} ฿</b>${st.special>0?` (รวมงานพิเศษ ${fmtBaht(st.special)})`:''}<br>
+        ${st.social>0?'หักปกส: 875 ฿<br>':''}เบิกล่วงหน้า: ${fmtBaht(st.advance)} ฿${st.settle>0?` · จ่ายปิดงวด: ${fmtBaht(st.settle)} ฿`:''}<br>
+        <span style="color:${st.pending<0?'var(--accent-red)':'var(--accent-green)'};font-weight:800;">รอรับคงเหลือ: ${fmtBaht(st.pending)} ฿</span>
+      </div>
+    </div>`;
+  }
+  let ov = document.getElementById('empDetailOverlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='empDetailOverlay'; document.body.appendChild(ov); }
+  ov.setAttribute('style','position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px;');
+  ov.onclick=function(ev){ if(ev.target===ov) closeEmpDetail(); };
+  ov.innerHTML = `<div style="background:var(--bg-card,#1a1a2e);border:1px solid var(--border);border-radius:12px;max-width:720px;width:100%;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,0.4);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="emp-avatar-sm" style="width:36px;height:36px;font-size:15px;">${emp.nickname.charAt(0)}</div>
+        <div><div style="font-size:16px;font-weight:800;">${emp.nickname} ${emp.fullName?`<span style="font-weight:400;font-size:12px;color:var(--text-secondary);">(${emp.fullName})</span>`:''}</div>
+        <div style="font-size:11px;color:var(--text-secondary);">${emp.type==='daily'?'รายวัน':'รายเดือน'} · ${fmtBaht(emp.rate)} ฿${emp.type==='daily'?'/วัน':'/เดือน'} · เดือน ${ym}</div></div>
+      </div>
+      <button onclick="closeEmpDetail()" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:18px;cursor:pointer;padding:2px 10px;color:var(--text-secondary);">✕</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">${pcard('รอบที่ 1 (1–15)',s1)}${pcard('รอบที่ 2 (16–สิ้นเดือน)',s2)}</div>
+    <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin:10px 0 4px;">💸 รายการเบิก / จ่าย เดือนนี้</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:var(--bg-surface);"><th style="padding:5px 8px;text-align:left;">วันที่</th><th style="padding:5px 8px;text-align:left;">งวด</th><th style="padding:5px 8px;text-align:left;">ประเภท</th><th style="padding:5px 8px;text-align:right;">จำนวน</th></tr></thead><tbody>${wdList}</tbody></table>
+    <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin:14px 0 4px;">📅 รายวันที่ลงเวลา (${ym})</div>
+    <div style="max-height:260px;overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:var(--bg-surface);position:sticky;top:0;"><th style="padding:5px 8px;text-align:left;">วันที่</th><th style="padding:5px 8px;text-align:left;">ลงเวลา</th><th style="padding:5px 8px;text-align:left;">งานพิเศษ</th><th style="padding:5px 8px;text-align:right;">ค่าแรงวันนั้น</th></tr></thead><tbody>${daily||'<tr><td colspan="4" style="padding:8px;color:var(--text-secondary);">— ไม่มีการลงเวลา —</td></tr>'}</tbody></table></div>
+  </div>`;
+}
+function closeEmpDetail(){ const ov=document.getElementById('empDetailOverlay'); if(ov) ov.remove(); }
 
 function exportCyclePDF(){
   const ym = document.getElementById('cycMonth').value || currentYM();
