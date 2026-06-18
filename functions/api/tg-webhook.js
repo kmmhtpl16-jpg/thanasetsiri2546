@@ -54,7 +54,21 @@ export async function onRequestPost(context) {
   return json({ ok: true });
 }
 
-export async function onRequestGet() { return json({ ok: true, info: 'telegram webhook' }); }
+export async function onRequestGet(context) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const setup = url.searchParams.get('setup');
+  // ตั้ง webhook ให้ตัวเองครั้งเดียว: เรียก /api/tg-webhook?setup=<TG_WEBHOOK_SECRET>
+  if (setup && env.TG_WEBHOOK_SECRET && setup === env.TG_WEBHOOK_SECRET) {
+    const hook = url.origin + '/api/tg-webhook';
+    const r = await fetch('https://api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/setWebhook', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: hook, secret_token: env.TG_WEBHOOK_SECRET, allowed_updates: ['message'] })
+    });
+    return json({ ok: true, setWebhook: await r.json() });
+  }
+  return json({ ok: true, info: 'telegram webhook' });
+}
 
 // ---------- Firestore (อ่าน/เขียนด้วยบัญชี admin) ----------
 async function login() {
