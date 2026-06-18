@@ -1,4 +1,4 @@
-const GROUP_CHAT_ID = '8066824631';
+const GROUP_CHAT_ID = '-5450363615';
 export async function onRequestPost(context) {
   const { request, env } = context;
   try {
