@@ -159,32 +159,28 @@ async function reportFuel() {
 }
 
 // ---------- เตรียมออกบิล (แสดงยอด + ขอยืนยัน) ----------
+// หมายเหตุ: ไม่เก็บ pending ใน Firestore แล้ว (collection app_meta ไม่อยู่ใน
+// security rules → write 403) ขั้นยืนยันจะคำนวณยอดสดใหม่แทน ปลอดภัยกว่า
 async function prepareInvoice() {
   const s = await teeranopSummary();
   const net = Math.round(s.net * 1000) / 1000;
   if (net <= 0) return 'ℹ️ ยังไม่มียอดทรายธีรนพใหม่ที่ยังไม่วางบิล';
   const grand = Math.round(net * TEERANOP_PRICE * 100) / 100;
   const custName = s.custName || ('หจก.' + TEERANOP_KEY);
-  // เก็บ pending ไว้ใน Firestore (app_meta/tg_pending_invoice) อายุ 5 นาที
-  await setDoc(s.idToken, 'app_meta', 'tg_pending_invoice', {
-    customer: { stringValue: custName },
-    dateFrom: { stringValue: s.dateFrom }, dateTo: { stringValue: s.dateTo },
-    netKiu: { doubleValue: net }, grandTotal: { doubleValue: grand },
-    price: { doubleValue: TEERANOP_PRICE },
-    expireAt: { stringValue: new Date(Date.now() + 5 * 60000).toISOString() }
-  });
-  return `🧾 <b>เตรียมออกใบแจ้งหนี้ธีรนพ</b>\n• ช่วง ${s.dateFrom} ถึง ${s.dateTo}\n• ${fmt(net)} คิว × ${TEERANOP_PRICE} = <b>${fmt(grand)} บาท</b> (รวม VAT)\n\nพิมพ์ <b>ยืนยันออกบิล</b> ภายใน 5 นาที เพื่อออกจริง`;
+  return `🧾 <b>เตรียมออกใบแจ้งหนี้ธีรนพ</b>\n• ${custName}\n• ช่วง ${s.dateFrom} ถึง ${s.dateTo}\n• ${fmt(net)} คิว × ${TEERANOP_PRICE} = <b>${fmt(grand)} บาท</b> (รวม VAT)\n\nพิมพ์ <b>ยืนยันออกบิล</b> เพื่อออกจริง (ระบบจะคำนวณยอดล่าสุดให้อีกครั้ง)`;
 }
 
-// ---------- ยืนยันออกบิลจริง ----------
+// ---------- ยืนยันออกบิลจริง (คำนวณยอดสดใหม่ตอนยืนยัน) ----------
 async function confirmIssueInvoice() {
-  const idToken = await login();
-  const pend = await getDoc(idToken, 'app_meta', 'tg_pending_invoice');
-  if (!pend) return '⚠️ ไม่พบรายการรอออกบิล พิมพ์ "ออกบิล" ใหม่อีกครั้ง';
-  const exp = fval(pend, 'expireAt');
-  if (exp && new Date(exp).getTime() < Date.now()) return '⏰ คำขอออกบิลหมดอายุแล้ว พิมพ์ "ออกบิล" ใหม่';
-  const custName = fval(pend, 'customer'); const dateFrom = fval(pend, 'dateFrom'); const dateTo = fval(pend, 'dateTo');
-  const netKiu = fval(pend, 'netKiu'); const grand = fval(pend, 'grandTotal'); const price = fval(pend, 'price');
+  const s = await teeranopSummary();          // คำนวณสด + ได้ idToken มาด้วย
+  const idToken = s.idToken;
+  const net = Math.round(s.net * 1000) / 1000;
+  if (net <= 0) return 'ℹ️ ยังไม่มียอดทรายธีรนพใหม่ที่ยังไม่วางบิล พิมพ์ "ยอดธีรนพ" เพื่อตรวจสอบ';
+  const custName = s.custName || ('หจก.' + TEERANOP_KEY);
+  const dateFrom = s.dateFrom; const dateTo = s.dateTo;
+  const price = TEERANOP_PRICE;
+  const grand = Math.round(net * price * 100) / 100;
+  const netKiu = net;
   // กันออกซ้ำ: customer+dateFrom+dateTo ที่ยังไม่ยกเลิก
   const invs = await runQuery(idToken, { from: [{ collectionId: 'invoices' }],
     where: { compositeFilter: { op: 'AND', filters: [
@@ -205,8 +201,6 @@ async function confirmIssueInvoice() {
     totalNetKiu: { doubleValue: Math.round(netKiu * 1000) / 1000 }, grandTotal: { doubleValue: Math.round(grand * 100) / 100 },
     status: { stringValue: 'pending' }, createdAt: { stringValue: new Date().toISOString() }, createdBy: { stringValue: 'telegram-bot' }
   });
-  // ลบ pending
-  await deleteDoc(idToken, 'app_meta', 'tg_pending_invoice');
   return `✅ <b>ออกใบแจ้งหนี้แล้ว</b>\n• เลขที่ ${docNo}\n• ${custName}\n• ${fmt(netKiu)} คิว = <b>${fmt(grand)} บาท</b>\n• สถานะ: รอวางบิล (ดู/แก้ในแอปได้)`;
 }
 
