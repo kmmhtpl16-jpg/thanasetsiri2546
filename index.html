@@ -5264,21 +5264,24 @@ function cancelInvoice(docNo){
 
 // ── พิมพ์ใบที่บันทึกไว้แล้ว (ดึงข้อมูลจาก Firestore) ──
 function printSavedInvoice(docNo){
+  // เปิดหน้าต่างพิมพ์ทันทีตอนกดปุ่ม กัน iOS Safari บล็อก popup (เพราะเดิมเปิดหลังโหลดข้อมูลเสร็จ จึงถูกบล็อก -> w เป็น null)
+  var pw=window.open('','_blank');
+  if(pw){ try{ pw.document.write('<!doctype html><html><head><meta charset="utf-8"><title>กำลังโหลด…</title></head><body style="font-family:Sarabun,sans-serif;padding:24px;color:#555;font-size:16px">กำลังดึงข้อมูลใบแจ้งหนี้…</body></html>'); }catch(e){} }
   prDb().collection('invoices').doc(docNo).get()
     .then(function(d){
-      if(!d.exists){ alert('ไม่พบใบแจ้งหนี้'); return; }
+      if(!d.exists){ if(pw)pw.close(); alert('ไม่พบใบแจ้งหนี้'); return; }
       var v=d.data();
       // สร้าง _invRows จำลองจากช่วงวันที่ + ลูกค้า เพื่อ reuse printInvoice
       _invRows=wData.filter(function(r){
         return r.customer===v.customer && r.date>=v.dateFrom && r.date<=v.dateTo;
       });
-      if(!_invRows.length){ alert('ไม่พบรายการชั่งของใบนี้ (อาจถูกลบไปแล้ว)'); return; }
-      printInvoice(v.sandType, v.price, v.vatType, v.balFwd, v.remark, v.docNo);
+      if(!_invRows.length){ if(pw)pw.close(); alert('ไม่พบรายการชั่งของใบนี้ (อาจถูกลบไปแล้ว)'); return; }
+      printInvoice(v.sandType, v.price, v.vatType, v.balFwd, v.remark, v.docNo, pw);
     })
-    .catch(function(e){ alert('ดึงข้อมูลไม่สำเร็จ: '+e.message); });
+    .catch(function(e){ if(pw)pw.close(); alert('ดึงข้อมูลไม่สำเร็จ: '+e.message); });
 }
 
-function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo) {
+function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo, preWin) {
   var totalNetKiu=0;
   _invRows.forEach(function(r){ totalNetKiu+=Math.max(0,r.kg/KPC-(dData[r._id]||0)); });
   var productName=sandType==='delivery'?'ทราย (รวมค่าจัดส่งถึงหน้างาน)':'ทราย (รับเอง)';
@@ -5424,7 +5427,10 @@ function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo) {
     +'</div>'
     +'</body></html>';
 
-  var w=window.open('',"_blank"); w.document.write(html); w.document.close();
+  var w=preWin||window.open('',"_blank");
+  if(!w){ alert('เบราว์เซอร์บล็อกการเปิดหน้าต่างพิมพ์ — กรุณาอนุญาต popup สำหรับเว็บนี้'); return; }
+  try{ w.document.open(); }catch(e){}
+  w.document.write(html); w.document.close();
 }
 
 
