@@ -4702,15 +4702,19 @@ function invSetPending(docNo) {
 
 /* ── Payment ── */
 function frLoadInvoiceList(){
-  db.collection('freight_invoices').orderBy('createdAt','desc').limit(50).get().then(function(snap){
+  db.collection('invoices').orderBy('createdAt','desc').limit(100).get().then(function(snap){
     var sel=document.getElementById('fr-pay-ref');
     if(!sel) return;
     sel.innerHTML='<option value="">— เลือกใบแจ้งหนี้ —</option>';
     snap.docs.forEach(function(d){
       var v=d.data();
-      sel.innerHTML+='<option value="'+v.docNo+'">'+v.docNo+' | '+v.customer+' | '+v.dateFrom+' ถึง '+v.dateTo+'</option>';
+      if(v.status==='cancelled') return;
+      sel.innerHTML+='<option value="'+v.docNo+'">'+v.docNo+' | '+(v.customer||'')+' | '+(v.dateFrom||'')+' ถึง '+(v.dateTo||'')+'</option>';
     });
-    if(frPayInv){sel.value=frPayInv; frLoadPayment();}
+    if(frPayInv && sel.querySelector('option[value="'+frPayInv+'"]')){ sel.value=frPayInv; frLoadPayment(); }
+  }).catch(function(e){
+    var sel=document.getElementById('fr-pay-ref');
+    if(sel) sel.innerHTML='<option value="">โหลดไม่สำเร็จ: '+e.message+'</option>';
   });
 }
 
@@ -4741,6 +4745,28 @@ function frPayMode(m){
   }
   owners.style.display='none';
   setMsg('fr-pay-msg','','info');
+}
+
+function frRunPayBuild(custList, from, to, refInvoice){
+  if(!custList.length){ setMsg('fr-pay-msg','❌ ไม่มีลูกค้าให้คำนวณ','err'); return; }
+  if(!from||!to){ setMsg('fr-pay-msg','❌ ระบุช่วงวัน','err'); return; }
+  var custSet={}; custList.forEach(function(c){custSet[c]=true;});
+  // ── ตรวจทะเบียนที่ยังไม่มีเจ้าของในฐาน ──
+  var unknownSet={};
+  wData.forEach(function(w){
+    if(!custSet[w.customer]) return;
+    if(w.date<from||w.date>to) return;
+    var net=(w.kg/KPC)-(typeof dData!=='undefined'&&dData[w._id]?dData[w._id]:0);
+    if(net<=0) return;
+    if(!lookupVeh(w.plate)){ unknownSet[normPlate(w.plate)]=true; }
+  });
+  var unknowns=Object.keys(unknownSet);
+  if(unknowns.length){
+    _pendingManualArgs={custSet:custSet,from:from,to:to,custList:custList,refInvoice:refInvoice||''};
+    startPlateResolve(unknowns);
+    return;
+  }
+  frManualBuild(custSet,from,to,custList,refInvoice||'');
 }
 
 function frManualLoad(){
@@ -4782,7 +4808,7 @@ function nextPlateResolve(){
     // เสร็จแล้ว — ทำต่อ
     document.getElementById('plate-resolve-dialog').style.display='none';
     var a=_pendingManualArgs; _pendingManualArgs=null;
-    if(a) frManualBuild(a.custSet,a.from,a.to,a.custList);
+    if(a) frManualBuild(a.custSet,a.from,a.to,a.custList,a.refInvoice);
     return;
   }
   var plate=_plateQueue[0];
@@ -4839,7 +4865,7 @@ function plateResolveSkip(){
   nextPlateResolve();
 }
 
-function frManualBuild(custSet,from,to,custList){
+function frManualBuild(custSet,from,to,custList,refInvoice){
   /* แยกข้อมูลตาม customer → owner(canonical) → plate */
   var custMap={};  /* { customer: { canonical: { plate: netKiu } } } */
   wData.forEach(function(w){
@@ -4859,7 +4885,7 @@ function frManualBuild(custSet,from,to,custList){
   if(!custs.length){ setMsg('fr-pay-msg','\u26A0\uFE0F \u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e02\u0e2d\u0e07\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e43\u0e19\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','warn'); document.getElementById('fr-pay-owners').style.display='none'; return; }
 
   /* เก็บ context ไว้คำนวณ/บันทึก/พิมพ์ — rate เก็บแยกต่อลูกค้า */
-  window._frManCtx={from:from,to:to,custMap:custMap,rates:{}};
+  window._frManCtx={from:from,to:to,custMap:custMap,rates:{},refInvoice:refInvoice||''};
 
   var html=custs.map(function(cust,ci){
     var safeCust=cust.replace(/'/g,"\\'").replace(/"/g,'&quot;');
@@ -4937,7 +4963,7 @@ function frSaveManual(cust,owner,ci){
   var trips=plates.map(function(p){return {plate:p,canonical:owner,netKiu:ctx.custMap[cust][owner][p]};}).filter(function(t){return t.netKiu>0.0001;});
   var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
   nextDocNo().then(function(docNo){
-    var data={docNo:docNo,type:'truck',refInvoice:'',customer:cust,
+    var data={docNo:docNo,type:'truck',refInvoice:(ctx&&ctx.refInvoice)||'',customer:cust,
       canonical:owner,dateFrom:ctx.from,dateTo:ctx.to,rateForTruck:rate,
       totalNetKiu:parseFloat(total.toFixed(3)),
       totalAmount:parseFloat((total*rate).toFixed(2)),
@@ -4988,40 +5014,11 @@ function frLoadPayment(){
   var docNo=document.getElementById('fr-pay-ref').value;
   if(!docNo){setMsg('fr-pay-msg','❌ เลือกใบแจ้งหนี้ก่อน','err');return;}
   setMsg('fr-pay-msg','⏳ กำลังโหลด…','info');
-  db.collection('freight_invoices').doc(docNo).get().then(function(doc){
-    if(!doc.exists){setMsg('fr-pay-msg','❌ ไม่พบเอกสาร','err');return;}
-    var inv=doc.data(), trips=inv.trips||[];
-    var ownerMap={};
-    trips.forEach(function(t){if(!ownerMap[t.canonical]) ownerMap[t.canonical]=[]; ownerMap[t.canonical].push(t);});
-    var owners=Object.keys(ownerMap).sort();
-    var html=owners.map(function(own){
-      var list=ownerMap[own];
-      var total=list.reduce(function(s,t){return s+t.netKiu;},0);
-      var totalAmt=total*inv.rateForTruck;
-      var rows=list.map(function(t){
-        return '<tr><td style="padding-left:20px;color:var(--muted)">└ '+t.plate+'</td>'
-          +'<td class="r">'+fmt3(t.netKiu)+'</td>'
-          +'<td class="r">'+(t.netKiu*inv.rateForTruck).toFixed(2)+'</td></tr>';
-      }).join('');
-      var safeOwn=own.replace(/'/g,"\\'");
-      return '<div class="fr-owner-card"><div class="fr-owner-hdr">'
-        +'<span class="fr-owner-name">👤 '+own+'</span>'
-        +'<span class="fr-owner-total"> รวม '+fmt3(total)+' คิว | <b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท</b></span>'
-        +'<button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px;font-size:11px"'
-        +' onclick="frSavePayment(\''+docNo+'\',\''+safeOwn+'\','+inv.rateForTruck+')">💾 บันทึก</button>'
-        +' <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px"'
-        +' onclick="frPrintPayment(\''+docNo+'\',\''+safeOwn+'\')">🖨️ พิมพ์</button>'
-        +'</div><div class="table-wrap"><table>'
-        +'<thead><tr><th>ทะเบียน</th><th class="r">คิวสุทธิ</th><th class="r">เงิน (×'+inv.rateForTruck+')</th></tr></thead>'
-        +'<tbody>'+rows
-        +'<tr style="border-top:1px solid var(--border)"><td><b>รวม</b></td>'
-        +'<td class="r gold"><b>'+fmt3(total)+'</b></td>'
-        +'<td class="r gold"><b>'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b></td></tr>'
-        +'</tbody></table></div></div>';
-    }).join('');
-    document.getElementById('fr-pay-owners').innerHTML=html;
-    document.getElementById('fr-pay-owners').style.display='';
-    setMsg('fr-pay-msg','✅ โหลด '+owners.length+' เจ้าของรถ','ok');
+  db.collection('invoices').doc(docNo).get().then(function(doc){
+    if(!doc.exists){setMsg('fr-pay-msg','❌ ไม่พบใบแจ้งหนี้','err');return;}
+    var inv=doc.data();
+    if(!inv.customer||!inv.dateFrom||!inv.dateTo){setMsg('fr-pay-msg','❌ ใบแจ้งหนี้นี้ไม่มีข้อมูลลูกค้า/ช่วงวันที่ ใช้อ้างอิงไม่ได้','err');return;}
+    frRunPayBuild([inv.customer], inv.dateFrom, inv.dateTo, inv.docNo);
   }).catch(function(e){setMsg('fr-pay-msg','❌ '+e.message,'err');});
 }
 
