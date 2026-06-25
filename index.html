@@ -5018,7 +5018,9 @@ function frLoadPayment(){
     if(!doc.exists){setMsg('fr-pay-msg','❌ ไม่พบใบแจ้งหนี้','err');return;}
     var inv=doc.data();
     if(!inv.customer||!inv.dateFrom||!inv.dateTo){setMsg('fr-pay-msg','❌ ใบแจ้งหนี้นี้ไม่มีข้อมูลลูกค้า/ช่วงวันที่ ใช้อ้างอิงไม่ได้','err');return;}
-    frRunPayBuild([inv.customer], inv.dateFrom, inv.dateTo, inv.docNo);
+    var _cs={}; _cs[inv.customer]=true;
+    // โหมดอ้างอิง: แสดงผลทันที ทะเบียนที่ยังไม่รู้เจ้าของจะขึ้นเป็นกลุ่ม ❓ (ไม่บังคับระบุก่อน)
+    frManualBuild(_cs, inv.dateFrom, inv.dateTo, [inv.customer], inv.docNo);
   }).catch(function(e){setMsg('fr-pay-msg','❌ '+e.message,'err');});
 }
 
