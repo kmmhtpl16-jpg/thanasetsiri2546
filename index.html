@@ -5333,7 +5333,7 @@ function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo, preW
   var css='*{box-sizing:border-box;margin:0;padding:0}'
     +'@page{size:A4;margin:0}'
     +'html,body{width:210mm;font-family:Sarabun,sans-serif;font-size:11pt;color:#333;background:#ececec}'
-    +'.wrap{width:210mm;min-height:297mm;background:#fff;margin:0 auto;display:flex;flex-direction:column;padding:8mm 10mm}'
+    +'.wrap{width:210mm;min-height:0;background:#fff;margin:0 auto;display:flex;flex-direction:column;padding:6mm 10mm}'
     +'.hdr{border-bottom:2.5px solid #6c63b6;padding-bottom:4mm;margin-bottom:3mm}'
     +'.hdr-top{display:flex;justify-content:space-between;align-items:flex-start}'
     +'.logo{height:46pt;margin-bottom:3pt}'
@@ -5362,12 +5362,12 @@ function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo, preW
     +'.tot .lbl{text-align:right;color:#777;padding:2.5pt 5pt}'
     +'.tot .amt{text-align:right;font-variant-numeric:tabular-nums;padding:2.5pt 4pt;min-width:80pt}'
     +'.tot .grand td{border-top:2px solid #6c63b6;font-weight:700;font-size:12.5pt;color:#6c63b6;padding-top:5pt}'
-    +'.bank{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:4pt;padding:5pt 8pt;font-size:9pt;margin-top:4mm}'
+    +'.bank{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:3pt;padding:2.5pt 7pt;font-size:7.5pt;margin-top:3mm}'
     +'.sign-row{display:grid;grid-template-columns:1fr 1fr;gap:15mm;margin-top:5mm}'
     +'.sign-box{padding-top:5pt;text-align:center;font-size:9pt;color:#777}'
               +'.sign-line{display:block;border-bottom:1px solid #bbb;width:180pt;margin:0 auto 4pt;}'
     +'@media screen{body{padding:6mm}}'
-    +'@media print{html,body{background:#fff}.wrap{box-shadow:none}button,.no-print{display:none!important}table.items{page-break-inside:auto}tr{page-break-inside:avoid}.ftr{page-break-inside:avoid}}';
+    +'@media print{html,body{background:#fff;height:auto}.wrap{box-shadow:none;min-height:0!important}button,.no-print{display:none!important}table.items{page-break-inside:auto}tr{page-break-inside:avoid}.ftr{page-break-inside:avoid}}';
 
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>ใบส่งสินค้า/ใบแจ้งหนี้ '+docNo+'</title>'
     +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">'
