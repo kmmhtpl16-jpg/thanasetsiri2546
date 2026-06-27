@@ -35,14 +35,18 @@ export async function onRequestPost(context) {
       await tgSend(token, chatId, menuText(), { reply_markup: menuKeyboard(), reply_to_message_id: msg.message_id });
     } else if (/^ยืนยันวางบิล/.test(text)) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
-      await tgSend(token, chatId, await confirmIssueInvoiceFor(text));
+      const r = await confirmIssueInvoiceFor(text);
+      if (typeof r === 'string') await tgSend(token, chatId, r);
+      else await tgSend(token, chatId, r.text, Object.assign({ reply_to_message_id: msg.message_id }, r.extra));
     } else if (/^วางบิล\s*$/.test(text)) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
       const pk = await customerPicker();
       await tgSend(token, chatId, pk.text, { reply_markup: pk.keyboard, reply_to_message_id: msg.message_id });
     } else if (/^วางบิล/.test(text)) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
-      await tgSend(token, chatId, await prepareInvoiceFor(text));
+      const r = await prepareInvoiceFor(text);
+      if (typeof r === 'string') await tgSend(token, chatId, r);
+      else await tgSend(token, chatId, r.text, Object.assign({ reply_to_message_id: msg.message_id }, r.extra));
     } else if (/^ค่าแรง|^เงินเดือน/.test(text)) {
       const ym = parseYM(text);
       const period = parsePeriod(text);
@@ -273,17 +277,43 @@ async function reportWithdrawals(ym, period) {
 // owner-only + ยืนยัน 2 ขั้น ใบที่ออก = status pending แก้/ลบในแอปได้
 // ============================================================
 
-// แยกชื่อลูกค้า + ราคา (ตัวเลขท้ายสุด) ออกจากข้อความคำสั่ง
+// ---------- ชนิด VAT ----------
+// inclusive = ราคารวม VAT แล้ว | exclusive = ยังไม่รวม VAT (บวก 7%) | zero = ไม่มี VAT (0%)
+function vatLabel(v) {
+  return v === 'zero' ? 'ไม่มี VAT (VAT 0%)'
+       : v === 'exclusive' ? 'ราคายังไม่รวม VAT (บวก 7%)'
+       : 'ราคารวม VAT 7% แล้ว';
+}
+function vatKeyword(v) { return v === 'zero' ? 'novat' : v === 'exclusive' ? 'แยกvat' : 'รวมvat'; }
+// แปลงคำในข้อความเป็นชนิด VAT (คืน null ถ้าไม่ระบุ)
+function parseVat(s) {
+  const t = s.toLowerCase().replace(/\s+/g, '');
+  // ไม่มี VAT — ตรวจก่อน เพราะ "ไม่รวมvat" มี "รวมvat" ซ้อนอยู่
+  if (/(novat|nonvat|ไม่มีvat|ไม่คิดvat|vat0|0vat|ยกเว้นvat)/.test(t)) return 'zero';
+  // ยังไม่รวม / แยก / บวก VAT
+  if (/(ไม่รวมvat|แยกvat|\+vat|บวกvat|exvat|exclvat|exclusive)/.test(t)) return 'exclusive';
+  // รวม VAT แล้ว
+  if (/(รวมvat|incvat|inclvat|inclusive|vatใน|vatรวม)/.test(t)) return 'inclusive';
+  return null;
+}
+
+// แยกชื่อลูกค้า + ราคา (ตัวเลข) + ชนิด VAT ออกจากข้อความคำสั่ง
 function parseBillCmd(text, keyword) {
   let rest = text.replace(new RegExp('^' + keyword + '\\s*'), '').trim();
+  // 1) ชนิด VAT (ตัดคำ VAT ออกจากข้อความก่อน เพื่อไม่ให้กวนการหาราคา)
+  const vat = parseVat(rest);
+  rest = rest.replace(/(no\s*vat|non\s*vat|ไม่มี\s*vat|ไม่คิด\s*vat|ไม่รวม\s*vat|แยก\s*vat|บวก\s*vat|รวม\s*vat|\+\s*vat|inc\s*vat|incl\s*vat|excl?\s*vat|vat\s*0|0\s*vat|vat|ยกเว้น)/ig, ' ').trim();
+  // 2) ราคา = โทเคนตัวเลขล้วนตัวสุดท้าย (กันเลขที่ติดอยู่ในชื่อ เช่น "ภาค2")
   let price = null;
-  const m = rest.match(/\s+(\d+(?:\.\d+)?)\s*$/);
-  if (m) { price = Number(m[1]); rest = rest.slice(0, m.index).trim(); }
-  return { name: rest, price };
+  const parts = rest.split(/\s+/).filter(Boolean);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (/^\d+(?:\.\d+)?$/.test(parts[i])) { price = Number(parts[i]); parts.splice(i, 1); break; }
+  }
+  return { name: parts.join(' ').trim(), price, vat };
 }
 
 // รวมข้อมูลวางบิลของลูกค้าที่ระบุ (รอบที่ยังไม่วางบิล)
-async function customerBillingData(nameQuery, priceOverride) {
+async function customerBillingData(nameQuery, priceOverride, vatOverride) {
   const idToken = await login();
   const invs = await runQuery(idToken, { from: [{ collectionId: 'invoices' }] });
   const deds = await runQuery(idToken, { from: [{ collectionId: 'deductions' }] });
@@ -328,29 +358,66 @@ async function customerBillingData(nameQuery, priceOverride) {
   let price = (priceOverride != null) ? priceOverride : (lastInv ? fval(lastInv, 'price') : null);
   if (price == null) return { error: `⚠️ "${cust}" ยังไม่เคยมีใบแจ้งหนี้ จึงไม่รู้ราคา\nพิมพ์ราคาต่อท้าย เช่น "วางบิล ${nameQuery} 105"` };
   const sandType = lastInv ? (fval(lastInv, 'sandType') || 'ทราย') : 'ทราย';
-  const vatType  = lastInv ? (fval(lastInv, 'vatType') || 'inclusive') : 'inclusive';
+  // ชนิด VAT: ระบุเอง > จากบิลล่าสุด > (ลูกค้าใหม่) ต้องถาม
+  let vatType, vatSrc;
+  if (vatOverride != null) { vatType = vatOverride; vatSrc = 'ระบุเอง'; }
+  else if (lastInv) { vatType = fval(lastInv, 'vatType') || 'inclusive'; vatSrc = 'จากบิลล่าสุด'; }
+  else { return { askVat: true, cust, name: nameQuery, price }; }   // ลูกค้าใหม่ ยังไม่ระบุ VAT
   const priceSrc = (priceOverride != null) ? 'ระบุเอง' : 'จากบิลล่าสุด';
-  return { idToken, cust, net, trips, lastBilledTo, dateFrom, dateTo, price, sandType, vatType, priceSrc };
+  return { idToken, cust, net, trips, lastBilledTo, dateFrom, dateTo, price, sandType, vatType, vatSrc, priceSrc };
+}
+
+// ปุ่มให้เลือกชนิด VAT (กดแล้วส่งคำสั่งเต็มกลับมา) — ใช้ตอนลูกค้าใหม่ยังไม่ระบุ VAT
+function vatAskPrompt(cust, price) {
+  const p = (price != null && price !== '') ? (' ' + price) : '';
+  const kb = { keyboard: [
+    [{ text: `วางบิล ${cust}${p} รวมvat` }],
+    [{ text: `วางบิล ${cust}${p} แยกvat` }],
+    [{ text: `วางบิล ${cust}${p} novat` }],
+    [{ text: 'เมนู' }]
+  ], resize_keyboard: true, one_time_keyboard: true, selective: true };
+  const text = `💰 ราคา ${price} บาท/คิว สำหรับ "${cust}"\nราคานี้เป็นแบบไหน? 👇\n`
+    + `• <b>รวมvat</b> = ราคารวม VAT 7% แล้ว\n`
+    + `• <b>แยกvat</b> = ยังไม่รวม VAT (บวก 7% เพิ่ม)\n`
+    + `• <b>novat</b> = ไม่มี VAT (VAT 0%)`;
+  return { text, extra: { reply_markup: kb } };
+}
+
+// ยอดรวมตามชนิด VAT (ตรงกับแอป: exclusive บวก 7%, inclusive/zero ไม่บวก)
+function grandWithVat(net, price, vatType) {
+  const subtotal = net * price;
+  const grand = (vatType === 'exclusive') ? subtotal * 1.07 : subtotal;
+  return Math.round(grand * 100) / 100;
 }
 
 async function prepareInvoiceFor(text) {
-  const { name, price } = parseBillCmd(text, 'วางบิล');
-  const s = await customerBillingData(name, price);
+  const { name, price, vat } = parseBillCmd(text, 'วางบิล');
+  const s = await customerBillingData(name, price, vat);
   if (s.error) return s.error;
+  if (s.askVat) return vatAskPrompt(s.cust, s.price);   // ลูกค้าใหม่ ต้องเลือก VAT ก่อน
   const net = Math.round(s.net * 1000) / 1000;
   if (net <= 0) return `ℹ️ "${s.cust}" ยังไม่มียอดใหม่ที่ยังไม่วางบิล` + (s.lastBilledTo ? ` (วางบิลล่าสุดถึง ${s.lastBilledTo})` : '');
-  const grand = Math.round(net * s.price * 100) / 100;
-  return `🧾 <b>เตรียมวางบิล</b>\n• ${s.cust}\n• ช่วง ${s.dateFrom} ถึง ${s.dateTo} (${s.trips} เที่ยว)\n• ${fmt(net)} คิว × ${s.price} (${s.priceSrc}) = <b>${fmt(grand)} บาท</b>\n\nพิมพ์ <b>ยืนยันวางบิล ${s.cust}</b> เพื่อออกจริง`;
+  const grand = grandWithVat(net, s.price, s.vatType);
+  const confirmCmd = `ยืนยันวางบิล ${s.cust} ${s.price} ${vatKeyword(s.vatType)}`;
+  const kb = { keyboard: [[{ text: confirmCmd }], [{ text: 'เมนู' }]], resize_keyboard: true, one_time_keyboard: true, selective: true };
+  return {
+    text: `🧾 <b>เตรียมวางบิล</b>\n• ${s.cust}\n• ช่วง ${s.dateFrom} ถึง ${s.dateTo} (${s.trips} เที่ยว)\n`
+        + `• ${fmt(net)} คิว × ${s.price} (${s.priceSrc}) = <b>${fmt(grand)} บาท</b>\n`
+        + `• VAT: ${vatLabel(s.vatType)} <i>(${s.vatSrc})</i>\n\n`
+        + `พิมพ์ <b>${confirmCmd}</b> เพื่อออกจริง`,
+    extra: { reply_markup: kb }
+  };
 }
 
 async function confirmIssueInvoiceFor(text) {
-  const { name, price } = parseBillCmd(text, 'ยืนยันวางบิล');
-  const s = await customerBillingData(name, price);
+  const { name, price, vat } = parseBillCmd(text, 'ยืนยันวางบิล');
+  const s = await customerBillingData(name, price, vat);
   if (s.error) return s.error;
+  if (s.askVat) return vatAskPrompt(s.cust, s.price);   // ลูกค้าใหม่ ต้องเลือก VAT ก่อน
   const idToken = s.idToken;
   const net = Math.round(s.net * 1000) / 1000;
   if (net <= 0) return `ℹ️ "${s.cust}" ยังไม่มียอดใหม่ที่ยังไม่วางบิล`;
-  const grand = Math.round(net * s.price * 100) / 100;
+  const grand = grandWithVat(net, s.price, s.vatType);
   // กันออกซ้ำ: customer+dateFrom+dateTo ที่ยังไม่ยกเลิก
   const dupInvs = await runQuery(idToken, { from: [{ collectionId: 'invoices' }],
     where: { compositeFilter: { op: 'AND', filters: [
@@ -370,7 +437,7 @@ async function confirmIssueInvoiceFor(text) {
     totalNetKiu: { doubleValue: Math.round(net * 1000) / 1000 }, grandTotal: { doubleValue: Math.round(grand * 100) / 100 },
     status: { stringValue: 'pending' }, createdAt: { stringValue: new Date().toISOString() }, createdBy: { stringValue: 'telegram-bot' }
   });
-  return `✅ <b>วางบิลแล้ว</b>\n• เลขที่ ${docNo}\n• ${s.cust}\n• ${fmt(net)} คิว × ${s.price} = <b>${fmt(grand)} บาท</b>\n• สถานะ: รอวางบิล (ดู/แก้ในแอปได้)`;
+  return `✅ <b>วางบิลแล้ว</b>\n• เลขที่ ${docNo}\n• ${s.cust}\n• ${fmt(net)} คิว × ${s.price} = <b>${fmt(grand)} บาท</b>\n• VAT: ${vatLabel(s.vatType)}\n• สถานะ: รอวางบิล (ดู/แก้ในแอปได้)`;
 }
 
 // ---------- Firestore REST write helpers ----------
@@ -401,7 +468,7 @@ async function tgSend(token, chatId, text, extra) {
   });
 }
 function menuText() {
-  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n👇 กดปุ่มด้านล่างได้เลย (หรือพิมพ์เองก็ได้)\n\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>ค่าแรง</b> — ดูค่าแรงพนักงานตามงวด (รอบ1/รอบ2) รอรับเท่าไหร่\n• <b>วางบิล</b> — เลือกลูกค้าที่จะวางบิลจากรายชื่อ (เฉพาะคุณหลิง)\n   หรือพิมพ์ "วางบิล &lt;ชื่อลูกค้า&gt;" ตรงๆ ก็ได้ (ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105")';
+  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n👇 กดปุ่มด้านล่างได้เลย (หรือพิมพ์เองก็ได้)\n\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>ค่าแรง</b> — ดูค่าแรงพนักงานตามงวด (รอบ1/รอบ2) รอรับเท่าไหร่\n• <b>วางบิล</b> — เลือกลูกค้าที่จะวางบิลจากรายชื่อ (เฉพาะคุณหลิง)\n   หรือพิมพ์ "วางบิล &lt;ชื่อลูกค้า&gt;" ตรงๆ ก็ได้\n   ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105" แล้วบอทจะถามว่ารวม VAT หรือ no VAT\n   (หรือพิมพ์รวดเดียว เช่น "วางบิล โพนแก้ว 105 novat")';
 }
 // ปุ่มเมนูหลัก (reply keyboard — กดแล้วส่งคำสั่งเป็นข้อความทันที)
 function menuKeyboard() {
