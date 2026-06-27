@@ -1,17 +1,14 @@
 // ============================================================
 // Telegram webhook สำหรับ thanaset_alert_bot (บอทโต้ตอบ)
-// คำสั่ง: "ยอดธีรนพ", "ยอดน้ำมัน", "ออกบิล", "ยืนยันออกบิล"
+// คำสั่ง: "ยอดน้ำมัน", "วางบิล <ชื่อลูกค้า>", "ยืนยันวางบิล <ชื่อลูกค้า>"
 // อ่าน/เขียน Firestore ฝั่งเซิร์ฟเวอร์ผ่านบัญชี admin (เก็บรหัสเป็น secret env)
-// สั่งงานสำคัญ (ออกบิล) ได้เฉพาะคุณหลิง (OWNER_ID) เท่านั้น
+// สั่งงานสำคัญ (วางบิล) ได้เฉพาะคุณหลิง (OWNER_ID) เท่านั้น
 // ============================================================
 
-const OWNER_ID   = 8066824631;        // คุณหลิง (@LhingP) — คนเดียวที่ออกบิลได้
+const OWNER_ID   = 8066824631;        // คุณหลิง (@LhingP) — คนเดียวที่วางบิลได้
 const FB_API_KEY = 'AIzaSyAaxKbw-MKrsVnCEw6IY_cYkiWsp1Ql8SA';   // public apiKey (มีในแอปอยู่แล้ว)
 const FB_PROJECT = 'thanasetsiri2546-20cb6';
 const KPC        = 1500;              // 1 คิว = 1,500 กก.
-const TEERANOP_KEY = 'ธีรนพ';        // คำที่ใช้จับชื่อลูกค้าธีรนพ
-const TEERANOP_PRICE = 145;          // บาท/คิว (รวม VAT แล้ว)
-const THRESHOLD  = 5000;             // เกณฑ์คิว
 
 const FS = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents`;
 
@@ -46,16 +43,8 @@ export async function onRequestPost(context) {
     } else if (/^วางบิล/.test(text)) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
       await tgSend(token, chatId, await prepareInvoiceFor(text));
-    } else if (/ธีรนพ/.test(text) && !/ออกบิล|ยืนยัน|วางบิล/.test(text)) {
-      await tgSend(token, chatId, await reportTeeranop());
     } else if (/น้ำมัน/.test(text)) {
       await tgSend(token, chatId, await reportFuel());
-    } else if (/^ยืนยันออกบิล/.test(text)) {
-      if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
-      await tgSend(token, chatId, await confirmIssueInvoice());
-    } else if (/ออกบิล|ออกใบแจ้งหนี้/.test(text)) {
-      if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
-      await tgSend(token, chatId, await prepareInvoice());
     }
     // ข้อความอื่นๆ: เงียบ (ไม่สแปมในกลุ่ม)
   } catch (e) {
@@ -109,53 +98,6 @@ function fval(doc, f) {  // อ่านค่า field แปลง type
 }
 function docId(doc) { const p = doc.name.split('/'); return p[p.length - 1]; }
 
-// ---------- คำนวณยอดธีรนพ (เฉพาะรอบที่ยังไม่วางบิล) ----------
-async function teeranopSummary() {
-  const idToken = await login();
-  // 1) หาวันสุดท้ายที่ออกใบแจ้งหนี้ธีรนพไปแล้ว (status != cancelled)
-  const invs = await runQuery(idToken, { from: [{ collectionId: 'invoices' }] });
-  let lastBilledTo = '';
-  invs.forEach(d => {
-    const cust = fval(d, 'customer') || '';
-    if (cust.indexOf(TEERANOP_KEY) >= 0 && fval(d, 'status') !== 'cancelled') {
-      const to = fval(d, 'dateTo') || '';
-      if (to > lastBilledTo) lastBilledTo = to;
-    }
-  });
-  // 2) ดึง deductions ทั้งหมด (id -> cubic)
-  const deds = await runQuery(idToken, { from: [{ collectionId: 'deductions' }] });
-  const dMap = {}; deds.forEach(d => { dMap[docId(d)] = fval(d, 'cubic') || 0; });
-  // 3) ดึง weighings วันที่ > lastBilledTo แล้วกรองธีรนพ
-  const wq = { from: [{ collectionId: 'weighings' }] };
-  if (lastBilledTo) wq.where = { fieldFilter: { field: { fieldPath: 'date' }, op: 'GREATER_THAN', value: { stringValue: lastBilledTo } } };
-  const ws = await runQuery(idToken, wq);
-  let net = 0, trips = 0, dateFrom = '', dateTo = '', custName = '';
-  ws.forEach(d => {
-    const cust = fval(d, 'customer') || '';
-    if (cust.indexOf(TEERANOP_KEY) < 0) return;
-    if (!custName) custName = cust;   // ใช้ชื่อลูกค้าเต็มจริงจากข้อมูล
-    const kg = fval(d, 'kg') || 0;
-    const ded = dMap[docId(d)] || 0;
-    net += Math.max(0, kg / KPC - ded);
-    trips++;
-    const dt = fval(d, 'date') || '';
-    if (!dateFrom || dt < dateFrom) dateFrom = dt;
-    if (dt > dateTo) dateTo = dt;
-  });
-  return { idToken, net, trips, lastBilledTo, dateFrom, dateTo, custName };
-}
-async function reportTeeranop() {
-  const s = await teeranopSummary();
-  const net = Math.round(s.net * 100) / 100;
-  const left = Math.round((THRESHOLD - net) * 100) / 100;
-  let m = '🏖️ <b>ยอดทรายธีรนพ</b> (รอบใหม่ที่ยังไม่วางบิล)\n';
-  m += `• สะสม = <b>${fmt(net)} คิว</b> (${s.trips} เที่ยว)\n`;
-  if (net >= THRESHOLD) m += `• ✅ ครบเกณฑ์ 5,000 คิวแล้ว (เกิน ${fmt(net - THRESHOLD)})\n  พิมพ์ "ออกบิล" เพื่อออกใบแจ้งหนี้`;
-  else m += `• เกณฑ์ 5,000 คิว → ขาดอีก <b>${fmt(left)} คิว</b>`;
-  if (s.lastBilledTo) m += `\n(วางบิลล่าสุดถึง ${s.lastBilledTo})`;
-  return m;
-}
-
 // ---------- ยอดน้ำมันคงเหลือ ----------
 async function reportFuel() {
   const idToken = await login();
@@ -168,57 +110,11 @@ async function reportFuel() {
   return `⛽ <b>น้ำมันคงเหลือในสต็อก</b>\n• คงเหลือ = <b>${fmt(remain)} ลิตร</b>\n  (รับเข้ารวม ${fmt(tin)} − จ่ายออก ${fmt(tout)})`;
 }
 
-// ---------- เตรียมออกบิล (แสดงยอด + ขอยืนยัน) ----------
-// หมายเหตุ: ไม่เก็บ pending ใน Firestore แล้ว (collection app_meta ไม่อยู่ใน
-// security rules → write 403) ขั้นยืนยันจะคำนวณยอดสดใหม่แทน ปลอดภัยกว่า
-async function prepareInvoice() {
-  const s = await teeranopSummary();
-  const net = Math.round(s.net * 1000) / 1000;
-  if (net <= 0) return 'ℹ️ ยังไม่มียอดทรายธีรนพใหม่ที่ยังไม่วางบิล';
-  const grand = Math.round(net * TEERANOP_PRICE * 100) / 100;
-  const custName = s.custName || ('หจก.' + TEERANOP_KEY);
-  return `🧾 <b>เตรียมออกใบแจ้งหนี้ธีรนพ</b>\n• ${custName}\n• ช่วง ${s.dateFrom} ถึง ${s.dateTo}\n• ${fmt(net)} คิว × ${TEERANOP_PRICE} = <b>${fmt(grand)} บาท</b> (รวม VAT)\n\nพิมพ์ <b>ยืนยันออกบิล</b> เพื่อออกจริง (ระบบจะคำนวณยอดล่าสุดให้อีกครั้ง)`;
-}
-
-// ---------- ยืนยันออกบิลจริง (คำนวณยอดสดใหม่ตอนยืนยัน) ----------
-async function confirmIssueInvoice() {
-  const s = await teeranopSummary();          // คำนวณสด + ได้ idToken มาด้วย
-  const idToken = s.idToken;
-  const net = Math.round(s.net * 1000) / 1000;
-  if (net <= 0) return 'ℹ️ ยังไม่มียอดทรายธีรนพใหม่ที่ยังไม่วางบิล พิมพ์ "ยอดธีรนพ" เพื่อตรวจสอบ';
-  const custName = s.custName || ('หจก.' + TEERANOP_KEY);
-  const dateFrom = s.dateFrom; const dateTo = s.dateTo;
-  const price = TEERANOP_PRICE;
-  const grand = Math.round(net * price * 100) / 100;
-  const netKiu = net;
-  // กันออกซ้ำ: customer+dateFrom+dateTo ที่ยังไม่ยกเลิก
-  const invs = await runQuery(idToken, { from: [{ collectionId: 'invoices' }],
-    where: { compositeFilter: { op: 'AND', filters: [
-      { fieldFilter: { field: { fieldPath: 'customer' }, op: 'EQUAL', value: { stringValue: custName } } },
-      { fieldFilter: { field: { fieldPath: 'dateFrom' }, op: 'EQUAL', value: { stringValue: dateFrom } } },
-      { fieldFilter: { field: { fieldPath: 'dateTo' }, op: 'EQUAL', value: { stringValue: dateTo } } }
-    ] } } });
-  const dup = invs.find(d => fval(d, 'status') !== 'cancelled');
-  if (dup) return `⚠️ ยอดช่วงนี้เคยออกใบแจ้งหนี้แล้ว (${fval(dup, 'docNo')}) — ถ้าจะออกใหม่ ให้ยกเลิกใบเดิมในแอปก่อน`;
-  // สร้างเลขที่ + เขียน doc
-  const t = new Date(); const yyyymmdd = t.getFullYear() + String(t.getMonth() + 1).padStart(2, '0') + String(t.getDate()).padStart(2, '0');
-  const docNo = 'BL' + yyyymmdd + String(Math.floor(Math.random() * 900 + 100));
-  await setDoc(idToken, 'invoices', docNo, {
-    docNo: { stringValue: docNo }, customer: { stringValue: custName },
-    dateFrom: { stringValue: dateFrom }, dateTo: { stringValue: dateTo },
-    sandType: { stringValue: 'ทราย (รับเอง)' }, price: { doubleValue: price },
-    vatType: { stringValue: 'inclusive' }, balFwd: { doubleValue: 0 }, remark: { stringValue: 'ออกผ่านบอท Telegram' },
-    totalNetKiu: { doubleValue: Math.round(netKiu * 1000) / 1000 }, grandTotal: { doubleValue: Math.round(grand * 100) / 100 },
-    status: { stringValue: 'pending' }, createdAt: { stringValue: new Date().toISOString() }, createdBy: { stringValue: 'telegram-bot' }
-  });
-  return `✅ <b>ออกใบแจ้งหนี้แล้ว</b>\n• เลขที่ ${docNo}\n• ${custName}\n• ${fmt(netKiu)} คิว = <b>${fmt(grand)} บาท</b>\n• สถานะ: รอวางบิล (ดู/แก้ในแอปได้)`;
-}
-
 // ============================================================
-// คำสั่งทั่วไป: "วางบิล <ชื่อลูกค้า> [ราคา]" — ใช้ได้กับลูกค้าทุกราย
+// คำสั่งวางบิล: "วางบิล <ชื่อลูกค้า> [ราคา]" — ใช้ได้กับลูกค้าทุกราย
 // ราคา/คิว: ถ้าระบุต่อท้ายใช้ค่านั้น; ถ้าไม่ระบุ → ดึงจากใบแจ้งหนี้ล่าสุดของลูกค้า
 // (ลูกค้าใหม่ที่ยังไม่เคยมีบิล = ต้องพิมพ์ราคาต่อท้าย)
-// owner-only + ยืนยัน 2 ขั้น (เหมือนธีรนพ) ใบที่ออก = status pending แก้/ลบในแอปได้
+// owner-only + ยืนยัน 2 ขั้น ใบที่ออก = status pending แก้/ลบในแอปได้
 // ============================================================
 
 // แยกชื่อลูกค้า + ราคา (ตัวเลขท้ายสุด) ออกจากข้อความคำสั่ง
@@ -349,14 +245,13 @@ async function tgSend(token, chatId, text, extra) {
   });
 }
 function menuText() {
-  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n👇 กดปุ่มด้านล่างได้เลย (หรือพิมพ์เองก็ได้)\n\n• <b>ยอดธีรนพ</b> — ดูยอดทรายสะสมเทียบ 5,000 คิว\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>ออกบิล</b> — เตรียมใบแจ้งหนี้ธีรนพ (เฉพาะคุณหลิง)\n• <b>วางบิล</b> — เลือกลูกค้าที่จะวางบิลจากรายชื่อ (เฉพาะคุณหลิง)\n   หรือพิมพ์ "วางบิล &lt;ชื่อลูกค้า&gt;" ตรงๆ ก็ได้ (ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105")';
+  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n👇 กดปุ่มด้านล่างได้เลย (หรือพิมพ์เองก็ได้)\n\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>วางบิล</b> — เลือกลูกค้าที่จะวางบิลจากรายชื่อ (เฉพาะคุณหลิง)\n   หรือพิมพ์ "วางบิล &lt;ชื่อลูกค้า&gt;" ตรงๆ ก็ได้ (ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105")';
 }
 // ปุ่มเมนูหลัก (reply keyboard — กดแล้วส่งคำสั่งเป็นข้อความทันที)
 function menuKeyboard() {
   return {
     keyboard: [
-      [{ text: 'ยอดธีรนพ' }, { text: 'ยอดน้ำมัน' }],
-      [{ text: 'ออกบิล' }, { text: 'วางบิล' }]
+      [{ text: 'ยอดน้ำมัน' }, { text: 'วางบิล' }]
     ],
     resize_keyboard: true, one_time_keyboard: true, selective: true
   };
