@@ -36,7 +36,13 @@ export async function onRequestPost(context) {
   try {
     if (/^\/?start|^เมนู|^help|^ช่วย/i.test(text)) {
       await tgSend(token, chatId, menuText());
-    } else if (/ธีรนพ/.test(text) && !/ออกบิล|ยืนยัน/.test(text)) {
+    } else if (/^ยืนยันวางบิล/.test(text)) {
+      if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
+      await tgSend(token, chatId, await confirmIssueInvoiceFor(text));
+    } else if (/^วางบิล/.test(text)) {
+      if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
+      await tgSend(token, chatId, await prepareInvoiceFor(text));
+    } else if (/ธีรนพ/.test(text) && !/ออกบิล|ยืนยัน|วางบิล/.test(text)) {
       await tgSend(token, chatId, await reportTeeranop());
     } else if (/น้ำมัน/.test(text)) {
       await tgSend(token, chatId, await reportFuel());
@@ -204,6 +210,108 @@ async function confirmIssueInvoice() {
   return `✅ <b>ออกใบแจ้งหนี้แล้ว</b>\n• เลขที่ ${docNo}\n• ${custName}\n• ${fmt(netKiu)} คิว = <b>${fmt(grand)} บาท</b>\n• สถานะ: รอวางบิล (ดู/แก้ในแอปได้)`;
 }
 
+// ============================================================
+// คำสั่งทั่วไป: "วางบิล <ชื่อลูกค้า> [ราคา]" — ใช้ได้กับลูกค้าทุกราย
+// ราคา/คิว: ถ้าระบุต่อท้ายใช้ค่านั้น; ถ้าไม่ระบุ → ดึงจากใบแจ้งหนี้ล่าสุดของลูกค้า
+// (ลูกค้าใหม่ที่ยังไม่เคยมีบิล = ต้องพิมพ์ราคาต่อท้าย)
+// owner-only + ยืนยัน 2 ขั้น (เหมือนธีรนพ) ใบที่ออก = status pending แก้/ลบในแอปได้
+// ============================================================
+
+// แยกชื่อลูกค้า + ราคา (ตัวเลขท้ายสุด) ออกจากข้อความคำสั่ง
+function parseBillCmd(text, keyword) {
+  let rest = text.replace(new RegExp('^' + keyword + '\\s*'), '').trim();
+  let price = null;
+  const m = rest.match(/\s+(\d+(?:\.\d+)?)\s*$/);
+  if (m) { price = Number(m[1]); rest = rest.slice(0, m.index).trim(); }
+  return { name: rest, price };
+}
+
+// รวมข้อมูลวางบิลของลูกค้าที่ระบุ (รอบที่ยังไม่วางบิล)
+async function customerBillingData(nameQuery, priceOverride) {
+  const idToken = await login();
+  const invs = await runQuery(idToken, { from: [{ collectionId: 'invoices' }] });
+  const deds = await runQuery(idToken, { from: [{ collectionId: 'deductions' }] });
+  const dMap = {}; deds.forEach(d => { dMap[docId(d)] = fval(d, 'cubic') || 0; });
+  const ws = await runQuery(idToken, { from: [{ collectionId: 'weighings' }] });
+  // 1) หาชื่อลูกค้าเต็มจริง (เทียบแบบไม่สนช่องว่าง) จากทั้ง weighings + invoices
+  const names = new Set();
+  ws.forEach(d => { const c = fval(d, 'customer'); if (c) names.add(c); });
+  invs.forEach(d => { const c = fval(d, 'customer'); if (c) names.add(c); });
+  const q = (nameQuery || '').replace(/\s+/g, '');
+  if (!q) return { error: 'พิมพ์ชื่อลูกค้าต่อท้าย เช่น "วางบิล โพนแก้ว"' };
+  const hits = [...names].filter(n => n.replace(/\s+/g, '').indexOf(q) >= 0);
+  if (hits.length === 0) return { error: `❌ ไม่พบลูกค้าที่ชื่อมีคำว่า "${nameQuery}"` };
+  if (hits.length > 1) return { error: `🔎 ตรงกับหลายราย:\n• ` + hits.join('\n• ') + `\nพิมพ์ชื่อให้ชัดเจนขึ้น` };
+  const cust = hits[0];
+  // 2) วันวางบิลล่าสุด + ใบล่าสุด (ไว้ดึงราคา/ชนิดทราย/VAT)
+  let lastBilledTo = '', lastInv = null;
+  invs.forEach(d => {
+    if (fval(d, 'customer') !== cust || fval(d, 'status') === 'cancelled') return;
+    const to = fval(d, 'dateTo') || '';
+    if (to > lastBilledTo) lastBilledTo = to;
+    if (!lastInv || to > (fval(lastInv, 'dateTo') || '')) lastInv = d;
+  });
+  // 3) รวมคิวสุทธิเฉพาะเที่ยวหลังวันวางบิลล่าสุด
+  let net = 0, trips = 0, dateFrom = '', dateTo = '';
+  ws.forEach(d => {
+    if (fval(d, 'customer') !== cust) return;
+    const dt = fval(d, 'date') || '';
+    if (lastBilledTo && !(dt > lastBilledTo)) return;
+    const kg = fval(d, 'kg') || 0;
+    net += Math.max(0, kg / KPC - (dMap[docId(d)] || 0));
+    trips++;
+    if (!dateFrom || dt < dateFrom) dateFrom = dt;
+    if (dt > dateTo) dateTo = dt;
+  });
+  // 4) ราคา/ชนิดทราย/VAT
+  let price = (priceOverride != null) ? priceOverride : (lastInv ? fval(lastInv, 'price') : null);
+  if (price == null) return { error: `⚠️ "${cust}" ยังไม่เคยมีใบแจ้งหนี้ จึงไม่รู้ราคา\nพิมพ์ราคาต่อท้าย เช่น "วางบิล ${nameQuery} 105"` };
+  const sandType = lastInv ? (fval(lastInv, 'sandType') || 'ทราย') : 'ทราย';
+  const vatType  = lastInv ? (fval(lastInv, 'vatType') || 'inclusive') : 'inclusive';
+  const priceSrc = (priceOverride != null) ? 'ระบุเอง' : 'จากบิลล่าสุด';
+  return { idToken, cust, net, trips, lastBilledTo, dateFrom, dateTo, price, sandType, vatType, priceSrc };
+}
+
+async function prepareInvoiceFor(text) {
+  const { name, price } = parseBillCmd(text, 'วางบิล');
+  const s = await customerBillingData(name, price);
+  if (s.error) return s.error;
+  const net = Math.round(s.net * 1000) / 1000;
+  if (net <= 0) return `ℹ️ "${s.cust}" ยังไม่มียอดใหม่ที่ยังไม่วางบิล` + (s.lastBilledTo ? ` (วางบิลล่าสุดถึง ${s.lastBilledTo})` : '');
+  const grand = Math.round(net * s.price * 100) / 100;
+  return `🧾 <b>เตรียมวางบิล</b>\n• ${s.cust}\n• ช่วง ${s.dateFrom} ถึง ${s.dateTo} (${s.trips} เที่ยว)\n• ${fmt(net)} คิว × ${s.price} (${s.priceSrc}) = <b>${fmt(grand)} บาท</b>\n\nพิมพ์ <b>ยืนยันวางบิล ${s.cust}</b> เพื่อออกจริง`;
+}
+
+async function confirmIssueInvoiceFor(text) {
+  const { name, price } = parseBillCmd(text, 'ยืนยันวางบิล');
+  const s = await customerBillingData(name, price);
+  if (s.error) return s.error;
+  const idToken = s.idToken;
+  const net = Math.round(s.net * 1000) / 1000;
+  if (net <= 0) return `ℹ️ "${s.cust}" ยังไม่มียอดใหม่ที่ยังไม่วางบิล`;
+  const grand = Math.round(net * s.price * 100) / 100;
+  // กันออกซ้ำ: customer+dateFrom+dateTo ที่ยังไม่ยกเลิก
+  const dupInvs = await runQuery(idToken, { from: [{ collectionId: 'invoices' }],
+    where: { compositeFilter: { op: 'AND', filters: [
+      { fieldFilter: { field: { fieldPath: 'customer' }, op: 'EQUAL', value: { stringValue: s.cust } } },
+      { fieldFilter: { field: { fieldPath: 'dateFrom' }, op: 'EQUAL', value: { stringValue: s.dateFrom } } },
+      { fieldFilter: { field: { fieldPath: 'dateTo' }, op: 'EQUAL', value: { stringValue: s.dateTo } } }
+    ] } } });
+  const dup = dupInvs.find(d => fval(d, 'status') !== 'cancelled');
+  if (dup) return `⚠️ ช่วงนี้เคยออกใบแจ้งหนี้แล้ว (${fval(dup, 'docNo')}) — ยกเลิกใบเดิมในแอปก่อนถ้าจะออกใหม่`;
+  const t = new Date(); const yyyymmdd = t.getFullYear() + String(t.getMonth() + 1).padStart(2, '0') + String(t.getDate()).padStart(2, '0');
+  const docNo = 'BL' + yyyymmdd + String(Math.floor(Math.random() * 900 + 100));
+  await setDoc(idToken, 'invoices', docNo, {
+    docNo: { stringValue: docNo }, customer: { stringValue: s.cust },
+    dateFrom: { stringValue: s.dateFrom }, dateTo: { stringValue: s.dateTo },
+    sandType: { stringValue: s.sandType }, price: { doubleValue: s.price },
+    vatType: { stringValue: s.vatType }, balFwd: { doubleValue: 0 }, remark: { stringValue: 'ออกผ่านบอท Telegram (วางบิล)' },
+    totalNetKiu: { doubleValue: Math.round(net * 1000) / 1000 }, grandTotal: { doubleValue: Math.round(grand * 100) / 100 },
+    status: { stringValue: 'pending' }, createdAt: { stringValue: new Date().toISOString() }, createdBy: { stringValue: 'telegram-bot' }
+  });
+  return `✅ <b>วางบิลแล้ว</b>\n• เลขที่ ${docNo}\n• ${s.cust}\n• ${fmt(net)} คิว × ${s.price} = <b>${fmt(grand)} บาท</b>\n• สถานะ: รอวางบิล (ดู/แก้ในแอปได้)`;
+}
+
 // ---------- Firestore REST write helpers ----------
 async function setDoc(idToken, coll, id, fields) {
   const r = await fetch(`${FS}/${coll}/${encodeURIComponent(id)}`, {
@@ -230,7 +338,7 @@ async function tgSend(token, chatId, text) {
   });
 }
 function menuText() {
-  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n• <b>ยอดธีรนพ</b> — ดูยอดทรายสะสมเทียบ 5,000 คิว\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>ออกบิล</b> — เตรียมใบแจ้งหนี้ธีรนพ (เฉพาะคุณหลิง)\n• <b>ยืนยันออกบิล</b> — ยืนยันออกจริง';
+  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n• <b>ยอดธีรนพ</b> — ดูยอดทรายสะสมเทียบ 5,000 คิว\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>ออกบิล</b> — เตรียมใบแจ้งหนี้ธีรนพ (เฉพาะคุณหลิง)\n• <b>ยืนยันออกบิล</b> — ยืนยันออกจริง\n• <b>วางบิล &lt;ชื่อลูกค้า&gt;</b> — เตรียมใบแจ้งหนี้ลูกค้าใดก็ได้ (ราคาดึงจากบิลล่าสุด; ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105") เฉพาะคุณหลิง\n• <b>ยืนยันวางบิล &lt;ชื่อลูกค้า&gt;</b> — ยืนยันออกจริง';
 }
 function fmt(n) { return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function json(obj, status) { return new Response(JSON.stringify(obj), { status: status || 200, headers: { 'content-type': 'application/json; charset=utf-8' } }); }
