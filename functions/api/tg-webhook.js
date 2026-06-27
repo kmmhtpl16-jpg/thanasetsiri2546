@@ -35,10 +35,14 @@ export async function onRequestPost(context) {
 
   try {
     if (/^\/?start|^เมนู|^help|^ช่วย/i.test(text)) {
-      await tgSend(token, chatId, menuText());
+      await tgSend(token, chatId, menuText(), { reply_markup: menuKeyboard(), reply_to_message_id: msg.message_id });
     } else if (/^ยืนยันวางบิล/.test(text)) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
       await tgSend(token, chatId, await confirmIssueInvoiceFor(text));
+    } else if (/^วางบิล\s*$/.test(text)) {
+      if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
+      const pk = await customerPicker();
+      await tgSend(token, chatId, pk.text, { reply_markup: pk.keyboard, reply_to_message_id: msg.message_id });
     } else if (/^วางบิล/.test(text)) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
       await tgSend(token, chatId, await prepareInvoiceFor(text));
@@ -239,9 +243,14 @@ async function customerBillingData(nameQuery, priceOverride) {
   invs.forEach(d => { const c = fval(d, 'customer'); if (c) names.add(c); });
   const q = (nameQuery || '').replace(/\s+/g, '');
   if (!q) return { error: 'พิมพ์ชื่อลูกค้าต่อท้าย เช่น "วางบิล โพนแก้ว"' };
-  const hits = [...names].filter(n => n.replace(/\s+/g, '').indexOf(q) >= 0);
+  let hits = [...names].filter(n => n.replace(/\s+/g, '').indexOf(q) >= 0);
   if (hits.length === 0) return { error: `❌ ไม่พบลูกค้าที่ชื่อมีคำว่า "${nameQuery}"` };
-  if (hits.length > 1) return { error: `🔎 ตรงกับหลายราย:\n• ` + hits.join('\n• ') + `\nพิมพ์ชื่อให้ชัดเจนขึ้น` };
+  // ถ้าตรงหลายราย แต่มีชื่อที่ตรงเป๊ะ (เช่นกดปุ่มเลือกชื่อเต็ม) ให้ใช้ชื่อนั้น
+  if (hits.length > 1) {
+    const exact = hits.filter(n => n.replace(/\s+/g, '') === q);
+    if (exact.length === 1) hits = exact;
+    else return { error: `🔎 ตรงกับหลายราย:\n• ` + hits.join('\n• ') + `\nพิมพ์ชื่อให้ชัดเจนขึ้น` };
+  }
   const cust = hits[0];
   // 2) วันวางบิลล่าสุด + ใบล่าสุด (ไว้ดึงราคา/ชนิดทราย/VAT)
   let lastBilledTo = '', lastInv = null;
@@ -331,14 +340,57 @@ async function deleteDoc(idToken, coll, id) {
 }
 
 // ---------- Telegram ----------
-async function tgSend(token, chatId, text) {
+async function tgSend(token, chatId, text, extra) {
+  const body = { chat_id: chatId, text: text, parse_mode: 'HTML', disable_web_page_preview: true };
+  if (extra) Object.assign(body, extra);
   await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML', disable_web_page_preview: true })
+    body: JSON.stringify(body)
   });
 }
 function menuText() {
-  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n• <b>ยอดธีรนพ</b> — ดูยอดทรายสะสมเทียบ 5,000 คิว\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>ออกบิล</b> — เตรียมใบแจ้งหนี้ธีรนพ (เฉพาะคุณหลิง)\n• <b>ยืนยันออกบิล</b> — ยืนยันออกจริง\n• <b>วางบิล &lt;ชื่อลูกค้า&gt;</b> — เตรียมใบแจ้งหนี้ลูกค้าใดก็ได้ (ราคาดึงจากบิลล่าสุด; ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105") เฉพาะคุณหลิง\n• <b>ยืนยันวางบิล &lt;ชื่อลูกค้า&gt;</b> — ยืนยันออกจริง';
+  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n👇 กดปุ่มด้านล่างได้เลย (หรือพิมพ์เองก็ได้)\n\n• <b>ยอดธีรนพ</b> — ดูยอดทรายสะสมเทียบ 5,000 คิว\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>ออกบิล</b> — เตรียมใบแจ้งหนี้ธีรนพ (เฉพาะคุณหลิง)\n• <b>วางบิล</b> — เลือกลูกค้าที่จะวางบิลจากรายชื่อ (เฉพาะคุณหลิง)\n   หรือพิมพ์ "วางบิล &lt;ชื่อลูกค้า&gt;" ตรงๆ ก็ได้ (ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105")';
+}
+// ปุ่มเมนูหลัก (reply keyboard — กดแล้วส่งคำสั่งเป็นข้อความทันที)
+function menuKeyboard() {
+  return {
+    keyboard: [
+      [{ text: 'ยอดธีรนพ' }, { text: 'ยอดน้ำมัน' }],
+      [{ text: 'ออกบิล' }, { text: 'วางบิล' }]
+    ],
+    resize_keyboard: true, one_time_keyboard: true, selective: true
+  };
+}
+// ปุ่มเลือกลูกค้าที่จะวางบิล (รายที่มียอดค้างวางบิล) — กดแล้วส่ง "วางบิล <ชื่อ>"
+async function customerPicker() {
+  const idToken = await login();
+  const invs = await runQuery(idToken, { from: [{ collectionId: 'invoices' }] });
+  const deds = await runQuery(idToken, { from: [{ collectionId: 'deductions' }] });
+  const dMap = {}; deds.forEach(d => { dMap[docId(d)] = fval(d, 'cubic') || 0; });
+  const ws = await runQuery(idToken, { from: [{ collectionId: 'weighings' }] });
+  const lastBilled = {};
+  invs.forEach(d => {
+    if (fval(d, 'status') === 'cancelled') return;
+    const c = fval(d, 'customer'); if (!c) return;
+    const to = fval(d, 'dateTo') || '';
+    if (!lastBilled[c] || to > lastBilled[c]) lastBilled[c] = to;
+  });
+  const byCust = {};
+  ws.forEach(d => {
+    const c = fval(d, 'customer'); if (!c || c.indexOf('ทั่วไป') >= 0) return;
+    const dt = fval(d, 'date') || '';
+    const lb = lastBilled[c];
+    if (lb && !(dt > lb)) return;
+    byCust[c] = (byCust[c] || 0) + Math.max(0, (fval(d, 'kg') || 0) / KPC - (dMap[docId(d)] || 0));
+  });
+  const rows = Object.entries(byCust).filter(([c, k]) => k > 0.001).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  if (rows.length === 0) return { text: 'ℹ️ ตอนนี้ไม่มีลูกค้าที่มียอดค้างวางบิล', keyboard: menuKeyboard() };
+  const kb = rows.map(([c]) => [{ text: 'วางบิล ' + c }]);
+  kb.push([{ text: 'เมนู' }]);
+  let t = '🧾 <b>เลือกลูกค้าที่จะวางบิล</b> (ยอดค้าง):\n';
+  rows.forEach(([c, k], i) => { t += `${i + 1}. ${c} — ${fmt(Math.round(k * 100) / 100)} คิว\n`; });
+  t += '\n👇 กดปุ่มชื่อลูกค้าด้านล่าง';
+  return { text: t, keyboard: { keyboard: kb, resize_keyboard: true, one_time_keyboard: true, selective: true } };
 }
 function fmt(n) { return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function json(obj, status) { return new Response(JSON.stringify(obj), { status: status || 200, headers: { 'content-type': 'application/json; charset=utf-8' } }); }
