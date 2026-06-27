@@ -43,6 +43,18 @@ export async function onRequestPost(context) {
     } else if (/^วางบิล/.test(text)) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
       await tgSend(token, chatId, await prepareInvoiceFor(text));
+    } else if (/^ค่าแรง|^เงินเดือน/.test(text)) {
+      const mMon = text.match(/(\d{4}-\d{2})/);
+      const ym = mMon ? mMon[1] : currentYM();
+      let period = null;
+      if (/รอบ\s*2|(^|\s)2(\s|$)|16/.test(text)) period = '16-end';
+      else if (/รอบ\s*1|(^|\s)1(\s|$)|1-?15/.test(text)) period = '1-15';
+      if (!period) {
+        const kb = { keyboard: [[{ text: 'ค่าแรง รอบ1' }, { text: 'ค่าแรง รอบ2' }], [{ text: 'เมนู' }]], resize_keyboard: true, one_time_keyboard: true, selective: true };
+        await tgSend(token, chatId, '💵 เลือกงวดค่าแรง:\n• รอบ1 = วันที่ 1–15\n• รอบ2 = วันที่ 16–สิ้นเดือน (หักปกส)', { reply_markup: kb, reply_to_message_id: msg.message_id });
+      } else {
+        await tgSend(token, chatId, await reportPayroll(ym, period));
+      }
     } else if (/น้ำมัน/.test(text)) {
       await tgSend(token, chatId, await reportFuel());
     }
@@ -108,6 +120,99 @@ async function reportFuel() {
   fout.forEach(d => tout += (fval(d, 'liters') || 0));
   const remain = tin - tout;
   return `⛽ <b>น้ำมันคงเหลือในสต็อก</b>\n• คงเหลือ = <b>${fmt(remain)} ลิตร</b>\n  (รับเข้ารวม ${fmt(tin)} − จ่ายออก ${fmt(tout)})`;
+}
+
+// ============================================================
+// คำสั่งค่าแรงพนักงาน: "ค่าแรง รอบ1" / "ค่าแรง รอบ2" [YYYY-MM]
+// คำนวณตรงกับหน้า "สรุปเงินเดือน" ในแอป (calcEarned/calcPeriodEarned)
+//   รอรับงวดนี้ = ค่าแรงงวด − ปกส(875 เฉพาะรอบ16-end ถ้ามีประกันสังคม) − เบิกงวดนั้น
+// ใช้ได้ทุกคนในกลุ่ม (ค่าแรงเปิดให้ทั้งกลุ่มดูตามที่คุณหลิงสั่ง)
+// ============================================================
+const SSO = 875;   // หักประกันสังคม/งวด (เฉพาะรอบ 16-end)
+function currentYM() { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0'); }
+function daysInYM(ym) { const [y, m] = ym.split('-').map(Number); return new Date(y, m, 0).getDate(); }
+function mfmt(n) { return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function thMon(m) { return ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][m]; }
+function num(v) { if (!v) return 0; if ('doubleValue' in v) return Number(v.doubleValue); if ('integerValue' in v) return Number(v.integerValue); return 0; }
+function specialSum(doc) {  // รวม amount จาก specialWork[] (Firestore arrayValue)
+  const v = doc.fields && doc.fields.specialWork;
+  if (!v || !v.arrayValue || !v.arrayValue.values) return 0;
+  let s = 0;
+  v.arrayValue.values.forEach(it => { const f = it.mapValue && it.mapValue.fields; if (f && f.amount) s += num(f.amount); });
+  return s;
+}
+
+async function payrollPeriod(ym, period) {
+  const idToken = await login();
+  // 1) พนักงาน (เฉพาะ active)
+  const emps = (await runQuery(idToken, { from: [{ collectionId: 'employees' }] }))
+    .map(d => ({ id: docId(d), nickname: fval(d, 'nickname') || docId(d), type: fval(d, 'type'), rate: fval(d, 'rate') || 0, sso: fval(d, 'socialSecurity') === true, active: fval(d, 'active') }))
+    .filter(e => e.active !== false);
+  // 2) ลงเวลาของเดือนนั้น → map[empId][date]
+  const att = await runQuery(idToken, { from: [{ collectionId: 'attendance' }],
+    where: { fieldFilter: { field: { fieldPath: 'month' }, op: 'EQUAL', value: { stringValue: ym } } } });
+  const attMap = {};
+  att.forEach(d => { const e = fval(d, 'empId'), dt = fval(d, 'date'); if (!e || !dt) return; (attMap[e] = attMap[e] || {})[dt] = { type: fval(d, 'type'), hours: fval(d, 'hours') || 0, special: specialSum(d) }; });
+  // 3) เบิกของเดือน+งวดนั้น → รวมต่อ emp
+  const wd = await runQuery(idToken, { from: [{ collectionId: 'withdrawals' }],
+    where: { compositeFilter: { op: 'AND', filters: [
+      { fieldFilter: { field: { fieldPath: 'month' }, op: 'EQUAL', value: { stringValue: ym } } },
+      { fieldFilter: { field: { fieldPath: 'period' }, op: 'EQUAL', value: { stringValue: period } } }
+    ] } } });
+  const wMap = {}; wd.forEach(d => { const e = fval(d, 'empId'); wMap[e] = (wMap[e] || 0) + (fval(d, 'amount') || 0); });
+  // 4) คำนวณรายคน (mirror calcEarned: ปัดเศษรายวันก่อนรวม)
+  const totalDays = daysInYM(ym);
+  const start = period === '1-15' ? 1 : 16;
+  const end = period === '1-15' ? 15 : totalDays;
+  const rows = emps.map(emp => {
+    let earned = 0;
+    const byDate = attMap[emp.id] || {};
+    for (let d = start; d <= end; d++) {
+      const rec = byDate[ym + '-' + String(d).padStart(2, '0')];
+      if (!rec || !rec.type || rec.type === 'absent') continue;
+      let base = 0;
+      if (emp.type === 'daily') {
+        if (rec.type === 'full') base = emp.rate;
+        else if (rec.type === 'half') base = emp.rate / 2;
+        else if (rec.type === 'hours') base = emp.rate * ((rec.hours || 0) / 8);
+      } else {
+        if (rec.type === 'full') base = emp.rate / totalDays;
+        else if (rec.type === 'half') base = emp.rate / totalDays / 2;
+        else if (rec.type === 'hours') base = (emp.rate / totalDays) * ((rec.hours || 0) / 8);
+      }
+      earned += Math.round((base + (rec.special || 0)) * 100) / 100;
+    }
+    earned = Math.round(earned * 100) / 100;
+    const social = (emp.sso && period === '16-end') ? SSO : 0;
+    const withdrawn = Math.round((wMap[emp.id] || 0) * 100) / 100;
+    const remain = Math.round((earned - social - withdrawn) * 100) / 100;
+    return { nickname: emp.nickname, earned, social, withdrawn, remain };
+  });
+  return { rows, end };
+}
+
+async function reportPayroll(ym, period) {
+  const { rows, end } = await payrollPeriod(ym, period);
+  const [y, m] = ym.split('-').map(Number);
+  const be = String(y + 543).slice(2);
+  const label = period === '1-15' ? '1 (1–15)' : `2 (16–${end})`;
+  const head = `💵 <b>ค่าแรงรอบ ${label} ${thMon(m)} ${be}</b>`;
+  if (!rows.length) return head + '\n— ไม่มีพนักงาน';
+  let tR = 0, tW = 0, tE = 0, tS = 0;
+  const body = rows.map((r, i) => {
+    tR += r.remain; tW += r.withdrawn; tE += r.earned; tS += r.social;
+    let line = `${i + 1}. ${r.nickname} — รอรับ <b>${mfmt(r.remain)}</b> ฿`;
+    const extra = [];
+    if (r.withdrawn) extra.push(`เบิกแล้ว ${mfmt(r.withdrawn)}`);
+    if (r.social) extra.push(`−ปกส ${SSO}`);
+    if (extra.length) line += ` <i>(${extra.join(', ')})</i>`;
+    return line;
+  }).join('\n');
+  let foot = `\n━━━━━━\n• รวมรอรับ = <b>${mfmt(tR)} ฿</b>`;
+  foot += `\n• ค่าแรงรวมงวดนี้ ${mfmt(tE)} ฿`;
+  if (tW) foot += ` | เบิกแล้ว ${mfmt(tW)} ฿`;
+  if (tS) foot += ` | ปกส ${mfmt(tS)} ฿`;
+  return head + '\n' + body + foot;
 }
 
 // ============================================================
@@ -245,13 +350,14 @@ async function tgSend(token, chatId, text, extra) {
   });
 }
 function menuText() {
-  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n👇 กดปุ่มด้านล่างได้เลย (หรือพิมพ์เองก็ได้)\n\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>วางบิล</b> — เลือกลูกค้าที่จะวางบิลจากรายชื่อ (เฉพาะคุณหลิง)\n   หรือพิมพ์ "วางบิล &lt;ชื่อลูกค้า&gt;" ตรงๆ ก็ได้ (ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105")';
+  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n👇 กดปุ่มด้านล่างได้เลย (หรือพิมพ์เองก็ได้)\n\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>ค่าแรง</b> — ดูค่าแรงพนักงานตามงวด (รอบ1/รอบ2) รอรับเท่าไหร่\n• <b>วางบิล</b> — เลือกลูกค้าที่จะวางบิลจากรายชื่อ (เฉพาะคุณหลิง)\n   หรือพิมพ์ "วางบิล &lt;ชื่อลูกค้า&gt;" ตรงๆ ก็ได้ (ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105")';
 }
 // ปุ่มเมนูหลัก (reply keyboard — กดแล้วส่งคำสั่งเป็นข้อความทันที)
 function menuKeyboard() {
   return {
     keyboard: [
-      [{ text: 'ยอดน้ำมัน' }, { text: 'วางบิล' }]
+      [{ text: 'ยอดน้ำมัน' }, { text: 'ค่าแรง' }],
+      [{ text: 'วางบิล' }]
     ],
     resize_keyboard: true, one_time_keyboard: true, selective: true
   };
