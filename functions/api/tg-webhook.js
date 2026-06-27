@@ -44,16 +44,26 @@ export async function onRequestPost(context) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
       await tgSend(token, chatId, await prepareInvoiceFor(text));
     } else if (/^ค่าแรง|^เงินเดือน/.test(text)) {
-      const mMon = text.match(/(\d{4}-\d{2})/);
-      const ym = mMon ? mMon[1] : currentYM();
-      let period = null;
-      if (/รอบ\s*2|(^|\s)2(\s|$)|16/.test(text)) period = '16-end';
-      else if (/รอบ\s*1|(^|\s)1(\s|$)|1-?15/.test(text)) period = '1-15';
+      const ym = parseYM(text);
+      const period = parsePeriod(text);
       if (!period) {
-        const kb = { keyboard: [[{ text: 'ค่าแรง รอบ1' }, { text: 'ค่าแรง รอบ2' }], [{ text: 'เมนู' }]], resize_keyboard: true, one_time_keyboard: true, selective: true };
-        await tgSend(token, chatId, '💵 เลือกงวดค่าแรง:\n• รอบ1 = วันที่ 1–15\n• รอบ2 = วันที่ 16–สิ้นเดือน (หักปกส)', { reply_markup: kb, reply_to_message_id: msg.message_id });
+        const kb = { keyboard: [
+          [{ text: 'ค่าแรง รอบ1' }, { text: 'ค่าแรง รอบ2' }],
+          [{ text: 'เบิก รอบ1' }, { text: 'เบิก รอบ2' }],
+          [{ text: 'เมนู' }]
+        ], resize_keyboard: true, one_time_keyboard: true, selective: true };
+        await tgSend(token, chatId, '💵 เลือกแบบที่จะดู:\n• <b>ค่าแรง</b> = ดูทั้งก้อน (รอรับรายคน)\n• <b>เบิก</b> = เฉพาะเอกสารเบิกเงิน\n(รอบ1 = 1–15 / รอบ2 = 16–สิ้นเดือน)', { reply_markup: kb, reply_to_message_id: msg.message_id });
       } else {
         await tgSend(token, chatId, await reportPayroll(ym, period));
+      }
+    } else if (/^เบิก(\s|$|รอบ|[12])/.test(text)) {
+      const ym = parseYM(text);
+      const period = parsePeriod(text);
+      if (!period) {
+        const kb = { keyboard: [[{ text: 'เบิก รอบ1' }, { text: 'เบิก รอบ2' }], [{ text: 'เมนู' }]], resize_keyboard: true, one_time_keyboard: true, selective: true };
+        await tgSend(token, chatId, '🧾 ดูเอกสารเบิกงวดไหน?\n• รอบ1 = 1–15 / รอบ2 = 16–สิ้นเดือน', { reply_markup: kb, reply_to_message_id: msg.message_id });
+      } else {
+        await tgSend(token, chatId, await reportWithdrawals(ym, period));
       }
     } else if (/น้ำมัน/.test(text)) {
       await tgSend(token, chatId, await reportFuel());
@@ -130,6 +140,12 @@ async function reportFuel() {
 // ============================================================
 const SSO = 875;   // หักประกันสังคม/งวด (เฉพาะรอบ 16-end)
 function currentYM() { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0'); }
+function parseYM(text) { const m = text.match(/(\d{4}-\d{2})/); return m ? m[1] : currentYM(); }
+function parsePeriod(text) {
+  if (/รอบ\s*2|(^|\s)2(\s|$)|16/.test(text)) return '16-end';
+  if (/รอบ\s*1|(^|\s)1(\s|$)|1-?15/.test(text)) return '1-15';
+  return null;
+}
 function daysInYM(ym) { const [y, m] = ym.split('-').map(Number); return new Date(y, m, 0).getDate(); }
 function mfmt(n) { return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
 function thMon(m) { return ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][m]; }
@@ -212,6 +228,41 @@ async function reportPayroll(ym, period) {
   foot += `\n• ค่าแรงรวมงวดนี้ ${mfmt(tE)} ฿`;
   if (tW) foot += ` | เบิกแล้ว ${mfmt(tW)} ฿`;
   if (tS) foot += ` | ปกส ${mfmt(tS)} ฿`;
+  return head + '\n' + body + foot;
+}
+
+// ---------- เฉพาะเอกสารเบิก (รายการเบิกเงินของงวด) ----------
+async function reportWithdrawals(ym, period) {
+  const idToken = await login();
+  const emps = await runQuery(idToken, { from: [{ collectionId: 'employees' }] });
+  const nick = {}; emps.forEach(d => { nick[docId(d)] = fval(d, 'nickname') || docId(d); });
+  const wd = await runQuery(idToken, { from: [{ collectionId: 'withdrawals' }],
+    where: { compositeFilter: { op: 'AND', filters: [
+      { fieldFilter: { field: { fieldPath: 'month' }, op: 'EQUAL', value: { stringValue: ym } } },
+      { fieldFilter: { field: { fieldPath: 'period' }, op: 'EQUAL', value: { stringValue: period } } }
+    ] } } });
+  const items = wd.map(d => ({
+    date: fval(d, 'date') || '', empId: fval(d, 'empId'), amount: fval(d, 'amount') || 0,
+    note: fval(d, 'note') || '', settle: fval(d, 'kind') === 'settle'
+  })).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const [y, m] = ym.split('-').map(Number);
+  const be = String(y + 543).slice(2);
+  const td = daysInYM(ym);
+  const label = period === '1-15' ? '1 (1–15)' : `2 (16–${td})`;
+  const head = `🧾 <b>เอกสารเบิก รอบ ${label} ${thMon(m)} ${be}</b> — ${items.length} รายการ`;
+  if (!items.length) return head + '\n— ไม่มีรายการเบิกในงวดนี้';
+  let totNormal = 0, totSettle = 0;
+  const body = items.map((w, i) => {
+    if (w.settle) totSettle += w.amount; else totNormal += w.amount;
+    const dd = w.date ? w.date.slice(8, 10) + '/' + w.date.slice(5, 7) : '--';
+    let line = `${i + 1}. ${dd} ${nick[w.empId] || w.empId} — ${mfmt(w.amount)} ฿`;
+    if (w.settle) line += ' ✅ปิดงวด';
+    else if (w.note) line += ` <i>(${w.note})</i>`;
+    return line;
+  }).join('\n');
+  const tot = totNormal + totSettle;
+  let foot = `\n━━━━━━\n• รวมเบิก = <b>${mfmt(tot)} ฿</b>`;
+  if (totSettle) foot += `\n  (เบิกปกติ ${mfmt(totNormal)} | ปิดงวด/จ่าย ${mfmt(totSettle)})`;
   return head + '\n' + body + foot;
 }
 
