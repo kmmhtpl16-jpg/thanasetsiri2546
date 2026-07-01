@@ -1230,8 +1230,8 @@ select{color-scheme:light;}
         <button class="pr-tab-btn active" id="fuelBtn0" onclick="fuelSubTab(0)">🛢️ รับเข้า</button>
         <button class="pr-tab-btn" id="fuelBtn1" onclick="fuelSubTab(1)">📤 เบิกจากถัง</button>
         <button class="pr-tab-btn" id="fuelBtn2" onclick="fuelSubTab(2)">🚛 ค่าน้ำมันรถ</button>
-        <button class="pr-tab-btn" id="fuelBtn3" onclick="fuelSubTab(3)">📊 ต้นทุนรายเดือน</button>
-        <button class="pr-tab-btn" id="fuelBtn4" onclick="fuelSubTab(4)">📋 รายงาน</button>
+        <button class="pr-tab-btn ta-fuel" id="fuelBtn3" onclick="fuelSubTab(3)" style="display:none">📊 ต้นทุนรายเดือน</button>
+        <button class="pr-tab-btn ta-fuel" id="fuelBtn4" onclick="fuelSubTab(4)" style="display:none">📋 รายงาน</button>
       </div>
       <div class="card" style="background:linear-gradient(135deg,rgba(21,128,61,.12),rgba(21,128,61,.04));border:1px solid rgba(21,128,61,.3);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
         <div>
@@ -1773,6 +1773,8 @@ async function tgSendDailyNow(){
 function applyRole() {
   var show = curRole==='admin' ? 'flex' : 'none';
   document.querySelectorAll('.ta').forEach(function(el){ el.style.display=show; });
+  // sub-tab น้ำมันที่เป็นข้อมูลต้นทุนธุรกิจ (ต้นทุนรายเดือน/รายงาน) — เฉพาะเจ้าของ
+  document.querySelectorAll('.ta-fuel').forEach(function(el){ el.style.display = curRole==='admin' ? '' : 'none'; });
 }
 
 function doLogout() {
@@ -5515,11 +5517,12 @@ function initFuelTab() {
   });
   var ym = today.slice(0,7);
   var fCostMonth = document.getElementById('fCostMonth');
-  if(fCostMonth && !fCostMonth.value) { fCostMonth.value = ym; loadFuelMonthly(); }
+  if(fCostMonth && !fCostMonth.value && curRole==='admin') { fCostMonth.value = ym; loadFuelMonthly(); }
 }
 
 // ── Sub-tab switching ──
 function fuelSubTab(n) {
+  if((n===3||n===4) && curRole!=='admin') n=0;  // พนักงานห้ามเข้าต้นทุน/รายงาน
   for(var i=0;i<5;i++){
     var pane = document.getElementById('fuelSub'+i);
     var btn  = document.getElementById('fuelBtn'+i);
