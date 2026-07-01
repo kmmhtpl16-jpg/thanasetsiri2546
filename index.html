@@ -2000,6 +2000,39 @@ function calcMonthEarned(empId, ym) {
   return calcPeriodEarned(empId, ym, '1-15') + calcPeriodEarned(empId, ym, '16-end');
 }
 
+// รวมค่าแรงทั้งเดือนของทุกคน จากการลงเวลาจริง (attendance) — ใช้ในหน้าน้ำมัน/ต้นทุนผันแปร
+// ดึงข้อมูลเดือนนั้นแยกต่างหาก ไม่แตะ prAttendance ของหน้าเงินเดือน
+async function computeMonthLabor(ym){
+  if(!ym) return 0;
+  if(!prEmployees || !prEmployees.length){ try{ await prLoadEmployees(); }catch(e){} }
+  var att={};
+  try{
+    var snap=await prDb().collection('attendance').where('month','==',ym).get();
+    snap.docs.forEach(function(dc){ var x=dc.data(); att[x.date+'_'+x.empId]=x; });
+  }catch(e){ console.warn('computeMonthLabor att error:', e); return 0; }
+  var days=daysInMonth(ym), total=0;
+  (prEmployees||[]).forEach(function(emp){
+    for(var d=1; d<=days; d++){
+      var rec=att[ym+'-'+String(d).padStart(2,'0')+'_'+emp.id];
+      if(!rec || rec.type==='absent' || !rec.type) continue;
+      var base=0;
+      if(emp.type==='daily'){
+        if(rec.type==='full') base=emp.rate;
+        else if(rec.type==='half') base=emp.rate/2;
+        else if(rec.type==='hours') base=emp.rate*((rec.hours||0)/8);
+      }else{
+        if(rec.type==='full') base=emp.rate/days;
+        else if(rec.type==='half') base=emp.rate/days/2;
+        else if(rec.type==='hours') base=(emp.rate/days)*((rec.hours||0)/8);
+      }
+      var special=0;
+      if(rec.specialWork) rec.specialWork.forEach(function(sw){ special+=sw.amount||0; });
+      total += Math.round((base+special)*100)/100;
+    }
+  });
+  return Math.round(total*100)/100;
+}
+
 function getPeriodWithdrawals(empId, ym, period) {
   return prWithdrawals.filter(w => w.empId === empId && w.month === ym && w.period === period);
 }
@@ -5749,15 +5782,12 @@ async function loadFuelMonthly() {
   var el2 = document.getElementById('fCostExpFuel');
   if(el1) el1.value = tankCost.toFixed(0);
   if(el2) el2.value = expCost.toFixed(0);
-  // load labor from payroll
+  // ค่าแรง: คำนวณสดจากการลงเวลาจริง (เดิมอ่าน payroll_monthly.total_labor ที่ไม่เคยถูกเขียน จึงได้ 0 เสมอ)
   try {
-    var snap = await prDb().collection('payroll_monthly').doc(ym).get();
-    if(snap.exists) {
-      var d = snap.data();
-      var el3 = document.getElementById('fCostLabor');
-      if(el3) el3.value = (d.total_labor||0).toFixed(0);
-    }
-  } catch(e) {}
+    var laborTotal = await computeMonthLabor(ym);
+    var el3 = document.getElementById('fCostLabor');
+    if(el3) el3.value = laborTotal.toFixed(0);
+  } catch(e) { console.warn('load labor error:', e); }
   // load saved monthly
   try {
     var snap2 = await prDb().collection('fuel_monthly').doc(ym).get();
