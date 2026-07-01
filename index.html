@@ -4111,6 +4111,7 @@ function frReportPrint(){
     +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td></tr>'
     +'</tbody></table>'
     +'<button onclick="window.print()" style="margin-top:16px;padding:8px 16px;cursor:pointer">🖨️ พิมพ์</button>'
+    +'<button onclick="if(window.opener||window.history.length<=1){window.close();}else{window.history.back();}" style="margin-top:16px;margin-left:8px;padding:8px 16px;cursor:pointer;background:#eee;border:1px solid #ccc;border-radius:5px">✕ ปิดรายงาน</button>'
     +'</div></body></html>';
   var w=window.open('','_blank'); w.document.write(html); w.document.close();
 }
