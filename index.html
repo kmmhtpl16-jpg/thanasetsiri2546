@@ -594,6 +594,7 @@ select{color-scheme:light;}
     <button class="tab-btn" data-tab="5" onclick="goTab(5)">🚛 ค่าเที่ยวรถร่วม</button>
     <button class="tab-btn" data-tab="6" onclick="goTab(6)">👷 เงินเดือน</button>
     <button class="tab-btn" data-tab="7" onclick="goTab(7)">⛽ น้ำมัน</button>
+    <button class="tab-btn" data-tab="9" onclick="goTab(9)">📤 ส่งรายวัน</button>
     <button class="tab-btn ta" data-tab="3" onclick="goTab(3)" style="display:none">📄 ใบแจ้งหนี้ลูกค้า</button>
     <button class="tab-btn ta" data-tab="4" onclick="goTab(4)" style="display:none">👑 สรุปผู้บริหาร</button>
     <button class="tab-btn ta" data-tab="8" onclick="goTab(8)" style="display:none">💸 รายจ่าย</button>
@@ -1489,6 +1490,36 @@ select{color-scheme:light;}
       </div><!-- /exContent -->
     </section>
 
+    <!-- TAB 9 — ส่งรายวัน (ขายรายวัน) -->
+    <section class="tab-pane" id="tp9" style="padding:16px;">
+      <div class="card">
+        <div class="table-toolbar"><div class="table-toolbar-title">📤 บันทึกส่ง/ขายรายวัน</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 0;">
+          <div><label class="pr-label">วันที่ *</label><input type="date" id="dsDate" class="pr-input"></div>
+          <div><label class="pr-label">ทะเบียนรถ</label><input type="text" id="dsPlate" class="pr-input" placeholder="เช่น 81-7580"></div>
+          <div><label class="pr-label">เที่ยว</label><input type="number" id="dsTrips" class="pr-input" placeholder="เช่น 4" min="0"></div>
+          <div><label class="pr-label">ลูกค้า *</label><input type="text" id="dsCust" class="pr-input" list="ds-cust-list" placeholder="ชื่อลูกค้า" onchange="dsFillPrice()"><datalist id="ds-cust-list"></datalist></div>
+          <div><label class="pr-label">หน่วย *</label><select id="dsUnit" class="pr-input" onchange="dsUnitChange()"><option value="คิว">คิว (ชั่งน้ำหนัก)</option><option value="ตัก">ตัก</option></select></div>
+          <div id="dsKgWrap"><label class="pr-label">น้ำหนักสุทธิ (กก.)</label><input type="number" id="dsKg" class="pr-input" placeholder="เช่น 124740" min="0" oninput="dsFromKg()"></div>
+          <div id="dsScoopWrap" style="display:none;"><label class="pr-label">จำนวนตัก</label><input type="number" id="dsScoop" class="pr-input" placeholder="เช่น 14" min="0" oninput="dsFromScoop()"></div>
+          <div><label class="pr-label" id="dsQtyLabel">คิวสุทธิ</label><input type="number" id="dsQty" class="pr-input" placeholder="อัตโนมัติ" step="0.001" oninput="dsCalc()" style="opacity:.9"></div>
+          <div><label class="pr-label">ราคา/หน่วย (บาท)</label><input type="number" id="dsPrice" class="pr-input" placeholder="เติมจากล่าสุด" step="0.01" oninput="dsCalc()"></div>
+          <div><label class="pr-label">ยอดเงิน (บาท)</label><input type="number" id="dsAmount" class="pr-input" placeholder="อัตโนมัติ" readonly style="opacity:.75;font-weight:700"></div>
+          <div style="grid-column:1/-1;"><label class="pr-label">หมายเหตุ/ปลายทาง</label><input type="text" id="dsNote" class="pr-input" placeholder="เช่น ส่งไซต์..., รับเอง"></div>
+        </div>
+        <div style="background:rgba(129,199,132,.08);border:1px dashed rgba(129,199,132,.4);border-radius:7px;padding:7px 11px;font-size:.7rem;color:#3a7a3a;margin-top:6px;">💡 คิว = น้ำหนัก ÷ 1,500 · ราคาเติมจากรายการล่าสุดของลูกค้าคนเดิม (แก้ได้)</div>
+        <button class="pr-save-btn" onclick="saveDailySale()" style="margin-top:8px;">💾 บันทึกส่งรายวัน</button>
+      </div>
+      <div class="card" style="margin-top:0;">
+        <div class="table-toolbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div class="table-toolbar-title">📋 รายการส่ง</div>
+          <input type="date" id="dsViewDate" class="pr-input" style="max-width:170px;" onchange="drawDailyList()">
+        </div>
+        <div id="dsListWrap" style="overflow:auto;"></div>
+        <div id="dsDayTotal" style="margin-top:8px;font-size:.85rem;"></div>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -1816,6 +1847,7 @@ function goTab(n) {
   if(n===6) initPayrollTab();
   if(n===7) initFuelTab();
   if(n===8) initExpenseTab();
+  if(n===9) initDailySalesTab();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -6495,23 +6527,127 @@ function exExportPDF(){
 /* ---------- Tab4 integration: profit/loss ---------- */
 
 /* ---------- Tab4 integration: profit/loss ---------- */
-function exDraw4(){
+/* ===== ส่งรายวัน (daily_sales) — พนักงานคีย์, สรุปรายได้อัตโนมัติ ===== */
+var dsData = [];
+var dsUn = null;
+function initDailySalesTab(){
+  var today = new Date().toISOString().slice(0,10);
+  var d1=document.getElementById('dsDate'); if(d1 && !d1.value) d1.value=today;
+  var d2=document.getElementById('dsViewDate'); if(d2 && !d2.value) d2.value=today;
+  dsPopulateCust(); dsUnitChange();
+  if(dsUn) return;
+  dsUn = prDb().collection('daily_sales').orderBy('date','desc').onSnapshot(function(snap){
+    dsData = snap.docs.map(function(d){ return Object.assign({_id:d.id}, d.data()); });
+    dsPopulateCust(); drawDailyList();
+  }, function(e){ console.warn('daily_sales listen:', e); });
+}
+function dsPopulateCust(){
+  var dl=document.getElementById('ds-cust-list'); if(!dl) return;
+  var set={};
+  (typeof wData!=='undefined'?wData:[]).forEach(function(w){ if(w.customer) set[w.customer]=1; });
+  dsData.forEach(function(r){ if(r.customer) set[r.customer]=1; });
+  dl.innerHTML=Object.keys(set).sort(function(a,b){return a.localeCompare(b,'th');})
+    .map(function(c){ return '<option value="'+String(c).replace(/"/g,'&quot;')+'"></option>'; }).join('');
+}
+function dsUnitChange(){
+  var unit=(document.getElementById('dsUnit')||{}).value||'คิว';
+  var kgW=document.getElementById('dsKgWrap'), scW=document.getElementById('dsScoopWrap'), ql=document.getElementById('dsQtyLabel');
+  if(unit==='ตัก'){ if(kgW)kgW.style.display='none'; if(scW)scW.style.display=''; if(ql)ql.textContent='จำนวนตัก'; dsFromScoop(); }
+  else { if(kgW)kgW.style.display=''; if(scW)scW.style.display='none'; if(ql)ql.textContent='คิวสุทธิ'; dsFromKg(); }
+}
+function dsFromKg(){ var kg=parseFloat((document.getElementById('dsKg')||{}).value)||0; var q=document.getElementById('dsQty'); if(q) q.value=kg>0?(kg/KPC).toFixed(3):''; dsCalc(); }
+function dsFromScoop(){ var sc=parseFloat((document.getElementById('dsScoop')||{}).value)||0; var q=document.getElementById('dsQty'); if(q) q.value=sc>0?sc:''; dsCalc(); }
+function dsCalc(){
+  var qty=parseFloat((document.getElementById('dsQty')||{}).value)||0;
+  var price=parseFloat((document.getElementById('dsPrice')||{}).value)||0;
+  var a=document.getElementById('dsAmount'); if(a) a.value=(qty>0&&price>0)?(Math.round(qty*price*100)/100):'';
+}
+function dsFillPrice(){
+  var cust=(document.getElementById('dsCust')||{}).value.trim();
+  var unit=(document.getElementById('dsUnit')||{}).value||'คิว';
+  var pe=document.getElementById('dsPrice'); if(!cust||!pe) return;
+  var mine=dsData.filter(function(r){ return r.customer===cust; });
+  var same=mine.filter(function(r){ return r.unit===unit; });
+  var pick=(same.length?same:mine)[0];
+  if(pick && pick.price!=null){ pe.value=pick.price; dsCalc(); }
+}
+async function saveDailySale(){
+  var date=(document.getElementById('dsDate')||{}).value;
+  var plate=(document.getElementById('dsPlate')||{}).value.trim();
+  var trips=parseFloat((document.getElementById('dsTrips')||{}).value)||0;
+  var cust=(document.getElementById('dsCust')||{}).value.trim();
+  var unit=(document.getElementById('dsUnit')||{}).value||'คิว';
+  var kg=parseFloat((document.getElementById('dsKg')||{}).value)||0;
+  var scoop=parseFloat((document.getElementById('dsScoop')||{}).value)||0;
+  var qty=parseFloat((document.getElementById('dsQty')||{}).value)||0;
+  var price=parseFloat((document.getElementById('dsPrice')||{}).value)||0;
+  var note=(document.getElementById('dsNote')||{}).value.trim();
+  if(!date){ toast('⚠️ เลือกวันที่'); return; }
+  if(!cust){ toast('⚠️ ใส่ชื่อลูกค้า'); return; }
+  if(qty<=0){ toast('⚠️ ใส่จำนวน (คิว/ตัก)'); return; }
+  if(price<=0){ toast('⚠️ ใส่ราคา/หน่วย'); return; }
+  var amount=Math.round(qty*price*100)/100;
+  var data={ date:date, plate:plate, trips:trips, customer:cust, unit:unit,
+    kg:(unit==='คิว'?kg:0), scoop:(unit==='ตัก'?scoop:0),
+    qty:Math.round(qty*1000)/1000, price:price, amount:amount, note:note,
+    by:(typeof curEmail!=='undefined'?curEmail:''), created_at:firebase.firestore.FieldValue.serverTimestamp() };
+  toast('⏳ กำลังบันทึก...');
+  try{
+    await prDb().collection('daily_sales').add(data);
+    toast('✅ บันทึกแล้ว — '+cust+' '+fmt3(qty)+' '+unit+' = '+fmtBaht(amount)+' ฿');
+    ['dsPlate','dsTrips','dsCust','dsKg','dsScoop','dsQty','dsPrice','dsAmount','dsNote'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  }catch(e){ toast('❌ '+e.message); }
+}
+function drawDailyList(){
+  var wrap=document.getElementById('dsListWrap'); if(!wrap) return;
+  var vd=(document.getElementById('dsViewDate')||{}).value||'';
+  var rows=dsData.filter(function(r){ return !vd || r.date===vd; });
+  var tt=document.getElementById('dsDayTotal');
+  if(!rows.length){ wrap.innerHTML='<div style="color:var(--muted);font-size:.8rem;padding:14px 0;text-align:center;">— ยังไม่มีรายการ'+(vd?(' วันที่ '+isoToBE(vd)):'')+' —</div>'; if(tt)tt.innerHTML=''; return; }
+  var body=rows.map(function(r){
+    return '<tr><td>'+(r.plate||'-')+'</td><td>'+(r.customer||'-')+'</td>'
+      +'<td class="r">'+fmt3(r.qty||0)+' '+(r.unit||'')+'</td>'
+      +'<td class="r">'+fmtBaht(r.price||0)+'</td>'
+      +'<td class="r" style="font-weight:700">'+fmtBaht(r.amount||0)+'</td>'
+      +'<td><button onclick="deleteDailySale(\''+r._id+'\')" style="background:none;border:1px solid rgba(255,255,255,.18);border-radius:4px;color:#e06a6a;cursor:pointer;padding:2px 7px;font-size:.7rem;">ลบ</button></td></tr>';
+  }).join('');
+  wrap.innerHTML='<table class="data-table" style="width:100%;font-size:.78rem;min-width:460px;"><thead><tr><th>ทะเบียน</th><th>ลูกค้า</th><th class="r">จำนวน</th><th class="r">ราคา</th><th class="r">ยอดเงิน</th><th></th></tr></thead><tbody>'+body+'</tbody></table>';
+  var totQ=rows.reduce(function(s,r){ return s+((r.unit==='คิว')?(r.qty||0):0); },0);
+  var totB=rows.reduce(function(s,r){ return s+(r.amount||0); },0);
+  if(tt) tt.innerHTML='<b>รวม '+rows.length+' รายการ</b> · ทราย '+fmt3(totQ)+' คิว · <b style="color:var(--gold)">ยอดเงิน '+fmtBaht(totB)+' ฿</b>';
+}
+function deleteDailySale(id){
+  if(!confirm('ลบรายการนี้?')) return;
+  prDb().collection('daily_sales').doc(id).delete().then(function(){ toast('🗑️ ลบแล้ว'); }).catch(function(e){ toast('❌ '+e.message); });
+}
+
+/* Tab4 — กำไร/ขาดทุน (รายได้อัตโนมัติจากส่งรายวัน) */
+async function exDraw4(){
   var sel=document.getElementById('ex4Month'); if(!sel) return;
   var m=sel.value;
   var rows=gExpenses.filter(function(e){ return m && e.date.slice(0,7)===m; });
   var byCat={}; var tot=0;
   rows.forEach(function(e){ byCat[e.category]=(byCat[e.category]||0)+e.amount; tot+=e.amount; });
+  var autoRev=0;
+  if(m){
+    try{
+      var snap=await prDb().collection('daily_sales').where('date','>=',m+'-01').where('date','<=',m+'-31').get();
+      snap.docs.forEach(function(d){ autoRev+=(d.data().amount||0); });
+    }catch(e){ console.warn('daily_sales rev:', e); }
+  }
+  var manual=exNum((document.getElementById('ex4Rev')||{}).value);
+  var rev = manual>0 ? manual : autoRev;
+  var head='';
+  head+='<tr><td>รายได้ขายทราย (ส่งรายวัน)</td><td class="r" style="color:#4ec98a">'+exMoney(autoRev)+'</td></tr>';
+  if(manual>0) head+='<tr><td>รายได้ (กรอกเอง — override)</td><td class="r" style="color:#4ec98a">'+exMoney(manual)+'</td></tr>';
   var body='';
   exAllCats().forEach(function(k){ if(byCat[k]) body+='<tr><td style="padding-left:14px;color:var(--muted)">'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>'; });
   body+='<tr><td><b>รายจ่ายรวม</b></td><td class="r"><b style="color:#e06a6a">'+exMoney(tot)+'</b></td></tr>';
-  var rev=exNum((document.getElementById('ex4Rev')||{}).value);
-  if(rev>0){
-    var profit=rev-tot;
-    body='<tr><td>รายได้ (กรอกเอง)</td><td class="r" style="color:#4ec98a">'+exMoney(rev)+'</td></tr>'+body
-      +'<tr><td><b>กำไร / ขาดทุน</b></td><td class="r"><b style="color:'+(profit>=0?'#4ec98a':'#e06a6a')+'">'+exMoney(profit)+'</b></td></tr>';
-  }
+  var profit=rev-tot;
+  var tail='<tr><td><b>กำไร / ขาดทุน</b></td><td class="r"><b style="color:'+(profit>=0?'#4ec98a':'#e06a6a')+'">'+exMoney(profit)+'</b></td></tr>';
+  var full=head+body+tail;
   var el=document.getElementById('ex4Body');
-  if(el) el.innerHTML = rows.length||rev>0 ? '<table class="data-table" style="width:100%;font-size:.85rem;"><tbody>'+body+'</tbody></table>' : '<div style="text-align:center;color:var(--muted);padding:18px">— เลือกเดือนเพื่อดูสรุปรายจ่าย —</div>';
+  if(el) el.innerHTML = (rows.length||autoRev>0||manual>0) ? '<table class="data-table" style="width:100%;font-size:.85rem;"><tbody>'+full+'</tbody></table>' : '<div style="text-align:center;color:var(--muted);padding:18px">— เลือกเดือนเพื่อดูสรุปรายได้-รายจ่าย —</div>';
 }
 </script>
 </body>
