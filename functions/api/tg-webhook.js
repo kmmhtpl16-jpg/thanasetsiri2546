@@ -500,4 +500,29 @@ async function customerPicker() {
   const lastBilled = {};
   invs.forEach(d => {
     if (fval(d, 'status') === 'cancelled') return;
-    const c = fval(d, 'customer'); if (!c) r
+    const c = fval(d, 'customer'); if (!c) return;
+    const to = fval(d, 'dateTo') || '';
+    if (!lastBilled[c] || to > lastBilled[c]) lastBilled[c] = to;
+  });
+  const byCust = {};
+  ws.forEach(d => {
+    const c = fval(d, 'customer'); if (!c || c.indexOf('ทั่วไป') >= 0) return;
+    const dt = fval(d, 'date') || '';
+    const lb = lastBilled[c];
+    if (lb && !(dt > lb)) return;
+    byCust[c] = (byCust[c] || 0) + Math.max(0, (fval(d, 'kg') || 0) / KPC - (dMap[docId(d)] || 0));
+  });
+  const rows = Object.entries(byCust).filter(([c, k]) => k > 0.001).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  if (rows.length === 0) return { text: 'ℹ️ ตอนนี้ไม่มีลูกค้าที่มียอดค้างวางบิล', keyboard: menuKeyboard() };
+  const kb = rows.map(([c]) => [{ text: 'วางบิล ' + c }]);
+  kb.push([{ text: 'เมนู' }]);
+  let t = '🧾 <b>เลือกลูกค้าที่จะวางบิล</b> (ยอดค้าง):\n';
+  rows.forEach(([c, k], i) => { t += `${i + 1}. ${c} — ${fmt(Math.round(k * 100) / 100)} คิว\n`; });
+  t += '\n👇 กดปุ่มชื่อลูกค้าด้านล่าง';
+  return { text: t, keyboard: { keyboard: kb, resize_keyboard: true, one_time_keyboard: true, selective: true } };
+}
+function fmt(n) { return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function json(obj, status) { return new Response(JSON.stringify(obj), { status: status || 200, headers: { 'content-type': 'application/json; charset=utf-8' } }); }
+
+// env เข้าถึงผ่าน context ใน onRequestPost; กำหนด global ให้ helper ใช้
+let GLOBAL_ENV = {};
