@@ -309,6 +309,8 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
 .modal-note{font-size:10px;color:var(--warn);margin-top:6px;}
 .modal-conflict{background:rgba(243,156,18,.1);border:1px solid rgba(243,156,18,.3);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--warn);margin-bottom:10px;}
+.ectab-btn{flex:1;padding:6px 8px;font-size:11px;font-weight:700;font-family:var(--font);background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;}
+.ectab-btn.active{background:rgba(212,175,55,.15);border-color:var(--gold);color:var(--gold);}
 /* ── ใบจ่ายแยกตามลูกค้า ── */
 .fr-cust-block{border:1px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;}
 .fr-cust-hdr{background:var(--bg3);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-left:3px solid var(--gold);}
@@ -594,7 +596,6 @@ select{color-scheme:light;}
     <button class="tab-btn" data-tab="5" onclick="goTab(5)">🚛 ค่าเที่ยวรถร่วม</button>
     <button class="tab-btn" data-tab="6" onclick="goTab(6)">👷 เงินเดือน</button>
     <button class="tab-btn" data-tab="7" onclick="goTab(7)">⛽ น้ำมัน</button>
-    <button class="tab-btn" data-tab="9" onclick="goTab(9)">📤 ส่งรายวัน</button>
     <button class="tab-btn ta" data-tab="3" onclick="goTab(3)" style="display:none">📄 ใบแจ้งหนี้ลูกค้า</button>
     <button class="tab-btn ta" data-tab="4" onclick="goTab(4)" style="display:none">👑 สรุปผู้บริหาร</button>
     <button class="tab-btn ta" data-tab="8" onclick="goTab(8)" style="display:none">💸 รายจ่าย</button>
@@ -635,9 +636,9 @@ select{color-scheme:light;}
               <table>
                 <thead><tr>
                   <th>เลขที่</th><th>ทะเบียน</th><th>วันที่</th><th>เวลา</th>
-                  <th>ลูกค้า</th><th>สินค้า</th><th>นน.(kg)</th><th>คิว</th><th></th>
+                  <th>ลูกค้า</th><th>สินค้า</th><th>นน.(kg)</th><th>คิว</th><th class="r">ยอดเงิน</th><th></th>
                 </tr></thead>
-                <tbody id="t1b"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:32px">กำลังเชื่อมต่อ…</td></tr></tbody>
+                <tbody id="t1b"><tr><td colspan="10" style="text-align:center;color:var(--muted);padding:32px">กำลังเชื่อมต่อ…</td></tr></tbody>
               </table>
             </div>
             <div id="t1pg" class="pager"></div>
@@ -672,14 +673,28 @@ select{color-scheme:light;}
       <!-- Modal: แก้ชื่อลูกค้า -->
       <div id="editCustModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeEditModal()">
         <div class="modal-box">
-          <div class="modal-title">✏️ แก้ชื่อลูกค้า</div>
+          <div class="modal-title">✏️ แก้ไขรายการขาย</div>
           <div id="editCustConflict" class="modal-conflict" style="display:none"></div>
-          <div class="modal-row"><label>บิลเลขที่ / วันที่</label><input id="ecMeta" readonly></div>
-          <div class="modal-row"><label>ทะเบียน</label><input id="ecPlate" readonly></div>
-          <div class="modal-row"><label>ชื่อเดิม (จาก Excel)</label><input id="ecOld" readonly></div>
-          <div class="modal-row"><label>แก้เป็น *</label><input id="ecNew" placeholder="ชื่อลูกค้าที่ถูกต้อง"></div>
-          <div class="modal-row"><label>เหตุผล * <span style="color:var(--muted);text-transform:none">(บังคับกรอก)</span></label><input id="ecReason" placeholder="เช่น บิลกระดาษระบุ ธีรนพ"></div>
-          <p class="modal-note">⚠️ ระบบเก็บชื่อเดิมไว้ใน customerOriginal — ไม่ลบทิ้ง</p>
+          <datalist id="ecCustList"></datalist>
+          <div style="display:flex;gap:6px;margin-bottom:12px;">
+            <button type="button" id="ecTabBtn1" class="ectab-btn active" onclick="ecTab(1)">👤 ข้อมูลลูกค้า</button>
+            <button type="button" id="ecTabBtn2" class="ectab-btn" onclick="ecTab(2)">💰 ราคาที่ขาย</button>
+          </div>
+          <div id="ecPane1">
+            <div class="modal-row"><label>บิลเลขที่ / วันที่</label><input id="ecMeta" readonly></div>
+            <div class="modal-row"><label>ทะเบียน</label><input id="ecPlate" readonly></div>
+            <div class="modal-row"><label>ชื่อเดิม (จาก Excel)</label><input id="ecOld" readonly></div>
+            <div class="modal-row"><label>ลูกค้า *</label><input id="ecNew" list="ecCustList" placeholder="ชื่อลูกค้าที่ถูกต้อง" onchange="ecFillPriceForCust()"></div>
+            <div class="modal-row"><label>เหตุผล <span style="color:var(--muted);text-transform:none">(กรอกเมื่อแก้ชื่อ)</span></label><input id="ecReason" placeholder="เช่น บิลกระดาษระบุ ธีรนพ"></div>
+            <p class="modal-note">⚠️ ระบบเก็บชื่อเดิมไว้ใน customerOriginal — ไม่ลบทิ้ง</p>
+          </div>
+          <div id="ecPane2" style="display:none">
+            <div class="modal-row"><label>หน่วยขาย</label><select id="ecUnit" onchange="ecUnitChange()" style="width:100%;padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font)"><option value="คิว">คิว (× คิวสุทธิ)</option><option value="ตัก">ตัก (× จำนวนตัก)</option></select></div>
+            <div class="modal-row" id="ecScoopWrap" style="display:none"><label>จำนวนตัก</label><input id="ecScoop" type="number" min="0" placeholder="เช่น 14" oninput="ecPriceCalc()"></div>
+            <div class="modal-row"><label id="ecQtyLbl">คิวสุทธิ (หลังหัก)</label><input id="ecQty" readonly></div>
+            <div class="modal-row"><label>ราคา/หน่วย (บาท)</label><input id="ecPrice" type="number" min="0" step="0.01" placeholder="เติมจากล่าสุด" oninput="ecPriceCalc()"></div>
+            <div class="modal-row"><label>ยอดเงิน (บาท)</label><input id="ecAmount" readonly style="font-weight:700;color:var(--gold)"></div>
+          </div>
           <div class="modal-actions">
             <button class="btn btn-ghost" onclick="closeEditModal()">ยกเลิก</button>
             <button class="btn btn-gold"  onclick="confirmEditCust()">💾 บันทึก</button>
@@ -1490,35 +1505,6 @@ select{color-scheme:light;}
       </div><!-- /exContent -->
     </section>
 
-    <!-- TAB 9 — ส่งรายวัน (ขายรายวัน) -->
-    <section class="tab-pane" id="tp9" style="padding:16px;">
-      <div class="card">
-        <div class="table-toolbar"><div class="table-toolbar-title">📤 บันทึกส่ง/ขายรายวัน</div></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 0;">
-          <div><label class="pr-label">วันที่ *</label><input type="date" id="dsDate" class="pr-input"></div>
-          <div><label class="pr-label">ทะเบียนรถ</label><input type="text" id="dsPlate" class="pr-input" placeholder="เช่น 81-7580"></div>
-          <div><label class="pr-label">เที่ยว</label><input type="number" id="dsTrips" class="pr-input" placeholder="เช่น 4" min="0"></div>
-          <div><label class="pr-label">ลูกค้า *</label><input type="text" id="dsCust" class="pr-input" list="ds-cust-list" placeholder="ชื่อลูกค้า" onchange="dsFillPrice()"><datalist id="ds-cust-list"></datalist></div>
-          <div><label class="pr-label">หน่วย *</label><select id="dsUnit" class="pr-input" onchange="dsUnitChange()"><option value="คิว">คิว (ชั่งน้ำหนัก)</option><option value="ตัก">ตัก</option></select></div>
-          <div id="dsKgWrap"><label class="pr-label">น้ำหนักสุทธิ (กก.)</label><input type="number" id="dsKg" class="pr-input" placeholder="เช่น 124740" min="0" oninput="dsFromKg()"></div>
-          <div id="dsScoopWrap" style="display:none;"><label class="pr-label">จำนวนตัก</label><input type="number" id="dsScoop" class="pr-input" placeholder="เช่น 14" min="0" oninput="dsFromScoop()"></div>
-          <div><label class="pr-label" id="dsQtyLabel">คิวสุทธิ</label><input type="number" id="dsQty" class="pr-input" placeholder="อัตโนมัติ" step="0.001" oninput="dsCalc()" style="opacity:.9"></div>
-          <div><label class="pr-label">ราคา/หน่วย (บาท)</label><input type="number" id="dsPrice" class="pr-input" placeholder="เติมจากล่าสุด" step="0.01" oninput="dsCalc()"></div>
-          <div><label class="pr-label">ยอดเงิน (บาท)</label><input type="number" id="dsAmount" class="pr-input" placeholder="อัตโนมัติ" readonly style="opacity:.75;font-weight:700"></div>
-          <div style="grid-column:1/-1;"><label class="pr-label">หมายเหตุ/ปลายทาง</label><input type="text" id="dsNote" class="pr-input" placeholder="เช่น ส่งไซต์..., รับเอง"></div>
-        </div>
-        <div style="background:rgba(129,199,132,.08);border:1px dashed rgba(129,199,132,.4);border-radius:7px;padding:7px 11px;font-size:.7rem;color:#3a7a3a;margin-top:6px;">💡 คิว = น้ำหนัก ÷ 1,500 · ราคาเติมจากรายการล่าสุดของลูกค้าคนเดิม (แก้ได้)</div>
-        <button class="pr-save-btn" onclick="saveDailySale()" style="margin-top:8px;">💾 บันทึกส่งรายวัน</button>
-      </div>
-      <div class="card" style="margin-top:0;">
-        <div class="table-toolbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <div class="table-toolbar-title">📋 รายการส่ง</div>
-          <input type="date" id="dsViewDate" class="pr-input" style="max-width:170px;" onchange="drawDailyList()">
-        </div>
-        <div id="dsListWrap" style="overflow:auto;"></div>
-        <div id="dsDayTotal" style="margin-top:8px;font-size:.85rem;"></div>
-      </div>
-    </section>
 
   </main>
 </div>
@@ -1847,7 +1833,6 @@ function goTab(n) {
   if(n===6) initPayrollTab();
   if(n===7) initFuelTab();
   if(n===8) initExpenseTab();
-  if(n===9) initDailySalesTab();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3524,21 +3509,23 @@ function draw1() {
   var isAdmin=(curRole==='admin');
 
   document.getElementById('t1b').innerHTML = paged.length===0
-    ? '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25</td></tr>'
+    ? '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:28px">\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25</td></tr>'
     : paged.map(function(r){
         var c=(r.kg/KPC).toFixed(3);
         var wasEdited=r.customerOriginal&&r.customerOriginal!==r.customer;
         var custCell=wasEdited
           ? r.customer+' <span class="b-edited" title="\u0e41\u0e01\u0e49\u0e08\u0e32\u0e01: '+r.customerOriginal+'">\u270f\ufe0f \u0e41\u0e01\u0e49\u0e41\u0e25\u0e49\u0e27</span>'
           : r.customer;
-        var editBtn=isAdmin
-          ? '<button class="btn-edit-cust" onclick="openEditModal(\''+r._id+'\')">\u270f\ufe0f</button>'
-          : '';
+        var _netK=Math.max(0,(r.kg/KPC)-((typeof dData!=='undefined'?dData[r._id]:0)||0));
+        var _amt=(r.price>0)?((r.sale_unit==='ตัก'?(r.scoop||0):_netK)*r.price):0;
+        var amtCell='<td class="r gold">'+(_amt>0?_amt.toLocaleString('th-TH',{minimumFractionDigits:2}):'<span style="color:var(--muted)">–</span>')+'</td>';
+        var editBtn='<button class="btn-edit-cust" onclick="openEditModal(\''+r._id+'\')">\u270f\ufe0f ตั้งราคา</button>';
         return '<tr><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
           +'<td style="color:var(--muted)">'+(r.time||'\u2013')+'</td>'
           +'<td>'+custCell+'</td><td style="color:var(--muted)">'+r.product+'</td>'
           +'<td class="r">'+r.kg.toLocaleString('th-TH')+'</td>'
           +'<td class="r gold">'+c+'</td>'
+          +amtCell
           +'<td>'+editBtn+'</td></tr>';
       }).join('');
 
@@ -3575,6 +3562,14 @@ function openEditModal(id){
         conf.style.display='block';
       }
     }).catch(function(){});
+  ecTab(1);
+  document.getElementById('ecUnit').value = r.sale_unit||'คิว';
+  document.getElementById('ecScoop').value = r.scoop||'';
+  document.getElementById('ecPrice').value = (r.price!=null&&r.price!=='')?r.price:'';
+  ecPopulateCustList();
+  ecUnitChange();
+  if(!document.getElementById('ecPrice').value){ ecFillPriceForCust(); }
+  ecPriceCalc();
   document.getElementById('editCustModal').style.display='flex';
   setTimeout(function(){ var n=document.getElementById('ecNew'); if(n) n.focus(); },100);
 }
@@ -3582,24 +3577,75 @@ function closeEditModal(){
   document.getElementById('editCustModal').style.display='none';
   _editId=null;
 }
+/* ---- popup 2 แท็บ: ข้อมูลลูกค้า / ราคาขาย ---- */
+function ecTab(n){
+  var p1=document.getElementById('ecPane1'), p2=document.getElementById('ecPane2');
+  if(p1) p1.style.display=(n===1)?'':'none';
+  if(p2) p2.style.display=(n===2)?'':'none';
+  var b1=document.getElementById('ecTabBtn1'), b2=document.getElementById('ecTabBtn2');
+  if(b1) b1.classList.toggle('active',n===1);
+  if(b2) b2.classList.toggle('active',n===2);
+}
+function ecPopulateCustList(){
+  var dl=document.getElementById('ecCustList'); if(!dl) return;
+  var set={};
+  (typeof wData!=='undefined'?wData:[]).forEach(function(w){ if(w.customer) set[w.customer]=1; });
+  dl.innerHTML=Object.keys(set).sort(function(a,b){return a.localeCompare(b,'th');}).map(function(c){return '<option value="'+String(c).replace(/"/g,'&quot;')+'"></option>';}).join('');
+}
+function ecNetKiu(){
+  var r=wData.find(function(w){return w._id===_editId;}); if(!r) return 0;
+  var g=r.kg/KPC, d=(typeof dData!=='undefined'?(dData[r._id]||0):0);
+  return Math.max(0, g-d);
+}
+function ecUnitChange(){
+  var u=(document.getElementById('ecUnit')||{}).value||'คิว';
+  var sw=document.getElementById('ecScoopWrap'), ql=document.getElementById('ecQtyLbl');
+  if(u==='ตัก'){ if(sw)sw.style.display=''; if(ql)ql.textContent='จำนวนตัก (ใช้คิดเงิน)'; }
+  else { if(sw)sw.style.display='none'; if(ql)ql.textContent='คิวสุทธิ (หลังหัก)'; }
+  ecPriceCalc();
+}
+function ecPriceCalc(){
+  var u=(document.getElementById('ecUnit')||{}).value||'คิว';
+  var price=parseFloat((document.getElementById('ecPrice')||{}).value)||0;
+  var qty=(u==='ตัก')?(parseFloat((document.getElementById('ecScoop')||{}).value)||0):ecNetKiu();
+  var qEl=document.getElementById('ecQty'); if(qEl) qEl.value=fmt3(qty);
+  var aEl=document.getElementById('ecAmount');
+  if(aEl) aEl.value=(qty>0&&price>0)?(Math.round(qty*price*100)/100).toLocaleString('th-TH',{minimumFractionDigits:2}):'';
+}
+function ecFillPriceForCust(){
+  var cust=(document.getElementById('ecNew')||{}).value.trim();
+  var u=(document.getElementById('ecUnit')||{}).value||'คิว';
+  if(!cust) return;
+  var prev=(typeof wData!=='undefined'?wData:[]).filter(function(w){ return w.customer===cust && w._id!==_editId && w.price>0 && (w.sale_unit||'คิว')===u; });
+  prev.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if(prev.length){ var pe=document.getElementById('ecPrice'); if(pe){ pe.value=prev[0].price; ecPriceCalc(); } }
+}
 function confirmEditCust(){
-  var newCust=document.getElementById('ecNew').value.trim();
-  var reason =document.getElementById('ecReason').value.trim();
-  if(!newCust){ alert('\u0e01\u0e23\u0e38\u0e13\u0e32\u0e01\u0e23\u0e2d\u0e01\u0e0a\u0e37\u0e48\u0e2d\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e16\u0e39\u0e01\u0e15\u0e49\u0e2d\u0e07'); return; }
-  if(!reason) { alert('\u0e01\u0e23\u0e38\u0e13\u0e32\u0e01\u0e23\u0e2d\u0e01\u0e40\u0e2b\u0e15\u0e38\u0e1c\u0e25'); return; }
   var r=wData.find(function(w){return w._id===_editId;});
   if(!r) return;
-  if(newCust===r.customer){ closeEditModal(); return; }
-  var original=r.customerOriginal||r.customer;
-  var logEntry={from:r.customer,to:newCust,by:curEmail,at:new Date().toISOString(),reason:reason};
-  var prevLog=Array.isArray(r.editLog)?r.editLog:[];
-  db.collection('weighings').doc(_editId).update({
-    customer:newCust, customerOriginal:original, editLog:prevLog.concat([logEntry])
-  }).then(function(){
+  var newCust=document.getElementById('ecNew').value.trim();
+  var reason =document.getElementById('ecReason').value.trim();
+  if(!newCust){ ecTab(1); alert('กรุณากรอกชื่อลูกค้า'); return; }
+  var custChanged=(newCust!==r.customer);
+  if(custChanged && !reason){ ecTab(1); alert('กรุณากรอกเหตุผล (เมื่อแก้ชื่อลูกค้า)'); return; }
+  var unit=(document.getElementById('ecUnit')||{}).value||'คิว';
+  var scoop=parseFloat((document.getElementById('ecScoop')||{}).value)||0;
+  var price=parseFloat((document.getElementById('ecPrice')||{}).value)||0;
+  var g=r.kg/KPC, d=(typeof dData!=='undefined'?(dData[r._id]||0):0), net=Math.max(0,g-d);
+  var qty=(unit==='ตัก')?scoop:net;
+  var amount=Math.round(qty*price*100)/100;
+  var upd={ sale_unit:unit, scoop:(unit==='ตัก'?scoop:0), price:price, sale_amount:amount };
+  if(custChanged){
+    upd.customer=newCust;
+    upd.customerOriginal=r.customerOriginal||r.customer;
+    var logEntry={from:r.customer,to:newCust,by:(typeof curEmail!=='undefined'?curEmail:''),at:new Date().toISOString(),reason:reason};
+    upd.editLog=(Array.isArray(r.editLog)?r.editLog:[]).concat([logEntry]);
+  }
+  db.collection('weighings').doc(_editId).update(upd).then(function(){
     closeEditModal();
-    setMsg('s1','\u2705 \u0e41\u0e01\u0e49\u0e0a\u0e37\u0e48\u0e2d\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08: '+r.customer+' \u2192 '+newCust,'ok');
+    setMsg('s1','✅ บันทึกแล้ว: '+newCust+(price>0?(' · '+amount.toLocaleString('th-TH',{minimumFractionDigits:2})+' ฿'):''),'ok');
   }).catch(function(e){
-    setMsg('s1','\u274c \u0e41\u0e01\u0e49\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08: '+e.message,'err');
+    setMsg('s1','❌ แก้ไม่สำเร็จ: '+e.message,'err');
   });
 }
 
@@ -6622,23 +6668,27 @@ function deleteDailySale(id){
 }
 
 /* Tab4 — กำไร/ขาดทุน (รายได้อัตโนมัติจากส่งรายวัน) */
-async function exDraw4(){
+function exDraw4(){
   var sel=document.getElementById('ex4Month'); if(!sel) return;
   var m=sel.value;
   var rows=gExpenses.filter(function(e){ return m && e.date.slice(0,7)===m; });
   var byCat={}; var tot=0;
   rows.forEach(function(e){ byCat[e.category]=(byCat[e.category]||0)+e.amount; tot+=e.amount; });
   var autoRev=0;
-  if(m){
-    try{
-      var snap=await prDb().collection('daily_sales').where('date','>=',m+'-01').where('date','<=',m+'-31').get();
-      snap.docs.forEach(function(d){ autoRev+=(d.data().amount||0); });
-    }catch(e){ console.warn('daily_sales rev:', e); }
+  if(m && typeof wData!=='undefined'){
+    wData.forEach(function(r){
+      if(!r.date || r.date.slice(0,7)!==m) return;
+      var price=r.price||0; if(price<=0) return;
+      var net=Math.max(0,(r.kg/KPC)-((typeof dData!=='undefined'?dData[r._id]:0)||0));
+      var qty=(r.sale_unit==='ตัก')?(r.scoop||0):net;
+      autoRev+=qty*price;
+    });
+    autoRev=Math.round(autoRev*100)/100;
   }
   var manual=exNum((document.getElementById('ex4Rev')||{}).value);
   var rev = manual>0 ? manual : autoRev;
   var head='';
-  head+='<tr><td>รายได้ขายทราย (ส่งรายวัน)</td><td class="r" style="color:#4ec98a">'+exMoney(autoRev)+'</td></tr>';
+  head+='<tr><td>รายได้ขายทราย (ตาชั่ง×ราคา)</td><td class="r" style="color:#4ec98a">'+exMoney(autoRev)+'</td></tr>';
   if(manual>0) head+='<tr><td>รายได้ (กรอกเอง — override)</td><td class="r" style="color:#4ec98a">'+exMoney(manual)+'</td></tr>';
   var body='';
   exAllCats().forEach(function(k){ if(byCat[k]) body+='<tr><td style="padding-left:14px;color:var(--muted)">'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>'; });
