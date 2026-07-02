@@ -689,11 +689,11 @@ select{color-scheme:light;}
             <p class="modal-note">⚠️ ระบบเก็บชื่อเดิมไว้ใน customerOriginal — ไม่ลบทิ้ง</p>
           </div>
           <div id="ecPane2" style="display:none">
-            <div class="modal-row"><label>หน่วยขาย</label><select id="ecUnit" onchange="ecUnitChange()" style="width:100%;padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font)"><option value="คิว">คิว (× คิวสุทธิ)</option><option value="ตัก">ตัก (× จำนวนตัก)</option></select></div>
+            <div class="modal-row"><label>หน่วยขาย</label><select id="ecUnit" onchange="ecUnitChange()" style="width:100%;padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font)"><option value="คิว">คิว (× คิวสุทธิ)</option><option value="ตัก">ตัก (× จำนวนตัก)</option><option value="เหมา">เหมา (ใส่ยอดเงินรวม)</option></select></div>
             <div class="modal-row" id="ecScoopWrap" style="display:none"><label>จำนวนตัก</label><input id="ecScoop" type="number" min="0" placeholder="เช่น 14" oninput="ecPriceCalc()"></div>
-            <div class="modal-row"><label id="ecQtyLbl">คิวสุทธิ (หลังหัก)</label><input id="ecQty" readonly></div>
-            <div class="modal-row"><label>ราคา/หน่วย (บาท)</label><input id="ecPrice" type="number" min="0" step="0.01" placeholder="เติมจากล่าสุด" oninput="ecPriceCalc()"></div>
-            <div class="modal-row"><label>ยอดเงิน (บาท)</label><input id="ecAmount" readonly style="font-weight:700;color:var(--gold)"></div>
+            <div class="modal-row" id="ecQtyWrap"><label id="ecQtyLbl">คิวสุทธิ (หลังหัก)</label><input id="ecQty" readonly></div>
+            <div class="modal-row" id="ecPriceWrap"><label id="ecPriceLbl">ราคา/หน่วย (บาท)</label><input id="ecPrice" type="number" min="0" step="0.01" placeholder="เติมจากล่าสุด" oninput="ecPriceCalc()"></div>
+            <div class="modal-row"><label id="ecAmtLbl">ยอดเงิน (บาท)</label><input id="ecAmount" readonly style="font-weight:700;color:var(--gold)"></div>
           </div>
           <div class="modal-actions">
             <button class="btn btn-ghost" onclick="closeEditModal()">ยกเลิก</button>
@@ -3517,7 +3517,7 @@ function draw1() {
           ? r.customer+' <span class="b-edited" title="\u0e41\u0e01\u0e49\u0e08\u0e32\u0e01: '+r.customerOriginal+'">\u270f\ufe0f \u0e41\u0e01\u0e49\u0e41\u0e25\u0e49\u0e27</span>'
           : r.customer;
         var _netK=Math.max(0,(r.kg/KPC)-((typeof dData!=='undefined'?dData[r._id]:0)||0));
-        var _amt=(r.price>0)?((r.sale_unit==='ตัก'?(r.scoop||0):_netK)*r.price):0;
+        var _amt=(r.sale_unit==='เหมา')?(r.sale_amount||0):((r.price>0)?((r.sale_unit==='ตัก'?(r.scoop||0):_netK)*r.price):0);
         var amtCell='<td class="r gold">'+(_amt>0?_amt.toLocaleString('th-TH',{minimumFractionDigits:2}):'<span style="color:var(--muted)">–</span>')+'</td>';
         var editBtn='<button class="btn-edit-cust" onclick="openEditModal(\''+r._id+'\')">\u270f\ufe0f ตั้งราคา</button>';
         return '<tr><td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
@@ -3566,9 +3566,11 @@ function openEditModal(id){
   document.getElementById('ecUnit').value = r.sale_unit||'คิว';
   document.getElementById('ecScoop').value = r.scoop||'';
   document.getElementById('ecPrice').value = (r.price!=null&&r.price!=='')?r.price:'';
+  var _aEl=document.getElementById('ecAmount'); if(_aEl) _aEl.value=((r.sale_unit==='เหมา')&&r.sale_amount)?r.sale_amount:'';
   ecPopulateCustList();
   ecUnitChange();
-  if(!document.getElementById('ecPrice').value){ ecFillPriceForCust(); }
+  if((r.sale_unit||'คิว')==='เหมา'){ if(!document.getElementById('ecAmount').value){ ecFillPriceForCust(); } }
+  else if(!document.getElementById('ecPrice').value){ ecFillPriceForCust(); }
   ecPriceCalc();
   document.getElementById('editCustModal').style.display='flex';
   setTimeout(function(){ var n=document.getElementById('ecNew'); if(n) n.focus(); },100);
@@ -3599,26 +3601,43 @@ function ecNetKiu(){
 }
 function ecUnitChange(){
   var u=(document.getElementById('ecUnit')||{}).value||'คิว';
-  var sw=document.getElementById('ecScoopWrap'), ql=document.getElementById('ecQtyLbl');
-  if(u==='ตัก'){ if(sw)sw.style.display=''; if(ql)ql.textContent='จำนวนตัก (ใช้คิดเงิน)'; }
-  else { if(sw)sw.style.display='none'; if(ql)ql.textContent='คิวสุทธิ (หลังหัก)'; }
+  var sw=document.getElementById('ecScoopWrap'), qw=document.getElementById('ecQtyWrap'),
+      pw=document.getElementById('ecPriceWrap'), ql=document.getElementById('ecQtyLbl'),
+      pl=document.getElementById('ecPriceLbl'), al=document.getElementById('ecAmtLbl'),
+      aEl=document.getElementById('ecAmount');
+  if(u==='ตัก'){
+    if(sw)sw.style.display=''; if(qw)qw.style.display='none'; if(pw)pw.style.display='';
+    if(pl)pl.textContent='ราคา/ตัก (บาท)'; if(al)al.textContent='ยอดเงิน (บาท)';
+    if(aEl){aEl.readOnly=true;aEl.style.opacity='';}
+  } else if(u==='เหมา'){
+    if(sw)sw.style.display='none'; if(qw)qw.style.display=''; if(pw)pw.style.display='none';
+    if(ql)ql.textContent='คิวสุทธิ (อ้างอิงจากตาชั่ง)'; if(al)al.textContent='ยอดเงินรวมทั้งคัน (บาท) *';
+    if(aEl){aEl.readOnly=false;aEl.style.opacity='1';}
+  } else {
+    if(sw)sw.style.display='none'; if(qw)qw.style.display=''; if(pw)pw.style.display='';
+    if(ql)ql.textContent='คิวสุทธิ (หลังหัก)'; if(pl)pl.textContent='ราคา/คิว (บาท)';
+    if(al)al.textContent='ยอดเงิน (บาท)'; if(aEl){aEl.readOnly=true;aEl.style.opacity='';}
+  }
   ecPriceCalc();
 }
 function ecPriceCalc(){
   var u=(document.getElementById('ecUnit')||{}).value||'คิว';
+  var qEl=document.getElementById('ecQty'), aEl=document.getElementById('ecAmount');
+  if(u==='เหมา'){ if(qEl) qEl.value=fmt3(ecNetKiu()); return; }
   var price=parseFloat((document.getElementById('ecPrice')||{}).value)||0;
   var qty=(u==='ตัก')?(parseFloat((document.getElementById('ecScoop')||{}).value)||0):ecNetKiu();
-  var qEl=document.getElementById('ecQty'); if(qEl) qEl.value=fmt3(qty);
-  var aEl=document.getElementById('ecAmount');
+  if(qEl) qEl.value=fmt3(qty);
   if(aEl) aEl.value=(qty>0&&price>0)?(Math.round(qty*price*100)/100).toLocaleString('th-TH',{minimumFractionDigits:2}):'';
 }
 function ecFillPriceForCust(){
   var cust=(document.getElementById('ecNew')||{}).value.trim();
   var u=(document.getElementById('ecUnit')||{}).value||'คิว';
   if(!cust) return;
-  var prev=(typeof wData!=='undefined'?wData:[]).filter(function(w){ return w.customer===cust && w._id!==_editId && w.price>0 && (w.sale_unit||'คิว')===u; });
+  var prev=(typeof wData!=='undefined'?wData:[]).filter(function(w){ return w.customer===cust && w._id!==_editId && (w.sale_unit||'คิว')===u; });
   prev.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-  if(prev.length){ var pe=document.getElementById('ecPrice'); if(pe){ pe.value=prev[0].price; ecPriceCalc(); } }
+  if(!prev.length) return;
+  if(u==='เหมา'){ var ae=document.getElementById('ecAmount'); if(ae && prev[0].sale_amount){ ae.value=prev[0].sale_amount; } }
+  else { var pe=document.getElementById('ecPrice'); if(pe && prev[0].price>0){ pe.value=prev[0].price; ecPriceCalc(); } }
 }
 function confirmEditCust(){
   var r=wData.find(function(w){return w._id===_editId;});
@@ -3632,9 +3651,15 @@ function confirmEditCust(){
   var scoop=parseFloat((document.getElementById('ecScoop')||{}).value)||0;
   var price=parseFloat((document.getElementById('ecPrice')||{}).value)||0;
   var g=r.kg/KPC, d=(typeof dData!=='undefined'?(dData[r._id]||0):0), net=Math.max(0,g-d);
-  var qty=(unit==='ตัก')?scoop:net;
-  var amount=Math.round(qty*price*100)/100;
-  var upd={ sale_unit:unit, scoop:(unit==='ตัก'?scoop:0), price:price, sale_amount:amount };
+  var amount, upd;
+  if(unit==='เหมา'){
+    amount=parseFloat(String((document.getElementById('ecAmount')||{}).value||'').replace(/,/g,''))||0;
+    upd={ sale_unit:'เหมา', scoop:0, price:(net>0?Math.round(amount/net*100)/100:0), sale_amount:amount };
+  } else {
+    var qty=(unit==='ตัก')?scoop:net;
+    amount=Math.round(qty*price*100)/100;
+    upd={ sale_unit:unit, scoop:(unit==='ตัก'?scoop:0), price:price, sale_amount:amount };
+  }
   if(custChanged){
     upd.customer=newCust;
     upd.customerOriginal=r.customerOriginal||r.customer;
@@ -3643,7 +3668,7 @@ function confirmEditCust(){
   }
   db.collection('weighings').doc(_editId).update(upd).then(function(){
     closeEditModal();
-    setMsg('s1','✅ บันทึกแล้ว: '+newCust+(price>0?(' · '+amount.toLocaleString('th-TH',{minimumFractionDigits:2})+' ฿'):''),'ok');
+    setMsg('s1','✅ บันทึกแล้ว: '+newCust+(amount>0?(' · '+amount.toLocaleString('th-TH',{minimumFractionDigits:2})+' ฿'):''),'ok');
   }).catch(function(e){
     setMsg('s1','❌ แก้ไม่สำเร็จ: '+e.message,'err');
   });
@@ -6678,8 +6703,9 @@ function exDraw4(){
   if(m && typeof wData!=='undefined'){
     wData.forEach(function(r){
       if(!r.date || r.date.slice(0,7)!==m) return;
-      var price=r.price||0; if(price<=0) return;
       var net=Math.max(0,(r.kg/KPC)-((typeof dData!=='undefined'?dData[r._id]:0)||0));
+      if(r.sale_unit==='เหมา'){ autoRev+=(r.sale_amount||0); return; }
+      var price=r.price||0; if(price<=0) return;
       var qty=(r.sale_unit==='ตัก')?(r.scoop||0):net;
       autoRev+=qty*price;
     });
