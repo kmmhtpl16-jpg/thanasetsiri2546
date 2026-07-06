@@ -169,7 +169,7 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
         <div class="row"><label class="fl">ลูกค้า</label>
           <div style="display:flex;gap:8px">
             <select id="fCust" class="inp" style="flex:1" onchange="custChanged()"></select>
-            <button class="ghost" style="white-space:nowrap;padding:0 14px;font-weight:700;color:var(--pri)" onclick="addCustNow()">➕ เพิ่ม</button>
+            <button class="ghost" style="white-space:nowrap;padding:0 14px;font-weight:700;color:var(--pri)" onclick="openCustDlg()">➕ เพิ่ม</button>
           </div>
           <div class="mini" style="margin-top:4px">เลือกลูกค้าจากรายการ หรือกด <b>➕ เพิ่ม</b> เพื่อเพิ่มลูกค้าใหม่</div>
         </div>
@@ -275,6 +275,11 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
       </div>
     </div>
     <div class="card">
+      <h2>👥 ลูกค้า / สิทธิ์ลงบัญชี</h2>
+      <div class="mini" style="margin-bottom:10px">ติ๊กให้ลูกค้าที่ "ลงบัญชี" (ค้างชำระ) ได้ · ลูกค้าเก่าที่เพิ่มไว้ก่อนหน้ามาเปิดสิทธิ์ตรงนี้ได้เลย</div>
+      <div id="custManage"></div>
+    </div>
+    <div class="card">
       <h2>📒 ยอดค้างชำระ (ลงบัญชี)</h2>
       <div class="mini" style="margin-bottom:10px">บิลที่ลูกค้าซื้อเชื่อ ยังไม่จ่าย — ไว้เก็บ/ตัดหักกับค่าเที่ยวรถร่วมภายหลัง กด "รับชำระแล้ว" เมื่อเคลียร์</div>
       <div id="creditOutstanding"></div>
@@ -303,6 +308,22 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
     <div style="display:flex;gap:9px;margin-top:6px">
       <button class="ghost" style="flex:1;padding:13px" onclick="document.getElementById('prodDlg').close()">ยกเลิก</button>
       <button class="bigsave" style="flex:1;padding:13px;font-size:15px" onclick="saveProdDlg()">บันทึก</button>
+    </div>
+  </div>
+</dialog>
+<dialog id="custDlg">
+  <div style="padding:18px;width:310px;max-width:88vw">
+    <h2 style="font-size:16px;color:var(--pri);font-weight:800;margin-bottom:14px">➕ เพิ่มลูกค้าใหม่</h2>
+    <div class="row"><label class="fl">ชื่อลูกค้า</label><input id="dcName" class="inp" placeholder="เช่น รุ่งชัย น้ำโสม"></div>
+    <div class="row"><label class="fl">ประเภทลูกค้า</label>
+      <div class="vatbtns">
+        <button type="button" id="dcCash" class="on" onclick="dcType('cash')">💵 ขายสด/โอน</button>
+        <button type="button" id="dcCredit" onclick="dcType('credit')">📒 เครดิต (ลงบัญชีได้)</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:9px;margin-top:6px">
+      <button class="ghost" style="flex:1;padding:13px" onclick="document.getElementById('custDlg').close()">ยกเลิก</button>
+      <button class="bigsave" style="flex:1;padding:13px;font-size:15px" onclick="saveCustDlg()">บันทึก</button>
     </div>
   </div>
 </dialog>
@@ -516,15 +537,42 @@ function rememberCust(name){
   var cs=load(K.custs,[]); if(cs.indexOf(name)<0){ cs.push(name); save(K.custs,cs); renderCustList(); }
 }
 function isCreditCust(name){ return load(K.credits,[]).indexOf(name)>=0; }
-function addCustNow(){
-  var name=(prompt('พิมพ์ชื่อลูกค้าใหม่')||'').trim();
-  if(!name) return;
+var dcCreditFlag=false;
+function dcType(t){ dcCreditFlag=(t==='credit'); $('dcCash').classList.toggle('on',!dcCreditFlag); $('dcCredit').classList.toggle('on',dcCreditFlag); }
+function openCustDlg(){ $('dcName').value=''; dcType('cash'); $('custDlg').showModal(); setTimeout(function(){ $('dcName').focus(); },50); }
+function saveCustDlg(){
+  var name=($('dcName').value||'').trim(); if(!name){ toast('⚠️ กรอกชื่อลูกค้า'); return; }
+  var cs=load(K.custs,[]); if(cs.indexOf(name)<0){ cs.push(name); save(K.custs,cs); }
+  var cr=load(K.credits,[]); var i=cr.indexOf(name);
+  if(dcCreditFlag && i<0){ cr.push(name); save(K.credits,cr); }
+  else if(!dcCreditFlag && i>=0){ cr.splice(i,1); save(K.credits,cr); }
+  renderCustList(); $('fCust').value=name; $('custDlg').close();
+  toast('✅ เพิ่มลูกค้า "'+name+'"'+(dcCreditFlag?' (เครดิต)':''));
+}
+function renderCustManage(){
+  var el=$('custManage'); if(!el) return;
   var cs=load(K.custs,[]);
-  if(cs.indexOf(name)<0){ cs.push(name); save(K.custs,cs); }
-  var canCredit=confirm('ให้ลูกค้า "'+name+'" ซื้อแบบ "ลงบัญชี" (ค้างชำระ) ได้ไหม?\n\nกด OK = ได้ (เช่น รถร่วม/ลูกค้าประจำ)\nกด Cancel = ไม่ได้ (ขายสด/โอนเท่านั้น)');
-  if(canCredit){ var cr=load(K.credits,[]); if(cr.indexOf(name)<0){ cr.push(name); save(K.credits,cr); } }
-  renderCustList(); $('fCust').value=name;
-  toast('✅ เพิ่มลูกค้า "'+name+'"'+(canCredit?' (ลงบัญชีได้)':''));
+  el.innerHTML = cs.length? cs.map(function(c,idx){
+    var isCr=isCreditCust(c);
+    return '<div class="prodrow"><div class="pn">'+esc(c)+'</div>'
+      +'<button class="ghost" style="padding:6px 11px;font-weight:700;'+(isCr?'color:#7b2ff2;border-color:#d9b8ff':'color:var(--muted)')+'" onclick="toggleCredit('+idx+')">'+(isCr?'📒 เครดิต':'💵 สด')+'</button>'
+      +(c!==DEFAULT_CUSTOMER?'<button class="slip del" onclick="delCust('+idx+')">ลบ</button>':'<span style="width:34px;display:inline-block"></span>')
+      +'</div>';
+  }).join('') : '<div class="empty">ยังไม่มีลูกค้า</div>';
+}
+function toggleCredit(idx){
+  var cs=load(K.custs,[]); var name=cs[idx]; if(!name) return;
+  var cr=load(K.credits,[]); var i=cr.indexOf(name);
+  if(i>=0) cr.splice(i,1); else cr.push(name);
+  save(K.credits,cr); renderCustManage(); renderCustList();
+  toast('"'+name+'" = '+(i>=0?'ขายสด':'เครดิต (ลงบัญชีได้)'));
+}
+function delCust(idx){
+  var cs=load(K.custs,[]); var name=cs[idx]; if(!name||name===DEFAULT_CUSTOMER) return;
+  if(!confirm('ลบลูกค้า "'+name+'"?')) return;
+  cs.splice(idx,1); save(K.custs,cs);
+  var cr=load(K.credits,[]); var j=cr.indexOf(name); if(j>=0){ cr.splice(j,1); save(K.credits,cr); }
+  renderCustManage(); renderCustList();
 }
 function custChanged(){ if(pay==='credit' && !isCreditCust($('fCust').value)){ setPay('cash'); toast('ลูกค้านี้ลงบัญชีไม่ได้ — เปลี่ยนเป็นเงินสด'); } }
 
@@ -935,6 +983,7 @@ function cancelEdit(){ editingId=null; $('editBanner').style.display='none'; sli
 /* ================= OWNER ================= */
 function renderOwner(){
   renderAccounts();
+  renderCustManage();
   renderCreditOutstanding();
   var bills=load(K.bills,[]).filter(function(b){return b.editLog&&b.editLog.length;});
   bills.sort(function(a,b){return (a.date<b.date)?1:-1;});
