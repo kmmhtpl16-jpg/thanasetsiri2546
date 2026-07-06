@@ -228,11 +228,11 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
       </div>
     </div>
     <div class="daytot"><div class="n" id="dayTotal">0 ฿</div><div class="l" id="dayTotalMeta">ยอดขายรวมของวัน</div></div>
-    <div id="dayList"></div>
-    <div class="card" id="monthCard" style="margin-top:18px">
+    <div class="card" id="monthCard" style="margin-top:16px;margin-bottom:16px">
       <h2>📆 สรุปเดือนนี้ — <span id="monthLabel"></span></h2>
       <div id="monthSum"></div>
     </div>
+    <div id="dayList"></div>
   </div>
 
   <!-- ===== PRODUCTS ===== -->
@@ -810,11 +810,11 @@ function itemBelow(i){
 }
 function underItems(b){ return (b.items||[]).filter(function(i){return itemBelow(i)>0;}); }
 function renderDay(){
-  var d=$('sumDate').value; var bills=load(K.bills,[]).filter(function(b){return b.date===d;});
-  bills.sort(function(a,b){return (a.billNo<b.billNo)?1:-1;});
-  var tot=bills.filter(function(b){return b.status!=='cancelled';}).reduce(function(s,b){return s+b.grandTotal;},0);
-  var cnt=bills.filter(function(b){return b.status!=='cancelled';}).length;
-  var active=bills.filter(function(b){return b.status!=='cancelled';});
+  var d=$('sumDate').value;
+  var dayBills=load(K.bills,[]).filter(function(b){return b.date===d;});
+  var active=dayBills.filter(function(b){return b.status!=='cancelled';});
+  var tot=active.reduce(function(s,b){return s+b.grandTotal;},0);
+  var cnt=active.length;
   var dayItems=[]; active.forEach(function(b){ (b.items||[]).forEach(function(i){dayItems.push(i);}); });
   if(role==='owner'){
     $('dayTotal').textContent=money(tot)+' ฿';
@@ -824,8 +824,11 @@ function renderDay(){
     $('dayTotalMeta').textContent=beLong(d)+(dayItems.length?(' • '+qtyByUnit(dayItems)):'');
   }
   renderMonth();
-  if(!bills.length){ $('dayList').innerHTML='<div class="empty">ยังไม่มีบิลในวันนี้</div>'; return; }
-  $('dayList').innerHTML=bills.map(function(b){
+  var bills = (role==='owner') ? load(K.bills,[]).slice() : dayBills;
+  bills.sort(function(a,b){ if(a.date!==b.date) return a.date<b.date?1:-1; return (a.billNo<b.billNo)?1:-1; });
+  var listHdr = (role==='owner') ? '<div style="font-size:13px;font-weight:700;color:var(--muted);margin:2px 2px 10px">📋 บิลทั้งหมด (ล่าสุด '+bills.length+' บิล) — แตะเลือกวันด้านบนเพื่อดูยอดรายวัน</div>' : '';
+  if(!bills.length){ $('dayList').innerHTML=listHdr+'<div class="empty">'+(role==='owner'?'ยังไม่มีบิล':'ยังไม่มีบิลในวันนี้')+'</div>'; return; }
+  $('dayList').innerHTML=listHdr+bills.map(function(b){
     var edited=(b.editLog&&b.editLog.length);
     var under=underItems(b);
     return '<div class="billrow'+(b.status==='cancelled'?' cancelled':'')+(under.length?' under':'')+'">'
@@ -834,7 +837,7 @@ function renderDay(){
         +(edited?'<span class="badge b-edited">✏️ แก้ไข '+b.editLog.length+'</span>':'')
         +(under.length?' <span class="badge b-under">⚠️ ต่ำกว่าราคา</span>':'')
         +(b.status==='cancelled'?' <span class="chip">(ยกเลิก)</span>':'')
-        +'<div class="bmeta">'+esc(b.customer)+' • '+b.items.length+' รายการ'+(b.slips&&b.slips.length?(' • สลิป '+b.slips.length+' ใบ'):'')+'</div></div>'
+        +'<div class="bmeta"><b style="color:var(--pri)">'+beDate(b.date)+'</b> • '+esc(b.customer)+' • '+b.items.length+' รายการ'+(b.slips&&b.slips.length?(' • สลิป '+b.slips.length+' ใบ'):'')+'</div></div>'
         +'<div class="bsum">'+(role==='owner'?(money(b.grandTotal)+' ฿'):billQtyText(b))+'</div></div>'
       +'<div class="acts">'
         +'<button class="ghost" onclick="reprint(\''+b.id+'\')">🖨️ พิมพ์</button>'
