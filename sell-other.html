@@ -168,7 +168,7 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
         <div class="row"><label class="fl">วันที่</label><input type="date" id="fDate" class="inp"><div class="mini" id="fDateBE" style="margin-top:4px"></div></div>
         <div class="row"><label class="fl">ลูกค้า</label>
           <div style="display:flex;gap:8px">
-            <select id="fCust" class="inp" style="flex:1"></select>
+            <select id="fCust" class="inp" style="flex:1" onchange="custChanged()"></select>
             <button class="ghost" style="white-space:nowrap;padding:0 14px;font-weight:700;color:var(--pri)" onclick="addCustNow()">➕ เพิ่ม</button>
           </div>
           <div class="mini" style="margin-top:4px">เลือกลูกค้าจากรายการ หรือกด <b>➕ เพิ่ม</b> เพื่อเพิ่มลูกค้าใหม่</div>
@@ -275,6 +275,11 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
       </div>
     </div>
     <div class="card">
+      <h2>📒 ยอดค้างชำระ (ลงบัญชี)</h2>
+      <div class="mini" style="margin-bottom:10px">บิลที่ลูกค้าซื้อเชื่อ ยังไม่จ่าย — ไว้เก็บ/ตัดหักกับค่าเที่ยวรถร่วมภายหลัง กด "รับชำระแล้ว" เมื่อเคลียร์</div>
+      <div id="creditOutstanding"></div>
+    </div>
+    <div class="card">
       <h2>✏️ ประวัติการแก้ไขบิล</h2>
       <div id="ownerEdits"></div>
     </div>
@@ -331,9 +336,9 @@ var DEFAULT_ACCOUNTS=[
   {id:'ac_kbank', bank:'กสิกรไทย (KBank)', accNo:'376-2-44778-8', accName:'หจก. ธนเศรษฐ์ศิริ 2546', qr:''}
 ];
 /* คีย์เชิงตรรกะ (routing ไป Firestore) */
-var K={bills:'bills',prods:'prods',custs:'custs',counter:'counter',log:'log',accounts:'accounts'};
+var K={bills:'bills',prods:'prods',custs:'custs',counter:'counter',log:'log',accounts:'accounts',credits:'credits'};
 /* แคชในหน่วยความจำ (sync จาก Firestore ผ่าน onSnapshot) */
-var _prods=[], _custs=[], _accounts=[], _counter={}, _bills=[], _logs=[], _listenersOn=false;
+var _prods=[], _custs=[], _accounts=[], _counter={}, _bills=[], _logs=[], _credits=[], _listenersOn=false;
 function load(k,def){
   if(k===K.prods)   return _prods.length?_prods:DEFAULT_PRODUCTS;
   if(k===K.custs)   return _custs.length?_custs:[DEFAULT_CUSTOMER];
@@ -341,6 +346,7 @@ function load(k,def){
   if(k===K.counter) return _counter;
   if(k===K.bills)   return _bills;
   if(k===K.log)     return _logs;
+  if(k===K.credits) return _credits;
   return def;
 }
 function metaSet(id,obj){ return db.collection('os_config').doc(id).set(obj); }
@@ -349,6 +355,7 @@ function save(k,v){
   if(k===K.custs)    return metaSet('os_customers',{list:v});
   if(k===K.accounts) return metaSet('os_accounts',{list:v});
   if(k===K.counter)  return metaSet('os_counter',{map:v});
+  if(k===K.credits)  return metaSet('os_credit_customers',{list:v});
 }
 function isoDaysAgo(n){ var d=new Date(); d.setDate(d.getDate()-n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 async function seedIfNeeded(){
@@ -368,6 +375,7 @@ function attachListeners(){
   db.collection('os_config').doc('os_customers').onSnapshot(function(d){ _custs=(d.exists&&d.data().list)||[]; renderCustList(); });
   db.collection('os_config').doc('os_accounts').onSnapshot(function(d){ _accounts=(d.exists&&d.data().list)||[]; renderAccounts(); });
   db.collection('os_config').doc('os_counter').onSnapshot(function(d){ _counter=(d.exists&&d.data().map)||{}; });
+  db.collection('os_config').doc('os_credit_customers').onSnapshot(function(d){ _credits=(d.exists&&d.data().list)||[]; renderCustList(); if($('pane-owner')&&$('pane-owner').classList.contains('on')) renderOwner(); });
   var cutoff=isoDaysAgo(400);
   db.collection('os_bills').where('date','>=',cutoff).onSnapshot(function(snap){ _bills=snap.docs.map(function(x){return x.data();}); renderDay(); }, function(e){ console.warn('bills',e); });
   db.collection('os_logs').orderBy('at','desc').limit(200).onSnapshot(function(snap){ _logs=snap.docs.map(function(x){return x.data();}); if($('pane-owner')&&$('pane-owner').classList.contains('on')) renderOwner(); }, function(e){ console.warn('logs',e); });
@@ -507,14 +515,18 @@ function rememberCust(name){
   name=(name||'').trim(); if(!name)return;
   var cs=load(K.custs,[]); if(cs.indexOf(name)<0){ cs.push(name); save(K.custs,cs); renderCustList(); }
 }
+function isCreditCust(name){ return load(K.credits,[]).indexOf(name)>=0; }
 function addCustNow(){
   var name=(prompt('พิมพ์ชื่อลูกค้าใหม่')||'').trim();
   if(!name) return;
   var cs=load(K.custs,[]);
   if(cs.indexOf(name)<0){ cs.push(name); save(K.custs,cs); }
+  var canCredit=confirm('ให้ลูกค้า "'+name+'" ซื้อแบบ "ลงบัญชี" (ค้างชำระ) ได้ไหม?\n\nกด OK = ได้ (เช่น รถร่วม/ลูกค้าประจำ)\nกด Cancel = ไม่ได้ (ขายสด/โอนเท่านั้น)');
+  if(canCredit){ var cr=load(K.credits,[]); if(cr.indexOf(name)<0){ cr.push(name); save(K.credits,cr); } }
   renderCustList(); $('fCust').value=name;
-  toast('✅ เพิ่มลูกค้า "'+name+'" แล้ว');
+  toast('✅ เพิ่มลูกค้า "'+name+'"'+(canCredit?' (ลงบัญชีได้)':''));
 }
+function custChanged(){ if(pay==='credit' && !isCreditCust($('fCust').value)){ setPay('cash'); toast('ลูกค้านี้ลงบัญชีไม่ได้ — เปลี่ยนเป็นเงินสด'); } }
 
 /* ================= PRODUCTS ================= */
 function getProds(){ return load(K.prods,DEFAULT_PRODUCTS); }
@@ -543,7 +555,9 @@ function updProdPrice(id,v){ var ps=getProds(); ps.forEach(function(p){if(p.id==
 function delProd(id){ if(!confirm('ลบสินค้านี้?'))return; save(K.prods,getProds().filter(function(p){return p.id!==id;})); renderProds(); }
 
 /* ================= PAYMENT + SLIPS ================= */
-function setPay(p){ pay=p;
+function setPay(p){
+  if(p==='credit' && !isCreditCust($('fCust').value)){ toast('⚠️ ลูกค้านี้ลงบัญชีไม่ได้ — กด ➕ เพิ่ม เป็นลูกค้าเครดิตก่อน'); return; }
+  pay=p;
   $('payCash').classList.toggle('on',p==='cash');
   $('payTransfer').classList.toggle('on',p==='transfer');
   var pc=$('payCredit'); if(pc) pc.classList.toggle('on',p==='credit');
@@ -855,7 +869,7 @@ function renderDay(){
     var under=underItems(b);
     return '<div class="billrow'+(b.status==='cancelled'?' cancelled':'')+(under.length?' under':'')+(b.pay==='credit'?' credit':'')+'">'
       +'<div class="bh"><div><span class="bno">'+b.billNo+'</span> '
-        +'<span class="badge '+(b.pay==='cash'?'b-cash">💵 เงินสด':b.pay==='credit'?'b-credit">📒 ลงบัญชี (ค้างชำระ)':'b-transfer">🏦 โอน')+'</span> '
+        +'<span class="badge '+(b.pay==='cash'?'b-cash">💵 เงินสด':b.pay==='credit'?('b-credit">📒 ลงบัญชี '+(b.creditPaid?'(ชำระแล้ว)':'(ค้างชำระ)')):'b-transfer">🏦 โอน')+'</span> '
         +(edited?'<span class="badge b-edited">✏️ แก้ไข '+b.editLog.length+'</span>':'')
         +(under.length?' <span class="badge b-under">⚠️ ต่ำกว่าราคา</span>':'')
         +(b.status==='cancelled'?' <span class="chip">(ยกเลิก)</span>':'')
@@ -921,6 +935,7 @@ function cancelEdit(){ editingId=null; $('editBanner').style.display='none'; sli
 /* ================= OWNER ================= */
 function renderOwner(){
   renderAccounts();
+  renderCreditOutstanding();
   var bills=load(K.bills,[]).filter(function(b){return b.editLog&&b.editLog.length;});
   bills.sort(function(a,b){return (a.date<b.date)?1:-1;});
   $('ownerEdits').innerHTML = bills.length? bills.map(function(b){
@@ -938,6 +953,42 @@ function renderOwner(){
   }).join('') : '<div class="empty">ยังไม่มีการแจ้งเตือน</div>';
 }
 function viewEdits(id){ goTab('owner'); }
+function renderCreditOutstanding(){
+  var el=$('creditOutstanding'); if(!el) return;
+  var out=load(K.bills,[]).filter(function(b){ return b.pay==='credit' && !b.creditPaid && b.status!=='cancelled'; });
+  if(!out.length){ el.innerHTML='<div class="empty">ไม่มียอดค้างชำระ</div>'; return; }
+  var byCust={};
+  out.forEach(function(b){ (byCust[b.customer]=byCust[b.customer]||[]).push(b); });
+  var grand=out.reduce(function(a,b){return a+(b.grandTotal||0);},0);
+  var html='<div class="total-line grand" style="margin-bottom:10px"><span>ยอดค้างทั้งหมด</span><span>'+money(grand)+' ฿</span></div>';
+  Object.keys(byCust).sort(function(a,b){return a.localeCompare(b,'th');}).forEach(function(c){
+    var arr=byCust[c]; arr.sort(function(a,b){return (a.date<b.date)?1:-1;});
+    var sub=arr.reduce(function(a,b){return a+(b.grandTotal||0);},0);
+    html+='<div style="border:1px solid var(--line);border-radius:10px;padding:11px;margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;font-weight:800"><span>'+esc(c)+'</span><span style="color:#7b2ff2">'+money(sub)+' ฿</span></div>'
+      +arr.map(function(b){
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px dashed var(--line);padding:7px 0;font-size:13px">'
+          +'<span>'+b.billNo+' • '+beDate(b.date)+' • '+money(b.grandTotal)+' ฿</span>'
+          +'<span style="display:flex;gap:5px">'
+            +(b.slips&&b.slips.length?'<button class="ghost" style="padding:5px 9px" onclick="viewSlips(\''+b.id+'\')">🧾 บิลรับ</button>':'')
+            +'<button class="ghost" style="padding:5px 9px;color:var(--green)" onclick="markCreditPaid(\''+b.id+'\')">✅ รับชำระแล้ว</button>'
+          +'</span></div>';
+      }).join('')
+      +'</div>';
+  });
+  el.innerHTML=html;
+}
+function markCreditPaid(id){
+  var src=_bills.find(function(x){return x.id===id;}); if(!src) return;
+  if(!confirm('ยืนยันว่าบิล '+src.billNo+' (ลูกค้า '+src.customer+', '+money(src.grandTotal)+' ฿) รับชำระ/ตัดหักแล้ว?')) return;
+  var b=JSON.parse(JSON.stringify(src));
+  b.creditPaid=true; b.creditPaidAt=new Date().toISOString(); b.editLog=b.editLog||[];
+  b.editLog.push({at:new Date().toISOString(),by:role,changes:['• รับชำระ/ตัดหักยอดค้าง (ลงบัญชี)']});
+  db.collection('os_bills').doc(id).set(b).then(function(){
+    notify('✅ <b>รับชำระยอดลงบัญชี</b>\nบิล '+b.billNo+' (ลูกค้า '+b.customer+')\nยอด: '+money(b.grandTotal)+' ฿\nโดย: '+(role==='owner'?'เจ้าของ':'พนักงาน'));
+    renderCreditOutstanding(); toast('✅ ตัดยอดค้างแล้ว');
+  }).catch(function(e){ alert('ไม่สำเร็จ: '+e.message); });
+}
 
 /* ================= PRINT A4 ================= */
 function printBill(b){
