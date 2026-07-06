@@ -340,7 +340,7 @@ function load(k,def){
   if(k===K.log)     return _logs;
   return def;
 }
-function metaSet(id,obj){ return db.collection('app_meta').doc(id).set(obj); }
+function metaSet(id,obj){ return db.collection('os_config').doc(id).set(obj); }
 function save(k,v){
   if(k===K.prods)    return metaSet('os_products',{list:v});
   if(k===K.custs)    return metaSet('os_customers',{list:v});
@@ -350,21 +350,21 @@ function save(k,v){
 function isoDaysAgo(n){ var d=new Date(); d.setDate(d.getDate()-n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 async function seedIfNeeded(){
   try{
-    var pd=await db.collection('app_meta').doc('os_products').get();
-    if(!pd.exists) await db.collection('app_meta').doc('os_products').set({list:DEFAULT_PRODUCTS});
-    var cd=await db.collection('app_meta').doc('os_customers').get();
-    if(!cd.exists) await db.collection('app_meta').doc('os_customers').set({list:[DEFAULT_CUSTOMER]});
-    var ad=await db.collection('app_meta').doc('os_accounts').get();
-    if(!ad.exists) await db.collection('app_meta').doc('os_accounts').set({list:DEFAULT_ACCOUNTS});
+    var pd=await db.collection('os_config').doc('os_products').get();
+    if(!pd.exists) await db.collection('os_config').doc('os_products').set({list:DEFAULT_PRODUCTS});
+    var cd=await db.collection('os_config').doc('os_customers').get();
+    if(!cd.exists) await db.collection('os_config').doc('os_customers').set({list:[DEFAULT_CUSTOMER]});
+    var ad=await db.collection('os_config').doc('os_accounts').get();
+    if(!ad.exists) await db.collection('os_config').doc('os_accounts').set({list:DEFAULT_ACCOUNTS});
   }catch(e){ console.warn('seed',e); }
 }
 function attachListeners(){
   if(_listenersOn||!db) return; _listenersOn=true;
   seedIfNeeded();
-  db.collection('app_meta').doc('os_products').onSnapshot(function(d){ _prods=(d.exists&&d.data().list)||[]; renderProds(); refreshItemSelects(); });
-  db.collection('app_meta').doc('os_customers').onSnapshot(function(d){ _custs=(d.exists&&d.data().list)||[]; renderCustList(); });
-  db.collection('app_meta').doc('os_accounts').onSnapshot(function(d){ _accounts=(d.exists&&d.data().list)||[]; renderAccounts(); });
-  db.collection('app_meta').doc('os_counter').onSnapshot(function(d){ _counter=(d.exists&&d.data().map)||{}; });
+  db.collection('os_config').doc('os_products').onSnapshot(function(d){ _prods=(d.exists&&d.data().list)||[]; renderProds(); refreshItemSelects(); });
+  db.collection('os_config').doc('os_customers').onSnapshot(function(d){ _custs=(d.exists&&d.data().list)||[]; renderCustList(); });
+  db.collection('os_config').doc('os_accounts').onSnapshot(function(d){ _accounts=(d.exists&&d.data().list)||[]; renderAccounts(); });
+  db.collection('os_config').doc('os_counter').onSnapshot(function(d){ _counter=(d.exists&&d.data().map)||{}; });
   var cutoff=isoDaysAgo(400);
   db.collection('os_bills').where('date','>=',cutoff).onSnapshot(function(snap){ _bills=snap.docs.map(function(x){return x.data();}); renderDay(); }, function(e){ console.warn('bills',e); });
   db.collection('os_logs').orderBy('at','desc').limit(200).onSnapshot(function(snap){ _logs=snap.docs.map(function(x){return x.data();}); if($('pane-owner')&&$('pane-owner').classList.contains('on')) renderOwner(); }, function(e){ console.warn('logs',e); });
@@ -708,7 +708,7 @@ function recalc(){
 /* ================= BILL NUMBER ================= */
 async function genBillNo(ymd){
   var p=ymd.split('-'); var yy=String((parseInt(p[0])+543)%100).padStart(2,'0'); var mm=p[1]; var key=yy+mm;
-  var ref=db.collection('app_meta').doc('os_counter');
+  var ref=db.collection('os_config').doc('os_counter');
   var num=await db.runTransaction(async function(tx){
     var d=await tx.get(ref); var map=(d.exists&&d.data().map)||{};
     map[key]=(map[key]||0)+1; tx.set(ref,{map:map},{merge:true}); return map[key];
