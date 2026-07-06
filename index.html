@@ -1759,26 +1759,68 @@ async function tgCheckDailySummary(){
 async function tgBuildDailySummary(today){
   var d = prDb();
   var empty = { forEach:function(){} };
+  var nd=new Date(today); nd.setDate(nd.getDate()+1); var nextDay=nd.toISOString().slice(0,10);
   var res = await Promise.all([
     d.collection('withdrawals').where('date','==',today).get().catch(function(){return empty;}),
     d.collection('expenses').where('date','==',today).get().catch(function(){return empty;}),
     d.collection('fuel_in').where('date','==',today).get().catch(function(){return empty;}),
     d.collection('fuel_expense').where('date','==',today).get().catch(function(){return empty;}),
-    d.collection('invoices').where('createdAt','>=',today).where('createdAt','<',today+'').get().catch(function(){return empty;})
+    d.collection('invoices').where('createdAt','>=',today).where('createdAt','<',nextDay).get().catch(function(){return empty;}),
+    d.collection('weighings').where('date','==',today).get().catch(function(){return empty;}),
+    d.collection('os_bills').where('date','==',today).get().catch(function(){return empty;})
   ]);
   var wdTot=0,wdN=0; res[0].forEach(function(x){var v=x.data();wdTot+=(v.amount||0);wdN++;});
   var exTot=0,exN=0; res[1].forEach(function(x){var v=x.data();exTot+=(v.amount||0);exN++;});
   var fiL=0;        res[2].forEach(function(x){fiL+=(x.data().liters||0);});
   var feTot=0,feN=0; res[3].forEach(function(x){feTot+=(x.data().total_amount||0);feN++;});
-  var invN=0,invTot=0; res[4].forEach(function(x){invN++;invTot+=(x.data().grandTotal||0);});
+  var invN=0;       res[4].forEach(function(x){invN++;});
+  /* รายได้ขายทราย (ตาชั่ง × ราคา) */
+  var sandRev=0;
+  res[5].forEach(function(x){
+    var w=x.data(); var id=x.id;
+    var net=Math.max(0,(w.kg/KPC)-((typeof dData!=='undefined'&&dData[id])?dData[id]:0));
+    if(w.sale_unit==='เหมา'){ sandRev+=(w.sale_amount||0); return; }
+    var price=w.price||0; if(price<=0) return;
+    var qty=(w.sale_unit==='ตัก')?(w.scoop||0):((w.sale_unit==='ตัน')?net*1.5:net);
+    sandRev+=qty*price;
+  });
+  sandRev=Math.round(sandRev*100)/100;
+  /* รายได้ขายดิน/สินค้าอื่น (os_bills) แยกตามช่องทางชำระ */
+  var osCash=0,osTrans=0,osCredit=0;
+  res[6].forEach(function(x){
+    var b=x.data(); if(b.status==='cancelled') return;
+    var amt=b.grandTotal||0;
+    if(b.pay==='transfer') osTrans+=amt;
+    else if(b.pay==='credit') osCredit+=amt;
+    else osCash+=amt;
+  });
+  var dirtTot=osCash+osTrans+osCredit;
+  var totalRev=sandRev+dirtTot;
+  var received=sandRev+osCash+osTrans;   /* เงินเข้าจริง (ไม่รวมลงบัญชี) */
+  var expTot=exTot+wdTot+feTot;
+  var netCash=Math.round((received-expTot)*100)/100;
+
   var L=[];
   L.push('📊 <b>สรุปประจำวัน '+isoToBE(today)+'</b>');
-  L.push('————————————');
-  L.push('👷 เบิกเงินเดือน: '+fmtBaht(wdTot)+' ฿ ('+wdN+' รายการ)');
-  L.push('💸 รายจ่าย: '+fmtBaht(exTot)+' ฿ ('+exN+' รายการ)');
-  L.push('⛽ ค่าน้ำมันรถ: '+fmtBaht(feTot)+' ฿ ('+feN+' ครั้ง)');
-  L.push('🛢️ รับน้ำมันเข้า: '+fmtBaht(fiL)+' ลิตร');
-  L.push('🧾 ใบแจ้งหนี้ใหม่: '+invN+' ใบ ('+fmtBaht(invTot)+' ฿)');
+  L.push('━━━━━━━━━━━━');
+  L.push('💰 <b>รายได้วันนี้</b>');
+  L.push('  ⛏️ ขายทราย: '+fmtBaht(sandRev)+' ฿');
+  L.push('  🧱 ขายดิน/อื่น: '+fmtBaht(dirtTot)+' ฿');
+  if(osCash>0)   L.push('     · เงินสด '+fmtBaht(osCash));
+  if(osTrans>0)  L.push('     · โอน '+fmtBaht(osTrans));
+  if(osCredit>0) L.push('     · ลงบัญชี '+fmtBaht(osCredit));
+  L.push('  รวมรายได้: <b>'+fmtBaht(totalRev)+' ฿</b>');
+  L.push('  (💵 เงินเข้าจริง '+fmtBaht(received)+' · 📒 ค้างชำระ '+fmtBaht(osCredit)+')');
+  L.push('');
+  L.push('💸 <b>รายจ่ายวันนี้</b>');
+  L.push('  🧾 รายจ่ายทั่วไป: '+fmtBaht(exTot)+' ฿ ('+exN+' รายการ)');
+  L.push('  👷 เบิกเงินเดือน: '+fmtBaht(wdTot)+' ฿ ('+wdN+' รายการ)');
+  L.push('  ⛽ ค่าน้ำมันรถ: '+fmtBaht(feTot)+' ฿ ('+feN+' ครั้ง)');
+  L.push('  รวมรายจ่าย: <b>'+fmtBaht(expTot)+' ฿</b>');
+  L.push('━━━━━━━━━━━━');
+  L.push('📈 <b>คงเหลือ (เงินเข้าจริง − รายจ่าย): '+(netCash>=0?'+':'')+fmtBaht(netCash)+' ฿</b>');
+  L.push('');
+  L.push('ℹ️ รับน้ำมันเข้า '+fmtBaht(fiL)+' ลิตร · ใบแจ้งหนี้ใหม่ '+invN+' ใบ');
   return L.join('\n');
 }
 
