@@ -109,6 +109,8 @@ label.fl{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-
 .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:700;}
 .b-cash{background:#fff7e6;color:#a86b00;}
 .b-transfer{background:#e6f0ff;color:#1857c4;}
+.b-credit{background:#f3e8ff;color:#7b2ff2;}
+.billrow.credit{border-color:#d9b8ff;background:#faf5ff;}
 .b-edited{background:#fdecea;color:var(--red);}
 .chip{font-size:12px;color:var(--muted);}
 .empty{text-align:center;color:var(--muted);padding:26px;font-size:14px;}
@@ -202,14 +204,15 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
 
     <div class="card">
       <h2>💳 วิธีการชำระเงิน</h2>
-      <div class="paybtns" style="margin-bottom:4px">
+      <div class="paybtns" style="margin-bottom:4px;grid-template-columns:repeat(3,1fr)">
         <button id="payCash" class="on" onclick="setPay('cash')">💵 เงินสด</button>
         <button id="payTransfer" onclick="setPay('transfer')">🏦 เงินโอน</button>
+        <button id="payCredit" onclick="setPay('credit')">📒 ลงบัญชี</button>
       </div>
       <div class="row" id="slipRow" style="display:none;margin-top:13px">
-        <label class="fl">สลิปโอนเงิน <span style="color:var(--red)">*บังคับแนบเมื่อโอน</span> — แนบรูปสลิป + ใส่ยอด (บัญชีปลายทางระบบตรวจให้เองหลังบ้าน)</label>
+        <label class="fl" id="slipLabel">สลิปโอนเงิน <span style="color:var(--red)">*บังคับแนบเมื่อโอน</span> — แนบรูปสลิป + ใส่ยอด (บัญชีปลายทางระบบตรวจให้เองหลังบ้าน)</label>
         <div id="slipWrap"></div>
-        <button class="addbtn" onclick="document.getElementById('slipFile').click()">➕ เพิ่มสลิป</button>
+        <button class="addbtn" id="addSlipBtn" onclick="document.getElementById('slipFile').click()">➕ เพิ่มสลิป</button>
         <input type="file" id="slipFile" accept="image/*" style="display:none" onchange="addSlip(this)">
         <div id="slipCheck" class="slipcheck"></div>
       </div>
@@ -540,7 +543,22 @@ function updProdPrice(id,v){ var ps=getProds(); ps.forEach(function(p){if(p.id==
 function delProd(id){ if(!confirm('ลบสินค้านี้?'))return; save(K.prods,getProds().filter(function(p){return p.id!==id;})); renderProds(); }
 
 /* ================= PAYMENT + SLIPS ================= */
-function setPay(p){ pay=p; $('payCash').classList.toggle('on',p==='cash'); $('payTransfer').classList.toggle('on',p==='transfer'); $('slipRow').style.display=p==='transfer'?'block':'none'; updateSlipCheck(); }
+function setPay(p){ pay=p;
+  $('payCash').classList.toggle('on',p==='cash');
+  $('payTransfer').classList.toggle('on',p==='transfer');
+  var pc=$('payCredit'); if(pc) pc.classList.toggle('on',p==='credit');
+  var needAttach=(p==='transfer'||p==='credit');
+  $('slipRow').style.display=needAttach?'block':'none';
+  var lbl=$('slipLabel'), ab=$('addSlipBtn');
+  if(p==='credit'){
+    if(lbl) lbl.innerHTML='รูปบิลรับสินค้า <span style="color:var(--red)">*บังคับแนบเมื่อลงบัญชี</span> — ถ่ายบิลที่ลูกค้าเซ็นรับของ (แนบได้หลายใบ)';
+    if(ab) ab.textContent='➕ เพิ่มรูปบิล';
+  } else {
+    if(lbl) lbl.innerHTML='สลิปโอนเงิน <span style="color:var(--red)">*บังคับแนบเมื่อโอน</span> — แนบรูปสลิป + ใส่ยอด (บัญชีปลายทางระบบตรวจให้เองหลังบ้าน)';
+    if(ab) ab.textContent='➕ เพิ่มสลิป';
+  }
+  renderSlips(); updateSlipCheck();
+}
 function addSlip(inp){
   var f=inp.files[0]; if(!f)return;
   var rd=new FileReader();
@@ -567,11 +585,12 @@ function resizeImg(dataUrl,cb){
   img.src=dataUrl;
 }
 function renderSlips(){
+  var isCredit = pay==='credit';
   $('slipWrap').innerHTML=slips.map(function(s,i){
     return '<div class="slip"><img src="'+(s.url||s.img)+'" onclick="showImg(\''+i+'\')">'
       +'<div class="si">'
-        +'<input class="amt-in" type="number" inputmode="decimal" placeholder="💰 ยอดเงินในสลิป (บาท)" value="'+(s.amount||'')+'" oninput="slips['+i+'].amount=this.value; updateSlipCheck()">'
-        +(s.dup?'<div class="dupwarn">⚠️ สลิปซ้ำ ('+esc(s.dup)+')</div>':'')
+        +(isCredit?'':'<input class="amt-in" type="number" inputmode="decimal" placeholder="💰 ยอดเงินในสลิป (บาท)" value="'+(s.amount||'')+'" oninput="slips['+i+'].amount=this.value; updateSlipCheck()">')
+        +(s.dup?'<div class="dupwarn">⚠️ รูปนี้ซ้ำ ('+esc(s.dup)+')</div>':'')
       +'</div>'
       +'<button class="del" onclick="delSlip('+i+')">ลบ</button></div>';
   }).join('');
@@ -730,6 +749,9 @@ async function saveBill(){
     var sumSlip=slips.reduce(function(a,s){return a+(parseFloat(s.amount)||0);},0);
     if(Math.abs(sumSlip-r.grand)>=0.01){ if(!confirm('⚠️ ยอดสลิปรวม '+money(sumSlip)+' ฿ ไม่ตรงกับยอดบิล '+money(r.grand)+' ฿\nยืนยันบันทึกหรือไม่?')) return; }
   }
+  if(pay==='credit'){
+    if(slips.length===0){ toast('⚠️ ลงบัญชีต้องแนบรูปบิลรับสินค้าอย่างน้อย 1 ใบ'); return; }
+  }
   rememberCust(cust);
   var btn=$('saveBtn'); var oldTxt=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='⏳ กำลังบันทึก...'; }
   try{
@@ -831,9 +853,9 @@ function renderDay(){
   $('dayList').innerHTML=listHdr+bills.map(function(b){
     var edited=(b.editLog&&b.editLog.length);
     var under=underItems(b);
-    return '<div class="billrow'+(b.status==='cancelled'?' cancelled':'')+(under.length?' under':'')+'">'
+    return '<div class="billrow'+(b.status==='cancelled'?' cancelled':'')+(under.length?' under':'')+(b.pay==='credit'?' credit':'')+'">'
       +'<div class="bh"><div><span class="bno">'+b.billNo+'</span> '
-        +'<span class="badge '+(b.pay==='cash'?'b-cash">💵 เงินสด':'b-transfer">🏦 โอน')+'</span> '
+        +'<span class="badge '+(b.pay==='cash'?'b-cash">💵 เงินสด':b.pay==='credit'?'b-credit">📒 ลงบัญชี (ค้างชำระ)':'b-transfer">🏦 โอน')+'</span> '
         +(edited?'<span class="badge b-edited">✏️ แก้ไข '+b.editLog.length+'</span>':'')
         +(under.length?' <span class="badge b-under">⚠️ ต่ำกว่าราคา</span>':'')
         +(b.status==='cancelled'?' <span class="chip">(ยกเลิก)</span>':'')
@@ -842,7 +864,7 @@ function renderDay(){
       +'<div class="acts">'
         +'<button class="ghost" onclick="reprint(\''+b.id+'\')">🖨️ พิมพ์</button>'
         +(b.status!=='cancelled'?'<button class="ghost" onclick="startEdit(\''+b.id+'\')">✏️ แก้ไข</button>':'')
-        +(b.slips&&b.slips.length?'<button class="ghost" onclick="viewSlips(\''+b.id+'\')">🧾 ดูสลิป</button>':'')
+        +(b.slips&&b.slips.length?'<button class="ghost" onclick="viewSlips(\''+b.id+'\')">🧾 '+(b.pay==='credit'?'ดูรูปบิล':'ดูสลิป')+'</button>':'')
         +(role==='owner'&&edited?'<button class="ghost" style="color:var(--red)" onclick="viewEdits(\''+b.id+'\')">🔒 ประวัติแก้ไข</button>':'')
         +(b.status!=='cancelled'?'<button class="ghost" style="color:var(--red)" onclick="cancelBill(\''+b.id+'\')">ยกเลิก</button>':'')
       +'</div></div>';
@@ -924,8 +946,9 @@ function printBill(b){
       +'<td class="r">'+ (it.qty%1?it.qty:it.qty) +'</td><td class="c">'+esc(it.unit)+'</td>'
       +'<td class="r">'+money(it.price)+'</td><td class="r">'+money(it.amount)+'</td></tr>';
   }).join('');
-  var payTxt=b.pay==='cash'?'เงินสด':'เงินโอน';
+  var payTxt=b.pay==='cash'?'เงินสด':b.pay==='credit'?'ลงบัญชี (ค้างชำระ)':'เงินโอน';
   var slipNote=(b.pay==='transfer'&&b.slips&&b.slips.length)?('<div class="paynote">🏦 ชำระโดยโอนเงิน — แนบสลิป '+b.slips.length+' ใบ (รวม '+money(b.slips.reduce(function(a,s){return a+(parseFloat(s.amount)||0);},0))+' ฿)</div>'):'';
+  if(b.pay==='credit') slipNote='<div class="paynote" style="color:#7b2ff2">📒 ลงบัญชี (ค้างชำระ) — แนบบิลรับสินค้า '+((b.slips&&b.slips.length)||0)+' ใบ</div>';
   var accArr=getAccounts();
   var bankBlock=(b.pay==='transfer'&&accArr.length)?('<div class="bank">💳 <b>ช่องทางรับเงิน — หจก.ธนเศรษฐ์ศิริ 2546</b><br>'+accArr.map(function(a){return esc(a.bank)+' &nbsp; <b>'+esc(a.accNo)+'</b> &nbsp; ('+esc(a.accName)+')';}).join('<br>')+'</div>'):'';
   var vatRows = b.vat==='ex'
