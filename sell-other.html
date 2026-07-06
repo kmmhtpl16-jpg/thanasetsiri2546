@@ -378,7 +378,7 @@ var DEFAULT_ACCOUNTS=[
 var K={bills:'bills',prods:'prods',custs:'custs',counter:'counter',log:'log',accounts:'accounts',credits:'credits'};
 /* แคชในหน่วยความจำ (sync จาก Firestore ผ่าน onSnapshot) */
 var _prods=[], _custs=[], _accounts=[], _counter={}, _bills=[], _logs=[], _credits=[], _listenersOn=false;
-var vehData={}; var curFreight=true;
+var vehData={}; var curFreight=true; var _custVeh={};
 function load(k,def){
   if(k===K.prods)   return _prods.length?_prods:DEFAULT_PRODUCTS;
   if(k===K.custs)   return _custs.length?_custs:[DEFAULT_CUSTOMER];
@@ -416,6 +416,7 @@ function attachListeners(){
   db.collection('os_config').doc('os_accounts').onSnapshot(function(d){ _accounts=(d.exists&&d.data().list)||[]; renderAccounts(); });
   db.collection('os_config').doc('os_counter').onSnapshot(function(d){ _counter=(d.exists&&d.data().map)||{}; });
   db.collection('os_config').doc('os_credit_customers').onSnapshot(function(d){ _credits=(d.exists&&d.data().list)||[]; renderCustList(); if($('pane-owner')&&$('pane-owner').classList.contains('on')) renderOwner(); });
+  db.collection('os_config').doc('os_customer_vehicle').onSnapshot(function(d){ _custVeh=(d.exists&&d.data().map)||{}; if($('pane-owner')&&$('pane-owner').classList.contains('on')) renderCustManage(); });
   var cutoff=isoDaysAgo(400);
   db.collection('os_bills').where('date','>=',cutoff).onSnapshot(function(snap){ _bills=snap.docs.map(function(x){return x.data();}); renderDay(); }, function(e){ console.warn('bills',e); });
   db.collection('vehicles').onSnapshot(function(snap){ vehData={}; snap.docs.forEach(function(d){ vehData[d.id]=d.data(); }); buildPlateList(); if($('fPlate')&&$('fPlate').value) onPlateInput(); }, function(e){ console.warn('vehicles',e); });
@@ -569,6 +570,8 @@ function saveCustDlg(){
   renderCustList(); $('fCust').value=name; $('custDlg').close(); custChanged();
   toast('✅ เพิ่มลูกค้า "'+name+'"'+(dcCreditFlag?' (เครดิต)':''));
 }
+function vehOwnerList(){ var s={}; Object.keys(vehData).forEach(function(p){ var v=vehData[p]; var o=(v&&(v.canonical||v.ownerName)); if(o)s[o]=true; }); return Object.keys(s).sort(function(a,b){return a.localeCompare(b,'th');}); }
+function setCustVeh(idx,owner){ var cs=load(K.custs,[]); var name=cs[idx]; if(!name)return; var m=Object.assign({},_custVeh); if(owner)m[name]=owner; else delete m[name]; db.collection('os_config').doc('os_customer_vehicle').set({map:m},{merge:true}).then(function(){ toast(owner?('✅ ผูก "'+name+'" = รถ '+owner):('ยกเลิกผูกรถของ "'+name+'"')); }).catch(function(e){ toast('❌ '+e.message); }); }
 function renderCustManage(){
   var el=$('custManage'); if(!el) return;
   var cs=load(K.custs,[]);
@@ -576,6 +579,10 @@ function renderCustManage(){
     var isCr=isCreditCust(c);
     return '<div class="prodrow"><div class="pn">'+esc(c)+'</div>'
       +'<button class="ghost" style="padding:6px 11px;font-weight:700;'+(isCr?'color:#7b2ff2;border-color:#d9b8ff':'color:var(--muted)')+'" onclick="toggleCredit('+idx+')">'+(isCr?'📒 เครดิต':'💵 สด')+'</button>'
+      +'<select class="inp" title="ผูกลูกค้านี้เข้ากับเจ้าของรถร่วม (เพื่อหักยอดลงบัญชีกับค่าเที่ยว)" style="max-width:150px;padding:5px 6px;font-size:12px" onchange="setCustVeh('+idx+',this.value)">'
+        +'<option value="">— ไม่ใช่เจ้าของรถ —</option>'
+        +vehOwnerList().map(function(o){return '<option value="'+esc(o)+'"'+(_custVeh[c]===o?' selected':'')+'>🚛 '+esc(o)+'</option>';}).join('')
+      +'</select>'
       +(c!==DEFAULT_CUSTOMER?'<button class="slip del" onclick="delCust('+idx+')">ลบ</button>':'<span style="width:34px;display:inline-block"></span>')
       +'</div>';
   }).join('') : '<div class="empty">ยังไม่มีลูกค้า</div>';
