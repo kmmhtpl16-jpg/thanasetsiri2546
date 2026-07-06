@@ -177,6 +177,24 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
     </div>
 
     <div class="card">
+      <h2>🚛 รถที่จัดส่ง <span style="font-size:13px;font-weight:500;color:var(--muted)">(สำหรับค่าเที่ยวรถร่วม)</span></h2>
+      <div class="row">
+        <label class="fl">ทะเบียนรถ</label>
+        <input id="fPlate" class="inp" list="plateList" placeholder="เช่น 83-4888" oninput="onPlateInput()" autocomplete="off">
+        <datalist id="plateList"></datalist>
+        <div class="mini" id="fPlateInfo" style="margin-top:5px"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label class="fl">ประเภทรถ / ค่าเที่ยว</label>
+        <div class="vatbtns">
+          <button type="button" id="frYes" class="on" onclick="setFreight(true)">🚛 รถร่วม (จ่ายค่าเที่ยว)</button>
+          <button type="button" id="frNo" onclick="setFreight(false)">🏢 รถบริษัท (ไม่จ่าย)</button>
+        </div>
+        <div class="mini" style="margin-top:5px">🚛 รถร่วม = บันทึกเที่ยวไว้จ่ายค่าเที่ยวให้เจ้าของรถ • 🏢 รถบริษัท = ไม่จ่ายค่าเที่ยว • เว้นว่างได้ถ้าไม่ใช่งานส่งด้วยรถร่วม</div>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>📦 รายการสินค้า</h2>
       <div id="itemWrap"></div>
       <div style="display:flex;gap:9px">
@@ -360,6 +378,7 @@ var DEFAULT_ACCOUNTS=[
 var K={bills:'bills',prods:'prods',custs:'custs',counter:'counter',log:'log',accounts:'accounts',credits:'credits'};
 /* แคชในหน่วยความจำ (sync จาก Firestore ผ่าน onSnapshot) */
 var _prods=[], _custs=[], _accounts=[], _counter={}, _bills=[], _logs=[], _credits=[], _listenersOn=false;
+var vehData={}; var curFreight=true;
 function load(k,def){
   if(k===K.prods)   return _prods.length?_prods:DEFAULT_PRODUCTS;
   if(k===K.custs)   return _custs.length?_custs:[DEFAULT_CUSTOMER];
@@ -399,6 +418,7 @@ function attachListeners(){
   db.collection('os_config').doc('os_credit_customers').onSnapshot(function(d){ _credits=(d.exists&&d.data().list)||[]; renderCustList(); if($('pane-owner')&&$('pane-owner').classList.contains('on')) renderOwner(); });
   var cutoff=isoDaysAgo(400);
   db.collection('os_bills').where('date','>=',cutoff).onSnapshot(function(snap){ _bills=snap.docs.map(function(x){return x.data();}); renderDay(); }, function(e){ console.warn('bills',e); });
+  db.collection('vehicles').onSnapshot(function(snap){ vehData={}; snap.docs.forEach(function(d){ vehData[d.id]=d.data(); }); buildPlateList(); if($('fPlate')&&$('fPlate').value) onPlateInput(); }, function(e){ console.warn('vehicles',e); });
   db.collection('os_logs').orderBy('at','desc').limit(200).onSnapshot(function(snap){ _logs=snap.docs.map(function(x){return x.data();}); if($('pane-owner')&&$('pane-owner').classList.contains('on')) renderOwner(); }, function(e){ console.warn('logs',e); });
   cleanupOldSlips();
 }
@@ -504,7 +524,7 @@ function startApp(){
   $('tabBtn-owner').style.display = role==='owner'?'':'none';
   $('fDate').value=todayYMD(); fDateChanged();
   $('sumDate').value=todayYMD();
-  renderCustList(); resetItems(); setPay('cash'); setVat('zero'); recalc();
+  renderCustList(); resetItems(); clearPlate(); setPay('cash'); setVat('zero'); recalc();
   goTab('sell');
 }
 $('fDate') && null;
@@ -546,7 +566,7 @@ function saveCustDlg(){
   var cr=load(K.credits,[]); var i=cr.indexOf(name);
   if(dcCreditFlag && i<0){ cr.push(name); save(K.credits,cr); }
   else if(!dcCreditFlag && i>=0){ cr.splice(i,1); save(K.credits,cr); }
-  renderCustList(); $('fCust').value=name; $('custDlg').close();
+  renderCustList(); $('fCust').value=name; $('custDlg').close(); custChanged();
   toast('✅ เพิ่มลูกค้า "'+name+'"'+(dcCreditFlag?' (เครดิต)':''));
 }
 function renderCustManage(){
@@ -574,7 +594,10 @@ function delCust(idx){
   var cr=load(K.credits,[]); var j=cr.indexOf(name); if(j>=0){ cr.splice(j,1); save(K.credits,cr); }
   renderCustManage(); renderCustList();
 }
-function custChanged(){ if(pay==='credit' && !isCreditCust($('fCust').value)){ setPay('cash'); toast('ลูกค้านี้ลงบัญชีไม่ได้ — เปลี่ยนเป็นเงินสด'); } }
+function custChanged(){
+  if(isCreditCust($('fCust').value)){ setPay('credit'); }
+  else if(pay==='credit'){ setPay('cash'); toast('ลูกค้านี้ลงบัญชีไม่ได้ — เปลี่ยนเป็นเงินสด'); }
+}
 
 /* ================= PRODUCTS ================= */
 function getProds(){ return load(K.prods,DEFAULT_PRODUCTS); }
@@ -784,6 +807,45 @@ function recalc(){
   return {items:items,sub:sub,vatAmt:vatAmt,grand:grand};
 }
 
+/* ================= ทะเบียนรถ / ค่าเที่ยวรถร่วม ================= */
+function normPlate(p){ return String(p||'').trim().replace(/\s+/g,'').replace(/[.\u0e46]+$/g,'').replace(/\.+/g,''); }
+function lookupVeh(plate){
+  if(!plate) return null;
+  if(vehData[plate]) return vehData[plate];
+  var np=normPlate(plate);
+  if(vehData[np]) return vehData[np];
+  var keys=Object.keys(vehData);
+  for(var i=0;i<keys.length;i++){ if(normPlate(keys[i])===np) return vehData[keys[i]]; }
+  return null;
+}
+function buildPlateList(){
+  var dl=$('plateList'); if(!dl) return;
+  dl.innerHTML=Object.keys(vehData).sort().map(function(p){
+    var v=vehData[p]; return '<option value="'+esc(p)+'">'+esc((v&&(v.canonical||v.ownerName))||'')+'</option>';
+  }).join('');
+}
+function _plateVal(){ return normPlate($('fPlate').value); }
+function _plateOwner(){ var v=lookupVeh(normPlate($('fPlate').value)); return (v&&(v.canonical||v.ownerName))||''; }
+function setFreight(isF){ curFreight=!!isF; if($('frYes'))$('frYes').classList.toggle('on',curFreight); if($('frNo'))$('frNo').classList.toggle('on',!curFreight); }
+function defaultFreightFor(np){
+  var hits=_bills.filter(function(b){return normPlate(b.plate||'')===np;})
+                 .sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'');});
+  if(hits.length) return hits[0].isFreight!==false;
+  return true;
+}
+function onPlateInput(){
+  var np=normPlate($('fPlate').value);
+  var info=$('fPlateInfo');
+  if(!np){ if(info){info.textContent='';info.style.color='var(--muted)';} if(!editingId) setFreight(true); return; }
+  var v=lookupVeh(np);
+  if(info){
+    if(v){ info.innerHTML='✅ เจ้าของรถ: <b>'+esc(v.canonical||v.ownerName||'-')+'</b>'; info.style.color='var(--pri)'; }
+    else { info.innerHTML='⚠️ ทะเบียนนี้ยังไม่มีเจ้าของในฐาน — เพิ่มในแอปหลัก (จัดการทะเบียน) เพื่อให้จ่ายค่าเที่ยวถูกคน'; info.style.color='#c0392b'; }
+  }
+  if(!editingId) setFreight(defaultFreightFor(np));
+}
+function clearPlate(){ if($('fPlate'))$('fPlate').value=''; if($('fPlateInfo'))$('fPlateInfo').textContent=''; setFreight(true); }
+
 /* ================= BILL NUMBER ================= */
 async function genBillNo(ymd){
   var p=ymd.split('-'); var yy=String((parseInt(p[0])+543)%100).padStart(2,'0'); var mm=p[1]; var key=yy+mm;
@@ -822,9 +884,10 @@ async function saveBill(){
       var oldRef=_bills.find(function(b){return b.id===editingId;});
       if(!oldRef){ toast('ไม่พบบิลเดิม'); cancelEdit(); return; }
       var old=JSON.parse(JSON.stringify(oldRef));
-      var changes=diffBill(old,{date:date,customer:cust,pay:pay,vat:vat,remark:$('fRemark').value.trim(),items:r.items,grand:r.grand});
+      var changes=diffBill(old,{date:date,customer:cust,pay:pay,vat:vat,remark:$('fRemark').value.trim(),items:r.items,grand:r.grand,plate:_plateVal(),isFreight:curFreight});
       old.date=date; old.customer=cust; old.pay=pay; old.vat=vat; old.remark=$('fRemark').value.trim();
       old.items=r.items; old.subtotal=r.sub; old.vatAmt=r.vatAmt; old.grandTotal=r.grand; old.slips=slipRecs;
+      old.plate=_plateVal(); old.plateOwner=_plateOwner(); old.isFreight=curFreight;
       if(changes.length){
         old.editLog=old.editLog||[];
         old.editLog.push({at:new Date().toISOString(),by:role,changes:changes});
@@ -838,12 +901,13 @@ async function saveBill(){
     var billNo=await genBillNo(date);
     var bill={ id:'b'+Date.now()+'_'+Math.floor(Math.random()*1e6), billNo:billNo, date:date, customer:cust, pay:pay,
       slips:slipRecs, items:r.items, vat:vat, subtotal:r.sub, vatAmt:r.vatAmt, grandTotal:r.grand,
-      remark:$('fRemark').value.trim(), status:'active', createdAt:new Date().toISOString(), createdBy:role, editLog:[] };
+      remark:$('fRemark').value.trim(), plate:_plateVal(), plateOwner:_plateOwner(), isFreight:curFreight,
+      status:'active', createdAt:new Date().toISOString(), createdBy:role, editLog:[] };
     await db.collection('os_bills').doc(bill.id).set(bill);
     if(under.length) notify('⚠️ <b>ขายต่ำกว่าราคาตั้ง</b>\nบิล '+billNo+' (ลูกค้า '+cust+')\nโดย: '+(role==='owner'?'เจ้าของ':'พนักงาน')+'\n'+under.map(function(i){return '• '+i.name+' ขาย '+money(i.price)+' (ตั้ง '+money(i.listPrice)+')';}).join('\n'));
     toast('✅ บันทึกบิล '+billNo);
     printBill(bill);
-    slips=[]; renderSlips(); $('fRemark').value=''; $('fCust').value=DEFAULT_CUSTOMER; setPay('cash'); setVat('zero'); resetItems();
+    slips=[]; renderSlips(); $('fRemark').value=''; $('fCust').value=DEFAULT_CUSTOMER; clearPlate(); setPay('cash'); setVat('zero'); resetItems();
     goTab('day');
   }catch(e){ alert('❌ บันทึกไม่สำเร็จ: '+(e&&e.message?e.message:e)+'\n(ถ้าเป็น permission — ตรวจสิทธิ์ Firestore/Storage)'); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=oldTxt; } }
@@ -858,6 +922,9 @@ function diffBill(old,nw){
   var oi=old.items.map(function(i){return i.name+' '+i.qty+i.unit+'×'+i.price;}).join(' | ');
   var ni=nw.items.map(function(i){return i.name+' '+i.qty+i.unit+'×'+i.price;}).join(' | ');
   if(oi!==ni) c.push('• รายการ: ['+oi+'] → ['+ni+']');
+  if((old.plate||'')!==(nw.plate||'')) c.push('• ทะเบียนรถ: '+(old.plate||'-')+' → '+(nw.plate||'-'));
+  var ofr=(old.isFreight===false)?'รถบริษัท':(old.plate?'รถร่วม':'-'); var nfr=(nw.isFreight===false)?'รถบริษัท':(nw.plate?'รถร่วม':'-');
+  if(ofr!==nfr) c.push('• ประเภทรถ: '+ofr+' → '+nfr);
   if(Math.round(old.grandTotal*100)!==Math.round(nw.grand*100)) c.push('• ยอดรวม: '+money(old.grandTotal)+' → '+money(nw.grand)+' ฿');
   return c;
 }
@@ -921,7 +988,8 @@ function renderDay(){
         +(edited?'<span class="badge b-edited">✏️ แก้ไข '+b.editLog.length+'</span>':'')
         +(under.length?' <span class="badge b-under">⚠️ ต่ำกว่าราคา</span>':'')
         +(b.status==='cancelled'?' <span class="chip">(ยกเลิก)</span>':'')
-        +'<div class="bmeta"><b style="color:var(--pri)">'+beDate(b.date)+'</b> • '+esc(b.customer)+' • '+b.items.length+' รายการ'+(b.slips&&b.slips.length?(' • สลิป '+b.slips.length+' ใบ'):'')+'</div></div>'
+        +(!b.plate&&b.status!=='cancelled'?' <span class="badge b-under">🚛 ยังไม่ใส่ทะเบียน</span>':'')
+        +'<div class="bmeta"><b style="color:var(--pri)">'+beDate(b.date)+'</b> • '+esc(b.customer)+' • '+b.items.length+' รายการ'+(b.slips&&b.slips.length?(' • สลิป '+b.slips.length+' ใบ'):'')+(b.plate?(' • 🚛 '+esc(b.plate)+(b.isFreight===false?' (บริษัท)':'')):'')+'</div></div>'
         +'<div class="bsum">'+(role==='owner'?(money(b.grandTotal)+' ฿'):billQtyText(b))+'</div></div>'
       +'<div class="acts">'
         +'<button class="ghost" onclick="reprint(\''+b.id+'\')">🖨️ พิมพ์</button>'
@@ -966,6 +1034,7 @@ function startEdit(id){
   $('editBanner').style.display='block'; $('editBillNo').textContent=b.billNo;
   $('fDate').value=b.date; fDateChanged(); ensureCust(b.customer); $('fCust').value=b.customer;
   setPay(b.pay);
+  $('fPlate').value=b.plate||''; onPlateInput(); setFreight(b.isFreight!==false);
   slips=(b.slips||[]).map(function(x){return Object.assign({},x);});
   slips.forEach(function(sl){ if(!sl.img && sl.slipId){ db.collection('os_slips_blob').doc(sl.slipId).get().then(function(d){ if(d.exists){ sl.img=d.data().img; renderSlips(); } }); } });
   renderSlips(); setVat(b.vat||'zero'); $('fRemark').value=b.remark||'';
@@ -978,7 +1047,7 @@ function startEdit(id){
   });
   recalc(); goTab('sell'); window.scrollTo(0,0); toast('แก้ไขบิล '+b.billNo);
 }
-function cancelEdit(){ editingId=null; $('editBanner').style.display='none'; slips=[]; renderSlips(); $('fRemark').value=''; $('fCust').value=DEFAULT_CUSTOMER; setPay('cash'); setVat('zero'); resetItems(); }
+function cancelEdit(){ editingId=null; $('editBanner').style.display='none'; slips=[]; renderSlips(); $('fRemark').value=''; $('fCust').value=DEFAULT_CUSTOMER; clearPlate(); setPay('cash'); setVat('zero'); resetItems(); }
 
 /* ================= OWNER ================= */
 function renderOwner(){
@@ -1103,6 +1172,7 @@ function printBill(b){
           +'<tr><td>เลขที่บิล</td><td><b style="color:#6c63b6;font-size:11pt">'+b.billNo+'</b></td></tr>'
           +'<tr><td>วันที่</td><td>'+beLong(b.date)+'</td></tr>'
           +'<tr><td>ชำระโดย</td><td>'+payTxt+'</td></tr>'
+          +(b.plate?('<tr><td>ทะเบียนรถ</td><td>'+esc(b.plate)+(b.plateOwner?(' ('+esc(b.plateOwner)+')'):'')+(b.isFreight===false?' — รถบริษัท':'')+'</td></tr>'):'')
         +'</tbody></table></div></div>'
       +'<div class="cust"><span><b>ลูกค้า</b> &nbsp; '+esc(b.customer)+'</span></div>'
     +'</div>'
