@@ -132,7 +132,8 @@ async function buildSummary(idToken, today) {
   if (osTrans > 0) L.push('     · โอน ' + fmt(osTrans));
   if (osCredit > 0) L.push('     · ลงบัญชี ' + fmt(osCredit));
   L.push('  รวมรายได้: <b>' + fmt(totalRev) + ' ฿</b>');
-  L.push('  (💵 เงินเข้าจริง ' + fmt(received) + ' · 📒 ค้างชำระ ' + fmt(osCredit) + ')');
+  L.push('  💵 เงินเข้าจริง: ' + fmt(received) + ' ฿');
+  L.push('  📒 ค้างชำระ: ' + fmt(osCredit) + ' ฿');
   L.push('');
   L.push('💸 <b>รายจ่ายวันนี้</b>');
   L.push('  🧾 รายจ่ายทั่วไป: ' + fmt(exTot) + ' ฿ (' + exN + ' รายการ)');
