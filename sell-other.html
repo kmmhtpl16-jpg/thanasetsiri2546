@@ -988,10 +988,10 @@ function renderDay(){
     $('dayTotalMeta').textContent=beLong(d)+(dayItems.length?(' • '+qtyByUnit(dayItems)):'');
   }
   renderMonth();
-  var bills = (role==='owner') ? load(K.bills,[]).slice() : dayBills;
+  var bills = load(K.bills,[]).slice();  /* ทั้งเจ้าของและพนักงานเห็นบิลทั้งหมด (พนักงานซ่อนยอดเงิน) */
   bills.sort(function(a,b){ if(a.date!==b.date) return a.date<b.date?1:-1; return (a.billNo<b.billNo)?1:-1; });
-  var listHdr = (role==='owner') ? '<div style="font-size:13px;font-weight:700;color:var(--muted);margin:2px 2px 10px">📋 บิลทั้งหมด (ล่าสุด '+bills.length+' บิล) — แตะเลือกวันด้านบนเพื่อดูยอดรายวัน</div>' : '';
-  if(!bills.length){ $('dayList').innerHTML=listHdr+'<div class="empty">'+(role==='owner'?'ยังไม่มีบิล':'ยังไม่มีบิลในวันนี้')+'</div>'; return; }
+  var listHdr = '<div style="font-size:13px;font-weight:700;color:var(--muted);margin:2px 2px 10px">📋 บิลทั้งหมด (ล่าสุด '+bills.length+' บิล) — แตะเลือกวันด้านบนเพื่อดูยอดรายวัน</div>';
+  if(!bills.length){ $('dayList').innerHTML=listHdr+'<div class="empty">ยังไม่มีบิล</div>'; return; }
   $('dayList').innerHTML=listHdr+bills.map(function(b){
     var edited=(b.editLog&&b.editLog.length);
     var under=underItems(b);
