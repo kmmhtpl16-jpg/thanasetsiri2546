@@ -1810,7 +1810,8 @@ async function tgBuildDailySummary(today){
   if(osTrans>0)  L.push('     · โอน '+fmtBaht(osTrans));
   if(osCredit>0) L.push('     · ลงบัญชี '+fmtBaht(osCredit));
   L.push('  รวมรายได้: <b>'+fmtBaht(totalRev)+' ฿</b>');
-  L.push('  (💵 เงินเข้าจริง '+fmtBaht(received)+' · 📒 ค้างชำระ '+fmtBaht(osCredit)+')');
+  L.push('  💵 เงินเข้าจริง: '+fmtBaht(received)+' ฿');
+  L.push('  📒 ค้างชำระ: '+fmtBaht(osCredit)+' ฿');
   L.push('');
   L.push('💸 <b>รายจ่ายวันนี้</b>');
   L.push('  🧾 รายจ่ายทั่วไป: '+fmtBaht(exTot)+' ฿ ('+exN+' รายการ)');
