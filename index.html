@@ -246,6 +246,12 @@ canvas{border-radius:var(--r);display:block;width:100%!important;}
 /* ── Tab4 สรุปผู้บริหาร — จำกัดความกว้างบนจอใหญ่ (FlowAccount style) ── */
 .tp4-grid{display:grid;grid-template-columns:1fr;gap:14px;}
 @media(min-width:900px){.tp4-grid{grid-template-columns:1fr 1fr;align-items:start;}}
+.k4-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:2px;}
+@media(min-width:900px){.k4-row{grid-template-columns:repeat(4,1fr);}}
+.k4-card{padding:14px 16px;}
+.k4-label{font-size:.78rem;color:var(--muted);margin-bottom:6px;}
+.k4-val{font-size:1.35rem;font-weight:800;line-height:1.1;}
+.k4-sub{font-size:.7rem;color:var(--muted);margin-top:5px;}
 @media(min-width:1024px){
   #tp4{
     max-width:1280px;
@@ -826,27 +832,35 @@ select{color-scheme:light;}
         <div class="card-title" style="margin:0;">📲 แจ้งเตือน Telegram</div>
         <button class="btn btn-gold" onclick="tgSendDailyNow()">📤 ส่งสรุปวันนี้เข้า Telegram</button>
       </div>
+      <!-- KPI การเงินเดือนนี้ -->
+      <div class="k4-row">
+        <div class="card k4-card"><div class="k4-label">💰 รายได้รวมเดือนนี้</div><div class="k4-val gold" id="k4rev">–</div><div class="k4-sub" id="k4revsub"></div></div>
+        <div class="card k4-card"><div class="k4-label">💵 เงินเข้าจริง</div><div class="k4-val" style="color:#137a3a" id="k4recv">–</div><div class="k4-sub">รับเงินแล้ว (ไม่รวมลงบัญชี)</div></div>
+        <div class="card k4-card"><div class="k4-label">📒 ค้างชำระ (ลงบัญชี)</div><div class="k4-val" style="color:#c88a2e" id="k4credit">–</div><div class="k4-sub">ยังไม่เก็บเงิน</div></div>
+        <div class="card k4-card"><div class="k4-label">📈 กำไร/ขาดทุนเดือนนี้</div><div class="k4-val" id="k4profit">–</div><div class="k4-sub" id="k4profitsub">รายได้ − รายจ่าย</div></div>
+      </div>
       <div class="tp4-grid">
-        <!-- ซ้ายบน: 7 วันล่าสุด -->
-        <div class="card"><div class="card-title">📈 7 วันล่าสุด</div><canvas id="c4" width="460" height="220"></canvas></div>
-        <!-- ขวาบน: สรุปรายเดือน -->
+        <!-- รายได้รายวัน (บาท) ทราย+ดิน -->
+        <div class="card"><div class="card-title">💵 รายได้ 14 วันล่าสุด (บาท)</div><canvas id="c4" width="460" height="220"></canvas>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:4px"><span style="color:#15803d">■</span> ทราย &nbsp;&nbsp; <span style="color:#e0a95a">■</span> ดิน/อื่น</div></div>
+        <!-- สรุปรายได้รายเดือน (บาท) -->
         <div class="card">
-          <div class="card-title">📅 สรุปรายเดือน</div>
+          <div class="card-title">📅 สรุปรายได้รายเดือน (บาท)</div>
           <div class="table-wrap" style="max-height:300px;overflow-y:auto">
             <table>
               <thead><tr>
-                <th>เดือน</th><th>เที่ยว</th><th>สุทธิ (คิว)</th><th>สุทธิ (ตัน)</th>
+                <th>เดือน</th><th class="r">ทราย</th><th class="r">ดิน/อื่น</th><th class="r">รวม</th>
               </tr></thead>
               <tbody id="t4b"></tbody>
             </table>
           </div>
         </div>
-        <!-- ซ้ายล่าง: สัดส่วนลูกค้า -->
-        <div class="card"><div class="card-title">🥧 สัดส่วนลูกค้า</div><canvas id="p4" width="460" height="220"></canvas></div>
-        <!-- ขวาล่าง: เปรียบเทียบยอดทราย -->
+        <!-- สัดส่วนรายได้ลูกค้า (เดือนนี้) -->
+        <div class="card"><div class="card-title">🥧 สัดส่วนรายได้ลูกค้า (เดือนนี้)</div><canvas id="p4" width="460" height="220"></canvas></div>
+        <!-- ปริมาณทราย (คงเดิม เป็นตัวอ้างอิง) -->
         <div class="card">
           <div class="card-title">
-            📊 เปรียบเทียบยอดทราย
+            📊 ปริมาณทราย (คิว/ตัน)
             <div class="brow" style="margin-left:auto;gap:6px;">
               <button class="btn btn-gold"  id="cmpBtnDaily"   onclick="setCmpMode('daily')">รายวัน</button>
               <button class="btn btn-ghost" id="cmpBtnWeekly"  onclick="setCmpMode('weekly')">รายสัปดาห์</button>
@@ -855,6 +869,32 @@ select{color-scheme:light;}
           </div>
           <canvas id="chartComparison" height="200" style="width:100%;max-height:240px;"></canvas>
           <div id="cmpTable" style="margin-top:12px;max-height:240px;overflow-y:auto;"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-title">🧱 สรุปยอดขายดิน/สินค้าอื่น (รายเดือน)</div>
+        <div class="table-wrap" style="max-height:320px;overflow-y:auto">
+          <table>
+            <thead><tr>
+              <th>เดือน</th><th>บิล</th>
+              <th class="r">เงินสด</th><th class="r">โอน</th>
+              <th class="r">ลงบัญชี (ค้าง)</th><th class="r">รวม</th>
+            </tr></thead>
+            <tbody id="dirt4Body"></tbody>
+          </table>
+        </div>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:6px;">
+          * รวม = เงินสด + โอน + ลงบัญชี · ยอด "ลงบัญชี" คือเครดิตที่ยังไม่เก็บเงิน (ค้างชำระ)
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-title">🧾 รายจ่ายแยกหมวด (เดือนนี้)</div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
+          <canvas id="exp4Chart" width="320" height="220" style="flex-shrink:0"></canvas>
+          <div style="flex:1;min-width:220px;">
+            <div id="exp4Chips" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+            <div id="exp4Total" style="margin-top:12px;font-size:.92rem;"></div>
+          </div>
         </div>
       </div>
       <div class="card" style="margin-top:14px;">
@@ -1868,6 +1908,12 @@ function listenFS() {
   var _osCut = new Date(Date.now()-400*864e5).toISOString().slice(0,10);
   unOsBills = db.collection('os_bills').where('date','>=',_osCut).onSnapshot(function(snap){
     osBills = snap.docs.map(function(d){ return Object.assign({_id:d.id}, d.data()); });
+    // อัปเดตหน้าสรุปผู้บริหาร (Tab 4) ถ้ากำลังเปิดอยู่
+    var tp4=document.getElementById('tp4');
+    if(tp4 && tp4.classList.contains('active')){
+      if(typeof draw4Dirt==='function') draw4Dirt();
+      if(typeof exDraw4==='function') exDraw4();
+    }
   }, function(e){ console.warn('os_bills',e); });
   unCustVeh = db.collection('os_config').doc('os_customer_vehicle').onSnapshot(function(d){
     custVeh = (d.exists && d.data().map) || {};
@@ -3923,39 +3969,218 @@ function doExport() {
 /* ================================================================
    TAB 4 — สรุปผู้บริหาร
 ================================================================ */
-function draw4() {
-  var bm={};
-  wData.forEach(function(r){
-    var m=r.date.slice(0,7);
-    if(!bm[m]) bm[m]={t:0,c:0};
-    bm[m].t++; bm[m].c+=Math.max(0,r.kg/KPC-(dData[r._id]||0));
+/* รายได้ขายทราย 1 ใบชั่ง (ตาชั่ง×ราคา) */
+function sandRevOf(r){
+  var net=Math.max(0,(r.kg/KPC)-((typeof dData!=='undefined'&&dData[r._id])?dData[r._id]:0));
+  if(r.sale_unit==='เหมา') return r.sale_amount||0;
+  var price=r.price||0; if(price<=0) return 0;
+  var qty=(r.sale_unit==='ตัก')?(r.scoop||0):((r.sale_unit==='ตัน')?net*1.5:net);
+  return qty*price;
+}
+/* เดือนปัจจุบัน YYYY-MM */
+function curYM4(){ return (typeof currentYM==='function')?currentYM():new Date().toISOString().slice(0,7); }
+/* ราคาน้ำมันเฉลี่ย/ลิตร (รวม VAT) จากน้ำมันเข้าถังทั้งหมดที่โหลดมา — weighted average */
+function fuelAvgPerL(){
+  var L=0,B=0;
+  (typeof pnlFin!=='undefined'?pnlFin:[]).forEach(function(r){ L+=(r.liters||0); B+=(r.total_amount||0); });
+  return L>0 ? B/L : 0;
+}
+/* ต้นทุนน้ำมันของเดือน m แบบใช้จริง (COGS) = เบิกออก(ลิตร)×เฉลี่ย/ลิตร + เติมปั๊มนอก(fuel_expense) */
+function fuelCostOfMonth(m){
+  if(!m) return 0;
+  var avg=fuelAvgPerL(), outL=0, pump=0;
+  (typeof pnlFout!=='undefined'?pnlFout:[]).forEach(function(r){ if(String(r.date||'').slice(0,7)===m) outL+=(r.liters||0); });
+  (typeof pnlFe!=='undefined'?pnlFe:[]).forEach(function(r){ if(String(r.date||'').slice(0,7)===m) pump+=(r.total_amount||0); });
+  return Math.round((outL*avg + pump)*100)/100;
+}
+/* อัปเดตการ์ดกำไรเดือนนี้ (เรียกซ้ำได้หลังโหลดค่าแรง/น้ำมัน) */
+function updateK4Profit(){
+  var CUR=curYM4(), rev=0, exp=0;
+  wData.forEach(function(r){ if(String(r.date||'').slice(0,7)===CUR) rev+=sandRevOf(r); });
+  osBills.forEach(function(b){ if(b&&b.status!=='cancelled'&&String(b.date||'').slice(0,7)===CUR) rev+=(b.grandTotal||0); });
+  (typeof gExpenses!=='undefined'?gExpenses:[]).forEach(function(e){ if(String(e.date||'').slice(0,7)===CUR) exp+=(e.amount||0); });
+  (typeof pnlWd!=='undefined'?pnlWd:[]).forEach(function(w){ if(String(w.date||'').slice(0,7)===CUR) exp+=(w.amount||0); });
+  exp += (typeof fuelCostOfMonth==='function')?fuelCostOfMonth(CUR):0;
+  var profit=rev-exp;
+  var pel=document.getElementById('k4profit');
+  if(pel){ pel.textContent=fmtBaht(profit)+' ฿'; pel.style.color=profit>=0?'#137a3a':'#c0392b'; }
+  var psub=document.getElementById('k4profitsub'); if(psub) psub.textContent='รายจ่าย '+fmtBaht(exp)+' ฿';
+}
+/* กราฟแท่งซ้อน 2 ชั้น (ทราย+ดิน) */
+function drawStackedBar(id, labels, aVals, bVals, colA, colB){
+  var cv=document.getElementById(id); if(!cv) return;
+  var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  var pad={t:26,r:12,b:40,l:54};
+  var totals=labels.map(function(_,i){return (parseFloat(aVals[i])||0)+(parseFloat(bVals[i])||0);});
+  var max=Math.max.apply(null,totals)*1.18||1;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(0,0,0,.09)'; ctx.lineWidth=1;
+  for(var j=0;j<=4;j++){
+    var yy=H-pad.b-(j/4)*(H-pad.t-pad.b);
+    ctx.beginPath(); ctx.moveTo(pad.l,yy); ctx.lineTo(W-pad.r,yy); ctx.stroke();
+    ctx.fillStyle='#506070'; ctx.font='9px sans-serif'; ctx.textAlign='right';
+    ctx.fillText(Math.round(max*j/4).toLocaleString(),pad.l-4,yy+3);
+  }
+  var n=labels.length||1, sw=(W-pad.l-pad.r)/n, bw=Math.min(sw*0.55,34);
+  labels.forEach(function(lb,i){
+    var a=parseFloat(aVals[i])||0, b=parseFloat(bVals[i])||0;
+    var x=pad.l+i*sw+sw/2-bw/2;
+    var ah=(a/max)*(H-pad.t-pad.b), bh=(b/max)*(H-pad.t-pad.b);
+    var yA=H-pad.b-ah;
+    ctx.fillStyle=colA; ctx.fillRect(x,yA,bw,Math.max(ah,0));
+    var yB=yA-bh;
+    ctx.fillStyle=colB; ctx.fillRect(x,yB,bw,Math.max(bh,0));
+    var tot=a+b;
+    if(tot>0){ ctx.fillStyle='#1f2b3a'; ctx.font='bold 9px Sarabun,sans-serif'; ctx.textAlign='center';
+      ctx.fillText(Math.round(tot).toLocaleString(),x+bw/2,yB-3); }
+    ctx.fillStyle='#5b6b7d'; ctx.font='9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(lb,x+bw/2,H-pad.b+13);
   });
-  var ms=Object.keys(bm).sort().reverse();
+}
+function draw4() {
+  var CUR=curYM4();
+  var byMonth={}, byDay={}, byCustCur={};
+  var curSand=0, curDCash=0, curDTrans=0, curDCredit=0;
+
+  wData.forEach(function(r){
+    var d=r.date||''; if(!d) return; var m=d.slice(0,7);
+    var rev=sandRevOf(r);
+    (byMonth[m]=byMonth[m]||{sand:0,dirt:0}).sand+=rev;
+    (byDay[d]=byDay[d]||{sand:0,dirt:0}).sand+=rev;
+    if(m===CUR){ curSand+=rev; var c=r.customer||'ไม่ระบุ'; byCustCur[c]=(byCustCur[c]||0)+rev; }
+  });
+  osBills.forEach(function(b){
+    if(!b||b.status==='cancelled') return;
+    var d=b.date||''; if(!d) return; var m=d.slice(0,7); var amt=b.grandTotal||0;
+    (byMonth[m]=byMonth[m]||{sand:0,dirt:0}).dirt+=amt;
+    (byDay[d]=byDay[d]||{sand:0,dirt:0}).dirt+=amt;
+    if(m===CUR){ var c=b.customer||'ไม่ระบุ'; byCustCur[c]=(byCustCur[c]||0)+amt;
+      if(b.pay==='transfer') curDTrans+=amt; else if(b.pay==='credit') curDCredit+=amt; else curDCash+=amt; }
+  });
+
+  /* ตารางรายได้รายเดือน (บาท) */
+  var TM=['','ม.ค','ก.พ','มี.ค','เม.ย','พ.ค','มิ.ย','ก.ค','ส.ค','ก.ย','ต.ค','พ.ย','ธ.ค'];
+  var ms=Object.keys(byMonth).sort().reverse();
   document.getElementById('t4b').innerHTML=ms.length===0
     ?'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
     :ms.map(function(m){
-        return '<tr><td>'+m+'</td><td class="r">'+bm[m].t+'</td>'
-          +'<td class="r gold">'+fmt3(bm[m].c)+'</td>'
-          +'<td class="r">'+fmt3(bm[m].c*1.5)+'</td></tr>';
+        var s=byMonth[m].sand, di=byMonth[m].dirt, tt=s+di, p=m.split('-');
+        var lbl=TM[parseInt(p[1])]+' '+(parseInt(p[0])+543);
+        return '<tr><td>'+lbl+'</td><td class="r">'+fmtBaht(s)+'</td>'
+          +'<td class="r" style="color:#c88a2e">'+fmtBaht(di)+'</td>'
+          +'<td class="r gold" style="font-weight:700">'+fmtBaht(tt)+'</td></tr>';
       }).join('');
 
-  var bd={};
-  wData.forEach(function(r){
-    if(!bd[r.date]) bd[r.date]=0;
-    bd[r.date]+=Math.max(0,r.kg/KPC-(dData[r._id]||0));
-  });
-  var days=Object.keys(bd).sort().slice(-7);
-  drawBar('c4', days.map(function(d){return d.slice(5);}), days.map(function(d){return bd[d];}));
+  /* กราฟรายได้ 14 วัน (ทราย+ดิน) */
+  var days=Object.keys(byDay).sort().slice(-14);
+  drawStackedBar('c4', days.map(function(d){return d.slice(5);}),
+    days.map(function(d){return byDay[d].sand;}),
+    days.map(function(d){return byDay[d].dirt;}), '#15803d', '#e0a95a');
 
-  var bc={};
-  wData.forEach(function(r){
-    var c=r.customer||'ไม่ระบุ';
-    if(!bc[c]) bc[c]=0;
-    bc[c]+=Math.max(0,r.kg/KPC-(dData[r._id]||0));
-  });
-  drawPie('p4', bc);
+  /* สัดส่วนรายได้ลูกค้าเดือนนี้ */
+  drawPie('p4', byCustCur);
+
+  /* KPI การเงินเดือนนี้ */
+  var curDirt=curDCash+curDTrans+curDCredit, curRev=curSand+curDirt, curRecv=curSand+curDCash+curDTrans;
+  var setTx=function(id,v){ var el=document.getElementById(id); if(el) el.textContent=v; };
+  setTx('k4rev', fmtBaht(curRev)+' ฿');
+  setTx('k4revsub','ทราย '+fmtBaht(curSand)+' · ดิน '+fmtBaht(curDirt));
+  setTx('k4recv', fmtBaht(curRecv)+' ฿');
+  setTx('k4credit', fmtBaht(curDCredit)+' ฿');
+  updateK4Profit();
+
   renderCmpChart();
+  draw4Dirt();
+  draw4ExpenseCard();
+  // สร้างตัวเลือกเดือน + คิดรายได้/กำไรทันที (ไม่ต้องรอปลดล็อกแท็บค่าใช้จ่าย)
+  if(typeof exFillMonths==='function') exFillMonths();
   if(typeof exReady==='function') exReady();
+  if(typeof pnlLoadExtra==='function') pnlLoadExtra();
+  if(typeof exDraw4==='function') exDraw4();
+}
+
+/* ── โหลดค่าแรง(withdrawals) + ค่าน้ำมันรถ(fuel_expense) สำหรับ P&L รายเดือน ── */
+var pnlWd=[], pnlFe=[], pnlFin=[], pnlFout=[], pnlLoaded=false;
+function pnlLoadExtra(){
+  var cut=new Date(Date.now()-400*864e5).toISOString().slice(0,10);
+  var empty={forEach:function(){}};
+  var needExp=!(typeof gExpenses!=='undefined' && gExpenses.length>0);
+  Promise.all([
+    db.collection('withdrawals').where('date','>=',cut).get().catch(function(){return empty;}),
+    db.collection('fuel_expense').where('date','>=',cut).get().catch(function(){return empty;}),
+    needExp ? db.collection('expenses').where('date','>=',cut).get().catch(function(){return empty;}) : Promise.resolve(empty),
+    db.collection('fuel_in').where('date','>=',cut).get().catch(function(){return empty;}),
+    db.collection('fuel_out').where('date','>=',cut).get().catch(function(){return empty;})
+  ]).then(function(res){
+    pnlWd=[]; res[0].forEach(function(d){ pnlWd.push(d.data()); });
+    pnlFe=[]; res[1].forEach(function(d){ pnlFe.push(d.data()); });
+    if(needExp){ var arr=[]; res[2].forEach(function(d){ var o=d.data(); o.id=d.id; arr.push(o); }); if(arr.length) gExpenses=arr; }
+    pnlFin=[];  res[3].forEach(function(d){ pnlFin.push(d.data()); });
+    pnlFout=[]; res[4].forEach(function(d){ pnlFout.push(d.data()); });
+    pnlLoaded=true;
+    if(typeof draw4ExpenseCard==='function') draw4ExpenseCard();
+    if(typeof updateK4Profit==='function') updateK4Profit();
+    if(typeof exDraw4==='function') exDraw4();
+  }).catch(function(e){ console.warn('pnlLoadExtra',e); });
+}
+
+/* ── สรุปยอดขายดิน/สินค้าอื่น (os_bills) รายเดือน แยกช่องทางชำระ ── */
+function dirtByMonth(){
+  var bm={};
+  if(typeof osBills==='undefined') return bm;
+  osBills.forEach(function(b){
+    if(!b || b.status==='cancelled') return;
+    var m=String(b.date||'').slice(0,7); if(!m) return;
+    if(!bm[m]) bm[m]={cash:0,transfer:0,credit:0,n:0};
+    var amt=b.grandTotal||0;
+    if(b.pay==='transfer')      bm[m].transfer+=amt;
+    else if(b.pay==='credit')   bm[m].credit  +=amt;
+    else                        bm[m].cash    +=amt;
+    bm[m].n++;
+  });
+  return bm;
+}
+function draw4Dirt(){
+  var el=document.getElementById('dirt4Body'); if(!el) return;
+  var bm=dirtByMonth();
+  var ms=Object.keys(bm).sort().reverse();
+  if(!ms.length){
+    el.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูลขายดิน</td></tr>';
+    return;
+  }
+  el.innerHTML=ms.map(function(m){
+    var d=bm[m], tot=d.cash+d.transfer+d.credit;
+    var p=m.split('-');
+    var mLbl=['','ม.ค','ก.พ','มี.ค','เม.ย','พ.ค','มิ.ย','ก.ค','ส.ค','ก.ย','ต.ค','พ.ย','ธ.ค'][parseInt(p[1])]+' '+(parseInt(p[0])+543);
+    return '<tr><td>'+mLbl+'</td><td class="r">'+d.n+'</td>'
+      +'<td class="r">'+fmtBaht(d.cash)+'</td>'
+      +'<td class="r">'+fmtBaht(d.transfer)+'</td>'
+      +'<td class="r" style="color:#e0a95a">'+fmtBaht(d.credit)+'</td>'
+      +'<td class="r gold" style="font-weight:700">'+fmtBaht(tot)+'</td></tr>';
+  }).join('');
+}
+
+/* ── การ์ดรายจ่ายแยกหมวด เดือนนี้ (expenses + ค่าแรง + ค่าน้ำมัน) ── */
+function draw4ExpenseCard(){
+  var chipsEl=document.getElementById('exp4Chips'); if(!chipsEl) return;
+  var CUR=curYM4(), byCat={};
+  (typeof gExpenses!=='undefined'?gExpenses:[]).forEach(function(e){
+    if(String(e.date||'').slice(0,7)!==CUR) return;
+    var c=e.category||'อื่นๆ'; byCat[c]=(byCat[c]||0)+(e.amount||0);
+  });
+  var wage=0; (typeof pnlWd!=='undefined'?pnlWd:[]).forEach(function(w){ if(String(w.date||'').slice(0,7)===CUR) wage+=(w.amount||0); });
+  var fuel=(typeof fuelCostOfMonth==='function')?fuelCostOfMonth(CUR):0;
+  if(wage>0) byCat['ค่าแรง/เงินเดือน']=(byCat['ค่าแรง/เงินเดือน']||0)+wage;
+  if(fuel>0) byCat['ค่าน้ำมัน (ใช้จริง)']=(byCat['ค่าน้ำมัน (ใช้จริง)']||0)+fuel;
+  var keys=Object.keys(byCat).filter(function(k){return byCat[k]>0;}).sort(function(a,b){return byCat[b]-byCat[a];});
+  var tot=keys.reduce(function(s,k){return s+byCat[k];},0);
+  var pieData={}; keys.forEach(function(k){ pieData[k]=byCat[k]; });
+  if(typeof drawPie==='function') drawPie('exp4Chart', pieData);
+  chipsEl.innerHTML = tot>0
+    ? keys.map(function(k){ return '<span style="display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;">'+k+': <b style="color:#c0392b">'+fmtBaht(byCat[k])+'</b></span>'; }).join('')
+    : '<span style="color:var(--muted);font-size:.85rem">— เดือนนี้ยังไม่มีรายจ่าย (หรือยังโหลดไม่เสร็จ) —</span>';
+  var totEl=document.getElementById('exp4Total');
+  if(totEl) totEl.innerHTML='รวมรายจ่ายเดือนนี้: <b style="color:#c0392b;font-size:1.05rem">'+fmtBaht(tot)+' ฿</b>';
 }
 
 /* ================================================================
@@ -6827,6 +7052,14 @@ function exDraw4(){
   var rows=gExpenses.filter(function(e){ return m && e.date.slice(0,7)===m; });
   var byCat={}; var tot=0;
   rows.forEach(function(e){ byCat[e.category]=(byCat[e.category]||0)+e.amount; tot+=e.amount; });
+  /* ค่าแรง(withdrawals) + ค่าน้ำมันรถ(fuel_expense) เดือนนี้ — ให้ตรงกับสรุปรายวัน */
+  var wageTot=0, fuelTot=0;
+  if(m){
+    (typeof pnlWd!=='undefined'?pnlWd:[]).forEach(function(w){ if(String(w.date||'').slice(0,7)===m) wageTot+=(w.amount||0); });
+    fuelTot=(typeof fuelCostOfMonth==='function')?fuelCostOfMonth(m):0;
+  }
+  wageTot=Math.round(wageTot*100)/100;
+  var totAll=Math.round((tot+wageTot+fuelTot)*100)/100;
   var autoRev=0;
   if(m && typeof wData!=='undefined'){
     wData.forEach(function(r){
@@ -6839,19 +7072,43 @@ function exDraw4(){
     });
     autoRev=Math.round(autoRev*100)/100;
   }
+  /* รายได้ขายดิน/สินค้าอื่น (os_bills) เดือนนี้ แยกช่องทาง */
+  var dCash=0,dTrans=0,dCredit=0;
+  if(m && typeof osBills!=='undefined'){
+    osBills.forEach(function(b){
+      if(!b || b.status==='cancelled') return;
+      if(String(b.date||'').slice(0,7)!==m) return;
+      var amt=b.grandTotal||0;
+      if(b.pay==='transfer')    dTrans +=amt;
+      else if(b.pay==='credit') dCredit+=amt;
+      else                      dCash  +=amt;
+    });
+  }
+  var dirtRev=Math.round((dCash+dTrans+dCredit)*100)/100;
   var manual=exNum((document.getElementById('ex4Rev')||{}).value);
-  var rev = manual>0 ? manual : autoRev;
+  var sandRev = manual>0 ? manual : autoRev;
+  var rev = sandRev + dirtRev;
   var head='';
   head+='<tr><td>รายได้ขายทราย (ตาชั่ง×ราคา)</td><td class="r" style="color:#4ec98a">'+exMoney(autoRev)+'</td></tr>';
-  if(manual>0) head+='<tr><td>รายได้ (กรอกเอง — override)</td><td class="r" style="color:#4ec98a">'+exMoney(manual)+'</td></tr>';
+  if(manual>0) head+='<tr><td>รายได้ขายทราย (กรอกเอง — override)</td><td class="r" style="color:#4ec98a">'+exMoney(manual)+'</td></tr>';
+  if(dirtRev>0){
+    head+='<tr><td>รายได้ขายดิน/อื่น</td><td class="r" style="color:#4ec98a">'+exMoney(dirtRev)+'</td></tr>';
+    if(dCash>0)   head+='<tr><td style="padding-left:14px;color:var(--muted)">· เงินสด</td><td class="r" style="color:var(--muted)">'+exMoney(dCash)+'</td></tr>';
+    if(dTrans>0)  head+='<tr><td style="padding-left:14px;color:var(--muted)">· โอน</td><td class="r" style="color:var(--muted)">'+exMoney(dTrans)+'</td></tr>';
+    if(dCredit>0) head+='<tr><td style="padding-left:14px;color:#e0a95a">· ลงบัญชี (ค้างชำระ)</td><td class="r" style="color:#e0a95a">'+exMoney(dCredit)+'</td></tr>';
+  }
+  head+='<tr><td><b>รายได้รวม</b></td><td class="r"><b style="color:#4ec98a">'+exMoney(rev)+'</b></td></tr>';
   var body='';
   exAllCats().forEach(function(k){ if(byCat[k]) body+='<tr><td style="padding-left:14px;color:var(--muted)">'+k+'</td><td class="r">'+exMoney(byCat[k])+'</td></tr>'; });
-  body+='<tr><td><b>รายจ่ายรวม</b></td><td class="r"><b style="color:#e06a6a">'+exMoney(tot)+'</b></td></tr>';
-  var profit=rev-tot;
+  if(wageTot>0) body+='<tr><td style="padding-left:14px;color:var(--muted)">ค่าแรง / เบิกเงินเดือน</td><td class="r">'+exMoney(wageTot)+'</td></tr>';
+  if(fuelTot>0) body+='<tr><td style="padding-left:14px;color:var(--muted)">ค่าน้ำมัน (ตามที่ใช้จริง)</td><td class="r">'+exMoney(fuelTot)+'</td></tr>';
+  body+='<tr><td><b>รายจ่ายรวม</b></td><td class="r"><b style="color:#e06a6a">'+exMoney(totAll)+'</b></td></tr>';
+  var profit=rev-totAll;
   var tail='<tr><td><b>กำไร / ขาดทุน</b></td><td class="r"><b style="color:'+(profit>=0?'#4ec98a':'#e06a6a')+'">'+exMoney(profit)+'</b></td></tr>';
+  if(dCredit>0) tail+='<tr><td style="color:var(--muted);font-size:.9em">↳ ในนี้เป็นเงินลงบัญชี (ค้างชำระ)</td><td class="r" style="color:#e0a95a;font-size:.9em">'+exMoney(dCredit)+'</td></tr>';
   var full=head+body+tail;
   var el=document.getElementById('ex4Body');
-  if(el) el.innerHTML = (rows.length||autoRev>0||manual>0) ? '<table class="data-table" style="width:100%;font-size:.85rem;"><tbody>'+full+'</tbody></table>' : '<div style="text-align:center;color:var(--muted);padding:18px">— เลือกเดือนเพื่อดูสรุปรายได้-รายจ่าย —</div>';
+  if(el) el.innerHTML = (rows.length||autoRev>0||manual>0||dirtRev>0||wageTot>0||fuelTot>0) ? '<table class="data-table" style="width:100%;font-size:.85rem;"><tbody>'+full+'</tbody></table>' : '<div style="text-align:center;color:var(--muted);padding:18px">— เลือกเดือนเพื่อดูสรุปรายได้-รายจ่าย —</div>';
 }
 </script>
 </body>
