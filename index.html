@@ -854,6 +854,7 @@ select{color-scheme:light;}
               <tbody id="t4b"></tbody>
             </table>
           </div>
+          <div id="t4EstNote" style="font-size:.7rem;color:var(--muted);margin-top:6px;display:none;"></div>
         </div>
         <!-- สัดส่วนรายได้ลูกค้า (เดือนนี้) -->
         <div class="card"><div class="card-title">🥧 สัดส่วนรายได้ลูกค้า (เดือนนี้)</div><canvas id="p4" width="460" height="220"></canvas></div>
@@ -3996,7 +3997,7 @@ function fuelCostOfMonth(m){
 /* อัปเดตการ์ดกำไรเดือนนี้ (เรียกซ้ำได้หลังโหลดค่าแรง/น้ำมัน) */
 function updateK4Profit(){
   var CUR=curYM4(), rev=0, exp=0;
-  wData.forEach(function(r){ if(String(r.date||'').slice(0,7)===CUR) rev+=sandRevOf(r); });
+  rev += (typeof sandRevMonth==='function')?sandRevMonth(CUR).total:0;
   osBills.forEach(function(b){ if(b&&b.status!=='cancelled'&&String(b.date||'').slice(0,7)===CUR) rev+=(b.grandTotal||0); });
   (typeof gExpenses!=='undefined'?gExpenses:[]).forEach(function(e){ if(String(e.date||'').slice(0,7)===CUR) exp+=(e.amount||0); });
   (typeof pnlWd!=='undefined'?pnlWd:[]).forEach(function(w){ if(String(w.date||'').slice(0,7)===CUR) exp+=(w.amount||0); });
@@ -4037,6 +4038,62 @@ function drawStackedBar(id, labels, aVals, bVals, colA, colB){
     ctx.fillText(lb,x+bw/2,H-pad.b+13);
   });
 }
+/* ราคาต่อลูกค้า (ต่อคิว, ล่าสุดที่รู้) จากใบชั่งหน่วยคิวที่มีราคา + ใบแจ้งหนี้ BL */
+function custSandPrice(){
+  var mp={};
+  wData.forEach(function(r){
+    if(r.sale_unit!=='คิว') return; var p=r.price||0; if(p<=0) return;
+    var c=r.customer||''; if(!c) return; var d=r.date||'';
+    if(!mp[c]||d>mp[c].date) mp[c]={price:p,date:d};
+  });
+  (typeof pnlInv!=='undefined'?pnlInv:[]).forEach(function(iv){
+    var p=iv.price||0; if(p<=0) return; var c=iv.customer||''; if(!c) return; var d=iv.date||'';
+    if(!mp[c]||d>mp[c].date) mp[c]={price:p,date:d};
+  });
+  var out={}; Object.keys(mp).forEach(function(c){ out[c]=mp[c].price; }); return out;
+}
+/* รายได้ทรายของเดือน m: ใบมีราคา=จริง, ใบไม่มีราคา=ประมาณ(คิว×ราคาลูกค้า) */
+function sandRevMonth(m){
+  if(!m) return {total:0,est:false,unknown:[]};
+  var pm=custSandPrice(), total=0, est=false, unk={};
+  wData.forEach(function(r){
+    if(String(r.date||'').slice(0,7)!==m) return;
+    var ex=sandRevOf(r);
+    if(ex>0){ total+=ex; return; }
+    var net=Math.max(0,(r.kg/KPC)-((typeof dData!=='undefined'&&dData[r._id])?dData[r._id]:0));
+    if(net<=0) return;
+    var c=r.customer||'ไม่ระบุ', pr=pm[c]||0;
+    if(pr>0){ total+=net*pr; est=true; } else { unk[c]=1; }
+  });
+  return {total:Math.round(total*100)/100, est:est, unknown:Object.keys(unk)};
+}
+/* ตารางรายได้รายเดือน (ทราย จริง/ประมาณ + ดิน) */
+function renderMonthlyRev(){
+  var tb=document.getElementById('t4b'); if(!tb) return;
+  var TM=['','ม.ค','ก.พ','มี.ค','เม.ย','พ.ค','มิ.ย','ก.ค','ส.ค','ก.ย','ต.ค','พ.ย','ธ.ค'];
+  var dirtBM={}, monSet={};
+  (typeof osBills!=='undefined'?osBills:[]).forEach(function(b){ if(!b||b.status==='cancelled')return; var m=String(b.date||'').slice(0,7); if(!m)return; dirtBM[m]=(dirtBM[m]||0)+(b.grandTotal||0); monSet[m]=1; });
+  wData.forEach(function(r){ var m=String(r.date||'').slice(0,7); if(m) monSet[m]=1; });
+  var ms=Object.keys(monSet).sort().reverse(), anyEst=false, unkAll={};
+  tb.innerHTML = ms.length===0
+    ? '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
+    : ms.map(function(m){
+        var sr=sandRevMonth(m), sv=sr.total, di=dirtBM[m]||0, tt=sv+di, p=m.split('-');
+        if(sr.est) anyEst=true; sr.unknown.forEach(function(c){ unkAll[c]=1; });
+        var lbl=TM[parseInt(p[1])]+' '+(parseInt(p[0])+543);
+        var sCell=sr.est?'<span style="font-style:italic;color:#8a6d3b" title="ประมาณจากคิว×ราคาลูกค้า">~'+fmtBaht(sv)+'</span>':fmtBaht(sv);
+        return '<tr><td>'+lbl+'</td><td class="r">'+sCell+'</td>'
+          +'<td class="r" style="color:#c88a2e">'+fmtBaht(di)+'</td>'
+          +'<td class="r gold" style="font-weight:700">'+fmtBaht(tt)+'</td></tr>';
+      }).join('');
+  var note=document.getElementById('t4EstNote');
+  if(note){
+    var uk=Object.keys(unkAll), txt='';
+    if(anyEst) txt+='~ = ประมาณจาก คิว × ราคาลูกค้า (เดือนที่ยังไม่ได้กรอกราคาตาชั่ง)';
+    if(uk.length) txt+=(txt?' · ':'')+'ยังไม่รู้ราคา '+uk.length+' ราย: '+uk.slice(0,6).join(', ')+(uk.length>6?' …':'');
+    note.innerHTML=txt; note.style.display=txt?'':'none';
+  }
+}
 function draw4() {
   var CUR=curYM4();
   var byMonth={}, byDay={}, byCustCur={};
@@ -4047,7 +4104,7 @@ function draw4() {
     var rev=sandRevOf(r);
     (byMonth[m]=byMonth[m]||{sand:0,dirt:0}).sand+=rev;
     (byDay[d]=byDay[d]||{sand:0,dirt:0}).sand+=rev;
-    if(m===CUR){ curSand+=rev; var c=r.customer||'ไม่ระบุ'; byCustCur[c]=(byCustCur[c]||0)+rev; }
+    if(m===CUR){ var c=r.customer||'ไม่ระบุ'; byCustCur[c]=(byCustCur[c]||0)+rev; }
   });
   osBills.forEach(function(b){
     if(!b||b.status==='cancelled') return;
@@ -4058,18 +4115,8 @@ function draw4() {
       if(b.pay==='transfer') curDTrans+=amt; else if(b.pay==='credit') curDCredit+=amt; else curDCash+=amt; }
   });
 
-  /* ตารางรายได้รายเดือน (บาท) */
-  var TM=['','ม.ค','ก.พ','มี.ค','เม.ย','พ.ค','มิ.ย','ก.ค','ส.ค','ก.ย','ต.ค','พ.ย','ธ.ค'];
-  var ms=Object.keys(byMonth).sort().reverse();
-  document.getElementById('t4b').innerHTML=ms.length===0
-    ?'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:28px">ยังไม่มีข้อมูล</td></tr>'
-    :ms.map(function(m){
-        var s=byMonth[m].sand, di=byMonth[m].dirt, tt=s+di, p=m.split('-');
-        var lbl=TM[parseInt(p[1])]+' '+(parseInt(p[0])+543);
-        return '<tr><td>'+lbl+'</td><td class="r">'+fmtBaht(s)+'</td>'
-          +'<td class="r" style="color:#c88a2e">'+fmtBaht(di)+'</td>'
-          +'<td class="r gold" style="font-weight:700">'+fmtBaht(tt)+'</td></tr>';
-      }).join('');
+  /* ตารางรายได้รายเดือน (ทราย จริง/ประมาณ + ดิน) */
+  renderMonthlyRev();
 
   /* กราฟรายได้ 14 วัน (ทราย+ดิน) */
   var days=Object.keys(byDay).sort().slice(-14);
@@ -4081,6 +4128,7 @@ function draw4() {
   drawPie('p4', byCustCur);
 
   /* KPI การเงินเดือนนี้ */
+  curSand=(typeof sandRevMonth==='function')?sandRevMonth(CUR).total:curSand;
   var curDirt=curDCash+curDTrans+curDCredit, curRev=curSand+curDirt, curRecv=curSand+curDCash+curDTrans;
   var setTx=function(id,v){ var el=document.getElementById(id); if(el) el.textContent=v; };
   setTx('k4rev', fmtBaht(curRev)+' ฿');
@@ -4100,7 +4148,7 @@ function draw4() {
 }
 
 /* ── โหลดค่าแรง(withdrawals) + ค่าน้ำมันรถ(fuel_expense) สำหรับ P&L รายเดือน ── */
-var pnlWd=[], pnlFe=[], pnlFin=[], pnlFout=[], pnlLoaded=false;
+var pnlWd=[], pnlFe=[], pnlFin=[], pnlFout=[], pnlInv=[], pnlLoaded=false;
 function pnlLoadExtra(){
   var cut=new Date(Date.now()-400*864e5).toISOString().slice(0,10);
   var empty={forEach:function(){}};
@@ -4110,14 +4158,17 @@ function pnlLoadExtra(){
     db.collection('fuel_expense').where('date','>=',cut).get().catch(function(){return empty;}),
     needExp ? db.collection('expenses').where('date','>=',cut).get().catch(function(){return empty;}) : Promise.resolve(empty),
     db.collection('fuel_in').where('date','>=',cut).get().catch(function(){return empty;}),
-    db.collection('fuel_out').where('date','>=',cut).get().catch(function(){return empty;})
+    db.collection('fuel_out').where('date','>=',cut).get().catch(function(){return empty;}),
+    db.collection('invoices').orderBy('createdAt','desc').limit(500).get().catch(function(){return empty;})
   ]).then(function(res){
     pnlWd=[]; res[0].forEach(function(d){ pnlWd.push(d.data()); });
     pnlFe=[]; res[1].forEach(function(d){ pnlFe.push(d.data()); });
     if(needExp){ var arr=[]; res[2].forEach(function(d){ var o=d.data(); o.id=d.id; arr.push(o); }); if(arr.length) gExpenses=arr; }
     pnlFin=[];  res[3].forEach(function(d){ pnlFin.push(d.data()); });
     pnlFout=[]; res[4].forEach(function(d){ pnlFout.push(d.data()); });
+    pnlInv=[]; res[5].forEach(function(d){ var v=d.data(); var no=String(v.docNo||d.id); if(no.indexOf('BL')===0 && v.status!=='cancelled' && (v.price||0)>0){ pnlInv.push({customer:v.customer||'', price:v.price||0, date:(v.dateTo||v.dateFrom||String(v.createdAt||'').slice(0,10))}); } });
     pnlLoaded=true;
+    if(typeof renderMonthlyRev==='function') renderMonthlyRev();
     if(typeof draw4ExpenseCard==='function') draw4ExpenseCard();
     if(typeof updateK4Profit==='function') updateK4Profit();
     if(typeof exDraw4==='function') exDraw4();
@@ -7060,17 +7111,10 @@ function exDraw4(){
   }
   wageTot=Math.round(wageTot*100)/100;
   var totAll=Math.round((tot+wageTot+fuelTot)*100)/100;
-  var autoRev=0;
-  if(m && typeof wData!=='undefined'){
-    wData.forEach(function(r){
-      if(!r.date || r.date.slice(0,7)!==m) return;
-      var net=Math.max(0,(r.kg/KPC)-((typeof dData!=='undefined'?dData[r._id]:0)||0));
-      if(r.sale_unit==='เหมา'){ autoRev+=(r.sale_amount||0); return; }
-      var price=r.price||0; if(price<=0) return;
-      var qty=(r.sale_unit==='ตัก')?(r.scoop||0):((r.sale_unit==='ตัน')?net*1.5:net);
-      autoRev+=qty*price;
-    });
-    autoRev=Math.round(autoRev*100)/100;
+  var autoRev=0, autoRevEst=false;
+  if(m){
+    var _sr=(typeof sandRevMonth==='function')?sandRevMonth(m):{total:0,est:false};
+    autoRev=_sr.total; autoRevEst=!!_sr.est;
   }
   /* รายได้ขายดิน/สินค้าอื่น (os_bills) เดือนนี้ แยกช่องทาง */
   var dCash=0,dTrans=0,dCredit=0;
@@ -7089,7 +7133,7 @@ function exDraw4(){
   var sandRev = manual>0 ? manual : autoRev;
   var rev = sandRev + dirtRev;
   var head='';
-  head+='<tr><td>รายได้ขายทราย (ตาชั่ง×ราคา)</td><td class="r" style="color:#4ec98a">'+exMoney(autoRev)+'</td></tr>';
+  head+='<tr><td>รายได้ขายทราย'+(autoRevEst?' (บางส่วนประมาณ)':'')+'</td><td class="r" style="color:#4ec98a">'+(autoRevEst?'~':'')+exMoney(autoRev)+'</td></tr>';
   if(manual>0) head+='<tr><td>รายได้ขายทราย (กรอกเอง — override)</td><td class="r" style="color:#4ec98a">'+exMoney(manual)+'</td></tr>';
   if(dirtRev>0){
     head+='<tr><td>รายได้ขายดิน/อื่น</td><td class="r" style="color:#4ec98a">'+exMoney(dirtRev)+'</td></tr>';
