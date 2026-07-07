@@ -192,6 +192,11 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
         </div>
         <div class="mini" style="margin-top:5px">🚛 รถร่วม = บันทึกเที่ยวไว้จ่ายค่าเที่ยวให้เจ้าของรถ • 🏢 รถบริษัท = ไม่จ่ายค่าเที่ยว • เว้นว่างได้ถ้าไม่ใช่งานส่งด้วยรถร่วม</div>
       </div>
+      <div class="row" id="fFreightPayRow" style="margin-top:12px">
+        <label class="fl">ค่าเที่ยวจ่ายรถร่วม (บาท)</label>
+        <input id="fFreightPay" class="inp" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal">
+        <div class="mini" style="margin-top:5px">💵 ยอดที่จ่ายให้เจ้าของรถร่วมสำหรับเที่ยวนี้ (คนละหน้างานใส่ต่างกันได้) — เว้นว่าง = ให้ระบบคิด คิว×เรต ในใบจ่ายค่าเที่ยว</div>
+      </div>
     </div>
 
     <div class="card">
@@ -833,7 +838,7 @@ function buildPlateList(){
 }
 function _plateVal(){ return normPlate($('fPlate').value); }
 function _plateOwner(){ var v=lookupVeh(normPlate($('fPlate').value)); return (v&&(v.canonical||v.ownerName))||''; }
-function setFreight(isF){ curFreight=!!isF; if($('frYes'))$('frYes').classList.toggle('on',curFreight); if($('frNo'))$('frNo').classList.toggle('on',!curFreight); }
+function setFreight(isF){ curFreight=!!isF; if($('frYes'))$('frYes').classList.toggle('on',curFreight); if($('frNo'))$('frNo').classList.toggle('on',!curFreight); var fr=$('fFreightPayRow'); if(fr) fr.style.display=curFreight?'':'none'; if(!curFreight && $('fFreightPay')) $('fFreightPay').value=''; }
 function defaultFreightFor(np){
   var hits=_bills.filter(function(b){return normPlate(b.plate||'')===np;})
                  .sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'');});
@@ -851,7 +856,7 @@ function onPlateInput(){
   }
   if(!editingId) setFreight(defaultFreightFor(np));
 }
-function clearPlate(){ if($('fPlate'))$('fPlate').value=''; if($('fPlateInfo'))$('fPlateInfo').textContent=''; setFreight(true); }
+function clearPlate(){ if($('fPlate'))$('fPlate').value=''; if($('fPlateInfo'))$('fPlateInfo').textContent=''; if($('fFreightPay'))$('fFreightPay').value=''; setFreight(true); }
 
 /* ================= BILL NUMBER ================= */
 async function genBillNo(ymd){
@@ -894,7 +899,7 @@ async function saveBill(){
       var changes=diffBill(old,{date:date,customer:cust,pay:pay,vat:vat,remark:$('fRemark').value.trim(),items:r.items,grand:r.grand,plate:_plateVal(),isFreight:curFreight});
       old.date=date; old.customer=cust; old.pay=pay; old.vat=vat; old.remark=$('fRemark').value.trim();
       old.items=r.items; old.subtotal=r.sub; old.vatAmt=r.vatAmt; old.grandTotal=r.grand; old.slips=slipRecs;
-      old.plate=_plateVal(); old.plateOwner=_plateOwner(); old.isFreight=curFreight;
+      old.plate=_plateVal(); old.plateOwner=_plateOwner(); old.isFreight=curFreight; old.freightPay=(curFreight?(parseFloat($('fFreightPay').value)||0):0);
       if(changes.length){
         old.editLog=old.editLog||[];
         old.editLog.push({at:new Date().toISOString(),by:role,changes:changes});
@@ -909,6 +914,7 @@ async function saveBill(){
     var bill={ id:'b'+Date.now()+'_'+Math.floor(Math.random()*1e6), billNo:billNo, date:date, customer:cust, pay:pay,
       slips:slipRecs, items:r.items, vat:vat, subtotal:r.sub, vatAmt:r.vatAmt, grandTotal:r.grand,
       remark:$('fRemark').value.trim(), plate:_plateVal(), plateOwner:_plateOwner(), isFreight:curFreight,
+      freightPay:(curFreight?(parseFloat($('fFreightPay').value)||0):0),
       status:'active', createdAt:new Date().toISOString(), createdBy:role, editLog:[] };
     await db.collection('os_bills').doc(bill.id).set(bill);
     if(under.length) notify('⚠️ <b>ขายต่ำกว่าราคาตั้ง</b>\nบิล '+billNo+' (ลูกค้า '+cust+')\nโดย: '+(role==='owner'?'เจ้าของ':'พนักงาน')+'\n'+under.map(function(i){return '• '+i.name+' ขาย '+money(i.price)+' (ตั้ง '+money(i.listPrice)+')';}).join('\n'));
@@ -1041,7 +1047,7 @@ function startEdit(id){
   $('editBanner').style.display='block'; $('editBillNo').textContent=b.billNo;
   $('fDate').value=b.date; fDateChanged(); ensureCust(b.customer); $('fCust').value=b.customer;
   setPay(b.pay);
-  $('fPlate').value=b.plate||''; onPlateInput(); setFreight(b.isFreight!==false);
+  $('fPlate').value=b.plate||''; onPlateInput(); setFreight(b.isFreight!==false); if($('fFreightPay'))$('fFreightPay').value=((b.freightPay!=null&&b.freightPay!=='')?b.freightPay:'');
   slips=(b.slips||[]).map(function(x){return Object.assign({},x);});
   slips.forEach(function(sl){ if(!sl.img && sl.slipId){ db.collection('os_slips_blob').doc(sl.slipId).get().then(function(d){ if(d.exists){ sl.img=d.data().img; renderSlips(); } }); } });
   renderSlips(); setVat(b.vat||'zero'); $('fRemark').value=b.remark||'';

@@ -5358,6 +5358,7 @@ function ownerOutstandingCredit(canon){
 function frManualBuild(custSet,from,to,custList,refInvoice){
   /* แยกข้อมูลตาม customer → owner(canonical) → plate */
   var custMap={};  /* { customer: { canonical: { plate: netKiu } } } */
+  var fixedMap={};  /* { customer: { canonical: บาทค่าเที่ยวที่พนักงานกรอก } } */
   wData.forEach(function(w){
     if(!custSet[w.customer]) return;
     if(w.date<from||w.date>to) return;
@@ -5375,10 +5376,19 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
     if(b.status==='cancelled'||b.isFreight===false||!b.plate) return;
     if(!custSet[b.customer]) return;
     if(b.date<from||b.date>to) return;
-    var kiu=dirtKiuOfBill(b); if(kiu<=0) return;
     var np=normPlate(b.plate);
     var v=lookupVeh(b.plate);
     var canon=(v&&v.canonical)||b.plateOwner||('\u2753 '+np);
+    var fp=parseFloat(b.freightPay)||0;
+    if(fp>0){
+      /* พนักงานกรอกค่าเที่ยวมาแล้ว → ใช้ยอดนี้ (แทน คิว×เรต) */
+      if(!fixedMap[b.customer]) fixedMap[b.customer]={};
+      fixedMap[b.customer][canon]=(fixedMap[b.customer][canon]||0)+fp;
+      if(!custMap[b.customer]) custMap[b.customer]={};
+      if(!custMap[b.customer][canon]) custMap[b.customer][canon]={};
+      return;
+    }
+    var kiu=dirtKiuOfBill(b); if(kiu<=0) return;
     if(!custMap[b.customer]) custMap[b.customer]={};
     if(!custMap[b.customer][canon]) custMap[b.customer][canon]={};
     if(!custMap[b.customer][canon][np]) custMap[b.customer][canon][np]=0;
@@ -5388,7 +5398,7 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
   if(!custs.length){ setMsg('fr-pay-msg','\u26A0\uFE0F \u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e02\u0e2d\u0e07\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e43\u0e19\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','warn'); document.getElementById('fr-pay-owners').style.display='none'; return; }
 
   /* เก็บ context ไว้คำนวณ/บันทึก/พิมพ์ — rate เก็บแยกต่อลูกค้า */
-  window._frManCtx={from:from,to:to,custMap:custMap,rates:{},refInvoice:refInvoice||''};
+  window._frManCtx={from:from,to:to,custMap:custMap,fixedMap:fixedMap,rates:{},refInvoice:refInvoice||''};
 
   var html=custs.map(function(cust,ci){
     var safeCust=cust.replace(/'/g,"\\'").replace(/"/g,'&quot;');
@@ -5402,6 +5412,7 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
       var plates=Object.keys(ownerMap[own]).sort();
       var trips=plates.map(function(p){return {plate:p,netKiu:ownerMap[own][p]};}).filter(function(t){return t.netKiu>0.0001;});
       var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
+      var fixed=(fixedMap[cust]&&fixedMap[cust][own])||0;
       var safeOwn=own.replace(/'/g,"\\'");
       var oc=ownerOutstandingCredit(own);
       var rows=trips.map(function(t){
@@ -5409,22 +5420,23 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
           +'<td class="r">'+fmt3(t.netKiu)+'</td>'
           +'<td class="r fr-amt" data-ci="'+ci+'" data-kiu="'+t.netKiu+'">\u2013</td></tr>';
       }).join('');
+      var fixedRow=fixed>0?('<tr><td style="padding-left:20px;color:#137a3a">\u2514 \u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e01\u0e23\u0e2d\u0e01\u0e40\u0e2d\u0e07</td><td class="r">-</td><td class="r" style="color:#137a3a">'+fixed.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>'):'';
       return '<div class="fr-owner-card"><div class="fr-owner-hdr">'
         +'<span class="fr-owner-name">\uD83D\uDE9B '+own+'</span>'
-        +'<span class="fr-owner-total"> \u0e23\u0e27\u0e21 '+fmt3(total)+' \u0e04\u0e34\u0e27 | <b class="fr-owner-amt" data-ci="'+ci+'" data-kiu="'+total+'">\u2013</b></span>'
+        +'<span class="fr-owner-total"> \u0e23\u0e27\u0e21 '+fmt3(total)+' \u0e04\u0e34\u0e27 | <b class="fr-owner-amt" data-ci="'+ci+'" data-kiu="'+total+'" data-fixed="'+fixed+'">\u2013</b></span>'
         +'<button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px;font-size:11px" onclick="frSaveManual(\''+safeCust+'\',\''+safeOwn+'\','+ci+')">\uD83D\uDCBE \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01</button>'
         +'<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="frPrintManual(\''+safeCust+'\',\''+safeOwn+'\','+ci+')">\uD83D\uDDA8\uFE0F \u0e1e\u0e34\u0e21\u0e1e\u0e4c</button>'
         +'<div class="table-wrap"><table>'
         +'<thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th class="r">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th class="r">\u0e40\u0e07\u0e34\u0e19</th></tr></thead>'
-        +'<tbody>'+rows
+        +'<tbody>'+rows+fixedRow
         +'<tr style="border-top:1px solid var(--border)"><td><b>\u0e23\u0e27\u0e21</b></td>'
         +'<td class="r gold"><b>'+fmt3(total)+'</b></td>'
-        +'<td class="r gold fr-owner-amt2" data-ci="'+ci+'" data-kiu="'+total+'"><b>\u2013</b></td></tr>'
+        +'<td class="r gold fr-owner-amt2" data-ci="'+ci+'" data-kiu="'+total+'" data-fixed="'+fixed+'"><b>\u2013</b></td></tr>'
         +'</tbody></table></div>'
         +(oc.total>0?('<div style="padding:7px 10px;font-size:12px;border-top:1px dashed var(--border);background:rgba(192,57,43,.06)">'
-          +'ค่าเที่ยว: <b class="fr-gross" data-ci="'+ci+'" data-kiu="'+total+'">-</b>'
+          +'ค่าเที่ยว: <b class="fr-gross" data-ci="'+ci+'" data-kiu="'+total+'" data-fixed="'+fixed+'">-</b>'
           +' &nbsp;|&nbsp; หักลงบัญชีค้าง: <b style="color:#c0392b">-'+oc.total.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b>'
-          +' &nbsp;|&nbsp; จ่ายสุทธิ: <b class="fr-net-amt" style="color:#137a3a" data-ci="'+ci+'" data-kiu="'+total+'" data-credit="'+oc.total+'">-</b>'
+          +' &nbsp;|&nbsp; จ่ายสุทธิ: <b class="fr-net-amt" style="color:#137a3a" data-ci="'+ci+'" data-kiu="'+total+'" data-fixed="'+fixed+'" data-credit="'+oc.total+'">-</b>'
           +'<div style="color:var(--muted);font-size:10px;margin-top:3px">* ตัดยอดลงบัญชีจริงตอนกดบันทึก (บิลเก่าก่อน) — '+oc.bills.length+' บิล</div>'
           +'</div>'):'')
         +'</div>';
@@ -5443,6 +5455,7 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
 
   var box=document.getElementById('fr-pay-owners');
   box.innerHTML=html; box.style.display='';
+  custs.forEach(function(_,ci){ frManRate(ci, (document.querySelector('.fr-cust-rate input[data-ci="'+ci+'"]')||{}).value||''); });
   setMsg('fr-pay-msg','\u2705 \u0e1e\u0e1a '+custs.length+' \u0e25\u0e39\u0e01\u0e04\u0e49\u0e32 \u2014 \u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e04\u0e32\u0e41\u0e15\u0e48\u0e25\u0e30\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32 \u0e41\u0e25\u0e49\u0e27\u0e01\u0e14\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e41\u0e22\u0e01\u0e15\u0e32\u0e21\u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16','ok');
 }
 
@@ -5450,27 +5463,34 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
 function frManRate(ci,val){
   var rate=parseFloat(val)||0;
   if(window._frManCtx) window._frManCtx.rates[ci]=rate;
-  /* แถวรายคัน */
+  var fmt2=function(x){ return x.toLocaleString('th-TH',{minimumFractionDigits:2}); };
+  /* แถวรายคัน (คิว×เรต) */
   document.querySelectorAll('.fr-amt[data-ci="'+ci+'"]').forEach(function(el){
     var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
-    el.textContent=rate>0?(kiu*rate).toLocaleString('th-TH',{minimumFractionDigits:2}):'\u2013';
+    el.textContent=rate>0?fmt2(kiu*rate):'\u2013';
   });
-  /* ยอดรวมเจ้าของ(header + แถวรวม) */
+  /* ยอดรวมเจ้าของ = คิว×เรต + ค่าเที่ยวกรอกเอง */
   ['.fr-owner-amt','.fr-owner-amt2'].forEach(function(sel){
     document.querySelectorAll(sel+'[data-ci="'+ci+'"]').forEach(function(el){
       var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
-      var txt=rate>0?(kiu*rate).toLocaleString('th-TH',{minimumFractionDigits:2})+' \u0e1a\u0e32\u0e17':'\u2013';
+      var fixed=parseFloat(el.getAttribute('data-fixed'))||0;
+      var amt=kiu*rate+fixed;
+      var txt=(amt>0)?(fmt2(amt)+' \u0e1a\u0e32\u0e17'):'\u2013';
       el.innerHTML=sel==='.fr-owner-amt2'?'<b>'+txt+'</b>':txt;
     });
   });
   document.querySelectorAll('.fr-gross[data-ci="'+ci+'"]').forEach(function(el){
     var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
-    el.textContent=rate>0?(kiu*rate).toLocaleString('th-TH',{minimumFractionDigits:2}):'-';
+    var fixed=parseFloat(el.getAttribute('data-fixed'))||0;
+    var amt=kiu*rate+fixed;
+    el.textContent=amt>0?fmt2(amt):'-';
   });
   document.querySelectorAll('.fr-net-amt[data-ci="'+ci+'"]').forEach(function(el){
     var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
+    var fixed=parseFloat(el.getAttribute('data-fixed'))||0;
     var credit=parseFloat(el.getAttribute('data-credit'))||0;
-    el.textContent=rate>0?(kiu*rate-credit).toLocaleString('th-TH',{minimumFractionDigits:2}):'-';
+    var amt=kiu*rate+fixed;
+    el.textContent=(amt>0)?fmt2(amt-credit):'-';
   });
 }
 
@@ -5478,17 +5498,19 @@ function frSaveManual(cust,owner,ci){
   var ctx=window._frManCtx;
   if(!ctx||!ctx.custMap[cust]||!ctx.custMap[cust][owner]){ setMsg('fr-pay-msg','\u274C ไม่มีข้อมูล','err'); return; }
   var rate=ctx.rates[ci]||0;
-  if(!(rate>0)){ setMsg('fr-pay-msg','\u274C กรอกราคา/คิว ของลูกค้า '+cust+' ก่อน','err'); return; }
+  var fixed=(ctx.fixedMap&&ctx.fixedMap[cust]&&ctx.fixedMap[cust][owner])||0;
   var plates=Object.keys(ctx.custMap[cust][owner]);
   var trips=plates.map(function(p){return {plate:p,canonical:owner,netKiu:ctx.custMap[cust][owner][p]};}).filter(function(t){return t.netKiu>0.0001;});
   var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
-  var gross=total*rate;
+  if(total>0.0001 && !(rate>0)){ setMsg('fr-pay-msg','\u274C กรอกราคา/คิว ของลูกค้า '+cust+' ก่อน','err'); return; }
+  var gross=total*rate+fixed;
+  if(!(gross>0)){ setMsg('fr-pay-msg','\u274C ไม่มียอดค่าเที่ยว (คิว×เรต หรือ ค่าเที่ยวกรอกเอง)','err'); return; }
   var oc=ownerOutstandingCredit(owner);
   var consumed=[], acc=0;
   oc.bills.forEach(function(b){ if(acc+(b.grandTotal||0) <= gross+0.001){ consumed.push(b); acc+=(b.grandTotal||0); } });
   var creditDeducted=parseFloat(acc.toFixed(2));
   var netPaid=parseFloat((gross-creditDeducted).toFixed(2));
-  var cm='จ่ายค่าเที่ยว '+owner+' ('+cust+')\nค่าเที่ยว: '+gross.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท';
+  var cm='จ่ายค่าเที่ยว '+owner+' ('+cust+')\nค่าเที่ยว: '+gross.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท'+(fixed>0?(' (รวมค่าเที่ยวกรอกเอง '+fixed.toLocaleString('th-TH',{minimumFractionDigits:2})+')'):'');
   if(creditDeducted>0) cm+='\nหักยอดลงบัญชี '+consumed.length+' บิล: -'+creditDeducted.toLocaleString('th-TH',{minimumFractionDigits:2})+'\nจ่ายสุทธิ: '+netPaid.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท';
   if(oc.total>creditDeducted+0.001) cm+='\n(ยอดลงบัญชีคงเหลือ '+(oc.total-creditDeducted).toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท ยังไม่ถูกตัด เพราะค่าเที่ยวไม่พอหัก)';
   cm+='\n\nยืนยันบันทึก?';
@@ -5497,6 +5519,7 @@ function frSaveManual(cust,owner,ci){
     var data={docNo:docNo,type:'truck',refInvoice:(ctx&&ctx.refInvoice)||'',customer:cust,
       canonical:owner,dateFrom:ctx.from,dateTo:ctx.to,rateForTruck:rate,
       totalNetKiu:parseFloat(total.toFixed(3)),
+      freightFixed:parseFloat(fixed.toFixed(2)),
       totalAmount:parseFloat(gross.toFixed(2)),
       creditDeducted:creditDeducted, netPaid:netPaid,
       creditBills:consumed.map(function(b){return {id:b._id,billNo:b.billNo||'',amount:b.grandTotal||0};}),
@@ -5515,11 +5538,12 @@ function frPrintManual(cust,owner,ci){
   var ctx=window._frManCtx;
   if(!ctx||!ctx.custMap[cust]||!ctx.custMap[cust][owner]) return;
   var rate=ctx.rates[ci]||0;
-  if(!(rate>0)){ setMsg('fr-pay-msg','\u274C \u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e04\u0e32 '+cust+' \u0e01\u0e48\u0e2d\u0e19\u0e1e\u0e34\u0e21\u0e1e\u0e4c','err'); return; }
+  var fixed=(ctx.fixedMap&&ctx.fixedMap[cust]&&ctx.fixedMap[cust][owner])||0;
   var plates=Object.keys(ctx.custMap[cust][owner]).sort();
   var trips=plates.map(function(p){return {plate:p,netKiu:ctx.custMap[cust][owner][p]};}).filter(function(t){return t.netKiu>0.0001;});
   var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
-  var totalAmt=total*rate;
+  if(total>0.0001 && !(rate>0)){ setMsg('fr-pay-msg','\u274C \u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e04\u0e32 '+cust+' \u0e01\u0e48\u0e2d\u0e19\u0e1e\u0e34\u0e21\u0e1e\u0e4c','err'); return; }
+  var totalAmt=total*rate+fixed;
   var _oc=ownerOutstandingCredit(owner);
   var _cons=[], _acc=0;
   _oc.bills.forEach(function(b){ if(_acc+(b.grandTotal||0)<=totalAmt+0.001){_cons.push(b);_acc+=(b.grandTotal||0);} });
