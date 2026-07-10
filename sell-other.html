@@ -116,6 +116,8 @@ label.fl{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-
 .empty{text-align:center;color:var(--muted);padding:26px;font-size:14px;}
 .prodrow{display:flex;gap:8px;align-items:center;padding:9px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fafafb;}
 .prodrow .pn{flex:1;font-weight:600;}
+.prodrow .edit{background:#eef1ff;color:var(--pri);border:1px solid #c9d2f3;border-radius:8px;padding:9px 12px;font-size:14px;font-weight:700;cursor:pointer;}
+.lockbadge{font-size:11px;color:#c0392b;font-weight:600;margin-left:6px;white-space:nowrap;}
 .notice{background:#fffbea;border:1px solid #f5e6a8;border-radius:10px;padding:11px 13px;font-size:13px;color:#7a5c00;line-height:1.6;margin-bottom:12px;}
 .ownerbox{background:#fff5f5;border:1px solid #f3c9c4;border-radius:12px;padding:14px;}
 .logline{font-size:13px;border-bottom:1px dashed var(--line);padding:9px 0;line-height:1.6;}
@@ -334,6 +336,22 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
     </div>
   </div>
 </dialog>
+<dialog id="editProdDlg">
+  <div style="padding:18px;width:300px;max-width:88vw">
+    <h2 style="font-size:16px;color:var(--pri);font-weight:800;margin-bottom:14px">✏️ แก้ไขสินค้า</h2>
+    <div class="row"><label class="fl">ชื่อสินค้า</label><input id="epName" class="inp" disabled style="background:#f2f2f5;color:#666"></div>
+    <div class="grid2">
+      <div class="row"><label class="fl">หน่วย</label><input id="epUnit" class="inp" disabled style="background:#f2f2f5;color:#666"></div>
+      <div class="row"><label class="fl">ราคา/หน่วย</label><input id="epPrice" type="number" class="inp" min="0" step="any"></div>
+    </div>
+    <div id="epLockNote" class="mini" style="margin:2px 0 8px;color:#c0392b"></div>
+    <div style="display:flex;gap:9px;margin-top:6px">
+      <button class="ghost" style="flex:1;padding:13px" onclick="document.getElementById('editProdDlg').close()">ยกเลิก</button>
+      <button class="bigsave" style="flex:1;padding:13px;font-size:15px" onclick="saveEditProd()">💾 บันทึกราคา</button>
+    </div>
+    <button id="epDelBtn" style="width:100%;margin-top:10px;display:none;background:#fff0f0;color:var(--red);border:1px solid #f3c9c4;border-radius:8px;padding:11px;font-weight:700;cursor:pointer" onclick="delProdFromDlg()">🗑️ ลบสินค้านี้</button>
+  </div>
+</dialog>
 <dialog id="custDlg">
   <div style="padding:18px;width:310px;max-width:88vw">
     <h2 style="font-size:16px;color:var(--pri);font-weight:800;margin-bottom:14px">➕ เพิ่มลูกค้าใหม่</h2>
@@ -382,7 +400,7 @@ var DEFAULT_ACCOUNTS=[
 /* คีย์เชิงตรรกะ (routing ไป Firestore) */
 var K={bills:'bills',prods:'prods',custs:'custs',counter:'counter',log:'log',accounts:'accounts',credits:'credits'};
 /* แคชในหน่วยความจำ (sync จาก Firestore ผ่าน onSnapshot) */
-var _prods=[], _custs=[], _accounts=[], _counter={}, _bills=[], _logs=[], _credits=[], _listenersOn=false;
+var _prods=[], _custs=[], _accounts=[], _counter={}, _bills=[], _logs=[], _credits=[], _listenersOn=false, _billsLoaded=false;
 var vehData={}; var curFreight=true; var _custVeh={};
 function load(k,def){
   if(k===K.prods)   return _prods.length?_prods:DEFAULT_PRODUCTS;
@@ -423,7 +441,7 @@ function attachListeners(){
   db.collection('os_config').doc('os_credit_customers').onSnapshot(function(d){ _credits=(d.exists&&d.data().list)||[]; renderCustList(); if($('pane-owner')&&$('pane-owner').classList.contains('on')) renderOwner(); });
   db.collection('os_config').doc('os_customer_vehicle').onSnapshot(function(d){ _custVeh=(d.exists&&d.data().map)||{}; if($('pane-owner')&&$('pane-owner').classList.contains('on')) renderCustManage(); });
   var cutoff=isoDaysAgo(400);
-  db.collection('os_bills').where('date','>=',cutoff).onSnapshot(function(snap){ _bills=snap.docs.map(function(x){return x.data();}); renderDay(); }, function(e){ console.warn('bills',e); });
+  db.collection('os_bills').where('date','>=',cutoff).onSnapshot(function(snap){ _bills=snap.docs.map(function(x){return x.data();}); _billsLoaded=true; renderDay(); if($('prodList')) renderProds(); }, function(e){ console.warn('bills',e); });
   db.collection('vehicles').onSnapshot(function(snap){ vehData={}; snap.docs.forEach(function(d){ vehData[d.id]=d.data(); }); buildPlateList(); if($('fPlate')&&$('fPlate').value) onPlateInput(); }, function(e){ console.warn('vehicles',e); });
   db.collection('os_logs').orderBy('at','desc').limit(200).onSnapshot(function(snap){ _logs=snap.docs.map(function(x){return x.data();}); if($('pane-owner')&&$('pane-owner').classList.contains('on')) renderOwner(); }, function(e){ console.warn('logs',e); });
   cleanupOldSlips();
@@ -613,6 +631,15 @@ function custChanged(){
 
 /* ================= PRODUCTS ================= */
 function getProds(){ return load(K.prods,DEFAULT_PRODUCTS); }
+/* ชื่อสินค้าที่เคยมีบิลซื้อขายแล้ว (จาก _bills ย้อนหลัง ~400 วัน) — ใช้กันการลบ */
+function usedProdNames(){
+  if(!_billsLoaded) return { has:function(){return true;} };
+  var s={};
+  (_bills||[]).forEach(function(b){
+    if(b && b.status!=='cancelled') (b.items||[]).forEach(function(i){ if(i && i.name) s[i.name]=true; });
+  });
+  return { has:function(n){return !!s[n];} };
+}
 function prodOptions(sel){
   var ps=getProds();
   return '<option value="">— เลือกสินค้า —</option>'+ps.map(function(p){
@@ -620,12 +647,13 @@ function prodOptions(sel){
   }).join('');
 }
 function renderProds(){
-  var ps=getProds();
+  var ps=getProds(), used=usedProdNames();
   $('prodList').innerHTML=ps.map(function(p){
-    return '<div class="prodrow"><div class="pn">'+esc(p.name)+'</div>'
-      +'<div class="mini">หน่วย <b>'+esc(p.unit)+'</b></div>'
-      +'<input type="number" value="'+p.price+'" class="inp" style="width:90px;padding:8px" onchange="updProdPrice(\''+p.id+'\',this.value)">'
-      +'<button class="slip del" onclick="delProd(\''+p.id+'\')">ลบ</button></div>';
+    var isUsed=used.has(p.name);
+    return '<div class="prodrow"><div class="pn">'+esc(p.name)
+      +(isUsed?' <span class="lockbadge">🔒 ขายแล้ว</span>':'')+'</div>'
+      +'<div class="mini">หน่วย <b>'+esc(p.unit)+'</b> · ราคา <b>'+money(p.price)+'</b>/'+esc(p.unit)+'</div>'
+      +'<button class="edit" onclick="openEditProd(\''+p.id+'\')">✏️ แก้ไข</button></div>';
   }).join('') || '<div class="empty">ยังไม่มีสินค้า</div>';
 }
 function addProduct(){
@@ -634,8 +662,30 @@ function addProduct(){
     renderProds(); refreshItemSelects(); toast('✅ เพิ่มสินค้าแล้ว');
   } else { toast('⚠️ กรอกชื่อและหน่วย'); }
 }
-function updProdPrice(id,v){ var ps=getProds(); ps.forEach(function(p){if(p.id===id)p.price=parseFloat(v)||0;}); save(K.prods,ps); toast('✅ อัปเดตราคาแล้ว'); }
-function delProd(id){ if(!confirm('ลบสินค้านี้?'))return; save(K.prods,getProds().filter(function(p){return p.id!==id;})); renderProds(); }
+var editingProdId=null;
+function openEditProd(id){
+  var p=getProds().find(function(x){return x.id===id;}); if(!p)return;
+  editingProdId=id;
+  $('epName').value=p.name; $('epUnit').value=p.unit; $('epPrice').value=p.price;
+  var isUsed=usedProdNames().has(p.name);
+  if(isUsed){ $('epLockNote').textContent='🔒 สินค้านี้มีการซื้อขายแล้ว — แก้ไขได้เฉพาะราคา ลบไม่ได้'; $('epDelBtn').style.display='none'; }
+  else { $('epLockNote').textContent='ยังไม่มีบิลซื้อขาย — แก้ราคาหรือลบได้'; $('epDelBtn').style.display=''; }
+  $('editProdDlg').showModal();
+}
+function saveEditProd(){
+  if(!editingProdId)return;
+  var v=parseFloat($('epPrice').value); if(isNaN(v)||v<0){ toast('⚠️ กรอกราคาให้ถูกต้อง'); return; }
+  var ps=getProds(); ps.forEach(function(p){if(p.id===editingProdId)p.price=v;}); save(K.prods,ps);
+  $('editProdDlg').close(); renderProds(); refreshItemSelects(); toast('✅ อัปเดตราคาแล้ว');
+}
+function delProdFromDlg(){
+  var id=editingProdId; if(!id)return;
+  var p=getProds().find(function(x){return x.id===id;}); if(!p)return;
+  if(usedProdNames().has(p.name)){ toast('⚠️ สินค้านี้มีการซื้อขายแล้ว ลบไม่ได้'); return; }
+  if(!confirm('ลบสินค้า "'+p.name+'"?'))return;
+  save(K.prods,getProds().filter(function(x){return x.id!==id;}));
+  $('editProdDlg').close(); renderProds(); refreshItemSelects(); toast('🗑️ ลบสินค้าแล้ว');
+}
 
 /* ================= PAYMENT + SLIPS ================= */
 function setPay(p){
