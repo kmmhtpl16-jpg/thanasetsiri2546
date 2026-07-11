@@ -318,6 +318,11 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
       <div class="mini" style="margin-bottom:8px">ระบบส่งแจ้งเตือนเข้ากลุ่ม Telegram "แจ้งเตือน:ท่าทราย" อัตโนมัติ และเก็บบันทึกย้อนหลังไว้ตรงนี้</div>
       <div id="notifyLog"></div>
     </div>
+    <div class="card">
+      <h2>🧹 ตรวจ/เคลียร์บิลเก่า</h2>
+      <div class="mini" style="margin-bottom:10px">ลบแถวสินค้าที่หลุด (ไม่ได้เลือกสินค้า เช่น ค่าเที่ยวรถร่วมที่เผลอใส่เป็นรายการ) ออกจากบิลทั้งหมด แล้วคำนวณยอดใหม่ให้อัตโนมัติ — กดครั้งเดียวก็พอ</div>
+      <button id="cleanupBtn" style="background:#fff5f5;color:#c0392b;border:1px solid #f3c9c4;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer" onclick="cleanupStrayItems()">🧹 ตรวจ/ลบแถวสินค้าที่หลุดในบิลเก่า</button>
+    </div>
   </div>
 </div>
 
@@ -851,7 +856,8 @@ function readItems(){
     var below = listPrice>0 && price>0 && price<listPrice;
     var prEl=it.querySelector('.pr'); if(prEl) prEl.classList.toggle('below',below);
     var bm=it.querySelector('.belowmsg'); if(bm){ bm.style.display=below?'block':'none'; if(below) bm.textContent='⚠️ ราคาต่ำกว่าที่ตั้งไว้ ('+money(listPrice)+'/'+unit+') — ต่ำไป '+money(listPrice-price)+' บาท/หน่วย'; }
-    if(pid||unit||qty){ out.push({name:name,unit:unit,qty:qty,price:price,amount:amt,listPrice:listPrice,below:below}); }
+    /* บันทึกเฉพาะแถวที่เลือกสินค้าจริง — กันแถว "— เลือกสินค้า —" (เช่น ค่าเที่ยวรถร่วมที่เผลอใส่) หลุดเข้าใบแจ้งหนี้ */
+    if(pid){ out.push({name:name,unit:unit,qty:qty,price:price,amount:amt,listPrice:listPrice,below:below}); }
   });
   return out;
 }
@@ -1169,6 +1175,42 @@ function markCreditPaid(id){
     notify('✅ <b>รับชำระยอดลงบัญชี</b>\nบิล '+b.billNo+' (ลูกค้า '+b.customer+')\nยอด: '+money(b.grandTotal)+' ฿\nโดย: '+(role==='owner'?'เจ้าของ':'พนักงาน'));
     renderCreditOutstanding(); toast('✅ ตัดยอดค้างแล้ว');
   }).catch(function(e){ alert('ไม่สำเร็จ: '+e.message); });
+}
+
+/* ================= เคลียร์แถวสินค้าที่หลุดในบิลเก่า (owner) ================= */
+function isStrayItem(it){ if(!it) return true; var n=(it.name||'').trim(); return !n || n.indexOf('เลือกสินค้า')>=0; }
+async function cleanupStrayItems(){
+  if(role!=='owner'){ toast('เฉพาะเจ้าของ'); return; }
+  if(!db){ toast('ยังไม่พร้อม'); return; }
+  if(!confirm('ตรวจและลบแถวสินค้าที่หลุด (ไม่ได้เลือกสินค้า เช่น ค่าเที่ยวรถร่วมที่เผลอใส่เป็นรายการ) ในบิลทั้งหมด?\nระบบจะคำนวณยอดใหม่และบันทึกทับ — ทำครั้งเดียว')) return;
+  var btn=$('cleanupBtn'); if(btn){ btn.disabled=true; btn.textContent='⏳ กำลังตรวจ...'; }
+  try{
+    var snap=await db.collection('os_bills').get();
+    var fixed=0, removed=0, details=[];
+    for(var i=0;i<snap.docs.length;i++){
+      var doc=snap.docs[i]; var b=doc.data();
+      var items=b.items||[];
+      var kept=items.filter(function(it){ return !isStrayItem(it); });
+      if(kept.length===items.length) continue;
+      var strayCount=items.length-kept.length;
+      var strayAmt=items.reduce(function(a,it){ return a+(isStrayItem(it)?(parseFloat(it.amount)||0):0); },0);
+      var sub=kept.reduce(function(a,it){ return a+(parseFloat(it.amount)||0); },0);
+      var vatAmt=(b.vat==='ex')?Math.round(sub*0.07*100)/100:0;
+      var grand=sub+vatAmt;
+      b.items=kept; b.subtotal=sub; b.vatAmt=vatAmt; b.grandTotal=grand;
+      b.editLog=b.editLog||[];
+      b.editLog.push({at:new Date().toISOString(),by:role,changes:['• ลบแถวสินค้าที่หลุด '+strayCount+' แถว (รวม '+money(strayAmt)+' ฿) → ยอดใหม่ '+money(grand)+' ฿ [ระบบตรวจอัตโนมัติ]']});
+      await db.collection('os_bills').doc(doc.id).set(b);
+      fixed++; removed+=strayCount; details.push((b.billNo||doc.id)+' (-'+money(strayAmt)+')');
+    }
+    if(btn){ btn.disabled=false; btn.textContent='🧹 ตรวจ/ลบแถวสินค้าที่หลุดในบิลเก่า'; }
+    if(fixed){
+      alert('✅ เคลียร์ '+fixed+' บิล (ลบ '+removed+' แถว)\n'+details.slice(0,25).join(', ')+(details.length>25?(' …และอีก '+(details.length-25)+' บิล'):''));
+      notify('🧹 <b>เคลียร์แถวสินค้าที่หลุดในบิลเก่า</b>\nแก้ '+fixed+' บิล / ลบ '+removed+' แถว\nโดย: เจ้าของ');
+    } else {
+      alert('✅ ไม่พบแถวที่หลุด — บิลสะอาดดีอยู่แล้ว');
+    }
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent='🧹 ตรวจ/ลบแถวสินค้าที่หลุดในบิลเก่า'; } alert('❌ ตรวจไม่สำเร็จ: '+e.message); }
 }
 
 /* ================= PRINT A4 ================= */
