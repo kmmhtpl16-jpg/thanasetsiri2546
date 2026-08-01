@@ -4624,8 +4624,7 @@ function _dirtTripsOfPlate(plateIn,from,to){
   }).map(function(b){
     var kiu=(typeof dirtKiuOfBill==='function')?dirtKiuOfBill(b):0;
     var fixed=parseFloat(b.freightPay)||0;
-    /* พนักงานกรอกค่าเที่ยวเป็นบาทมาแล้ว → ใช้ยอดนั้นแทน คิว×เรต (ตรงกับ frManualBuild) กันนับซ้ำ */
-    if(fixed>0) kiu=0;
+    /* คิว = ปริมาณจริงเสมอ (ไว้ดู/ตรวจ) — เงินค่าเที่ยวคิดแยกที่ _tripPay: กรอกเองมาก่อนเรตเหมา ไม่นับซ้ำ */
     return {date:b.date,customer:b.customer||'–',kiu:kiu,ded:0,net:kiu,fixed:fixed,
             seq:b.billNo||'',time:'',src:'ดิน',billNo:b.billNo||'',owner:b.plateOwner||''};
   });
@@ -4692,6 +4691,8 @@ function frReportRun(){
   var sumDed=trips.reduce(function(s,t){return s+t.ded;},0);
   var sumNet=trips.reduce(function(s,t){return s+t.net;},0);
   var sumPay=trips.reduce(function(s,t){return s+(t.pay||0);},0);
+  var sandKiu=sandTrips.reduce(function(s,t){return s+t.net;},0);
+  var dirtKiu=dirtTrips.reduce(function(s,t){return s+t.net;},0);
   var hasDirt=dirtTrips.length>0;
 
   // สรุปตามลูกค้า
@@ -4707,7 +4708,7 @@ function frReportRun(){
   var custList2=Object.keys(custAgg).sort(function(a,b){return custAgg[b].pay-custAgg[a].pay||custAgg[b].net-custAgg[a].net;});
 
   _frRptData={plate:plateIn,owner:owner,from:from,to:to,trips:trips,sumKiu:sumKiu,sumDed:sumDed,sumNet:sumNet,
-              sumPay:sumPay,custAgg:custAgg,custList:custList2,
+              sumPay:sumPay,custAgg:custAgg,custList:custList2,sandKiu:sandKiu,dirtKiu:dirtKiu,
               sandCount:sandTrips.length,dirtCount:dirtTrips.length,missList:missList};
 
   var money=function(x){ return x.toLocaleString('th-TH',{minimumFractionDigits:2}); };
@@ -4741,7 +4742,7 @@ function frReportRun(){
   res.innerHTML='<div style="margin-bottom:10px;font-size:14px">'
     +'🚛 ทะเบียน <b style="color:var(--gold)">'+plateIn+'</b> &nbsp;|&nbsp; เจ้าของ: <b>'+owner+'</b><br>'
     +'<span style="color:var(--muted);font-size:12px">ช่วง '+invDateFmt(from)+' – '+invDateFmt(to)+' &nbsp;|&nbsp; รวม '+trips.length+' เที่ยว'
-    +' (ทราย '+sandTrips.length+' / ดิน '+dirtTrips.length+')</span>'
+    +' (ทราย '+sandTrips.length+' เที่ยว '+fmt3(sandKiu)+' คิว / ดิน '+dirtTrips.length+' เที่ยว '+fmt3(dirtKiu)+' คิว)</span>'
     +'<div style="margin-top:8px;padding:9px 12px;background:rgba(212,175,55,.10);border:1px solid var(--border);border-radius:8px;display:inline-block">'
     +'💰 ค่าเที่ยวรวม: <b style="color:var(--gold);font-size:17px">'+money(sumPay)+'</b> บาท</div></div>'
     +'<div class="table-wrap"><table>'
@@ -4765,7 +4766,7 @@ function frReportRun(){
     +'<td class="r"><b>'+fmt3(sumNet)+'</b></td>'
     +'<td class="r gold"><b>'+money(sumPay)+'</b></td></tr>'
     +'</tbody></table></div>'
-    +(hasDirt?'<div style="margin-top:10px;font-size:12px;color:var(--muted)">หมายเหตุ: เที่ยวดินนับเฉพาะรถร่วม (บิลรถบริษัทไม่นับ) — บิลที่พนักงานกรอกค่าเที่ยวเป็นบาทไว้ จะใช้ยอดที่กรอก (ที่มา = "กรอกเอง") แทนเรตเหมา</div>':'')
+    +(hasDirt?'<div style="margin-top:10px;font-size:12px;color:var(--muted)">หมายเหตุ: คิวของเที่ยวดินนับจากรายการที่หน่วยเป็น "คิว" ในบิล (ขายเป็นตัน/ก้อน จะไม่มีตัวเลขคิว) — นับเฉพาะรถร่วม บิลรถบริษัทไม่นับ · บิลที่พนักงานกรอกค่าเที่ยวเป็นบาทไว้ ใช้ยอดที่กรอก (ที่มา = "กรอกเอง") แทนเรตเหมา</div>':'')
     +warn;
   setMsg('fr-rpt-msg','✅ พบ '+trips.length+' เที่ยว (ทราย '+sandTrips.length+' / ดิน '+dirtTrips.length+') — ค่าเที่ยวรวม '+money(sumPay)+' บาท','ok');
 }
@@ -4816,7 +4817,7 @@ function frReportPrint(){
     +'<div class="hd"><div><h2>รายงานค่าเที่ยวรถร่วม — ตามทะเบียน</h2>'
     +'<p>ทะเบียน: <b>'+d.plate+'</b> | เจ้าของ: <b>'+d.owner+'</b></p>'
     +'<p>ช่วงวันที่: <b>'+invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)+'</b></p>'
-    +'<p>เที่ยวทราย <b>'+(d.sandCount||0)+'</b> | เที่ยวดิน/สินค้าอื่น <b>'+(d.dirtCount||0)+'</b> | รวม <b>'+d.trips.length+'</b> เที่ยว</p>'
+    +'<p>ทราย <b>'+(d.sandCount||0)+'</b> เที่ยว '+fmt3(d.sandKiu||0)+' คิว | ดิน/สินค้าอื่น <b>'+(d.dirtCount||0)+'</b> เที่ยว '+fmt3(d.dirtKiu||0)+' คิว | รวม <b>'+d.trips.length+'</b> เที่ยว '+fmt3(d.sumNet)+' คิว</p>'
     +'<p class="big">ค่าเที่ยวรวม '+money(d.sumPay)+' บาท</p></div>'
     +'<div class="company"><b>หจก.ธนเศรษฐ์ศิริ 2546</b><br>274 ม.2 ต.ผาตั้ง อ.สังคม<br>จ.หนองคาย 43160<br>โทร 0818714977</div></div>'
     +((d.missList&&d.missList.length)?('<p style="color:#c0392b;font-size:10px">* ยังไม่ได้ตั้งเรตค่าเที่ยวของ: '+d.missList.join(', ')+'</p>'):'')
@@ -4844,7 +4845,7 @@ function frReportExcel(){
     ['รายงานค่าเที่ยวรถร่วม — ตามทะเบียน'],
     ['ทะเบียน', d.plate, '', 'เจ้าของ', d.owner],
     ['ช่วงวันที่', invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)],
-    ['เที่ยวทราย', d.sandCount||0, 'เที่ยวดิน/สินค้าอื่น', d.dirtCount||0],
+    ['ทราย (เที่ยว/คิว)', d.sandCount||0, parseFloat((d.sandKiu||0).toFixed(3)), 'ดิน (เที่ยว/คิว)', d.dirtCount||0, parseFloat((d.dirtKiu||0).toFixed(3))],
     ['ค่าเที่ยวรวม (บาท)', parseFloat((d.sumPay||0).toFixed(2))],
     [],
     ['วันที่','ประเภท','ลูกค้า','คิว','หักทรายเปียก','คิวสุทธิ','ค่าเที่ยว (บาท)','ที่มา']
