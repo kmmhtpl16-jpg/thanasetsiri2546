@@ -4458,12 +4458,35 @@ function frSetType(type) {
 
 /* ── รายงานค่าเที่ยวตามทะเบียน ── */
 var _frRptData=null;
+/* วันตัดของ os_bills ที่โหลดเข้าแอป (400 วันย้อนหลัง) — ใช้เตือนถ้าค้นย้อนไกลกว่านี้ */
+function _osCutDate(){ return new Date(Date.now()-400*864e5).toISOString().slice(0,10); }
+/* เที่ยวดินจาก os_bills ของทะเบียนนี้ (นับเฉพาะรถร่วม isFreight!==false) */
+function _dirtTripsOfPlate(plateIn,from,to){
+  if(typeof osBills==='undefined'||!osBills) return [];
+  return osBills.filter(function(b){
+    if(!b||b.status==='cancelled') return false;
+    if(b.isFreight===false) return false;          /* รถบริษัท ไม่จ่ายค่าเที่ยว */
+    if(!b.plate||normPlate(b.plate)!==plateIn) return false;
+    return b.date>=from && b.date<=to;
+  }).map(function(b){
+    var kiu=(typeof dirtKiuOfBill==='function')?dirtKiuOfBill(b):0;
+    var fixed=parseFloat(b.freightPay)||0;
+    /* พนักงานกรอกค่าเที่ยวเป็นบาทมาแล้ว → ใช้ยอดนั้นแทน คิว×เรต (ตรงกับ frManualBuild) กันนับซ้ำ */
+    if(fixed>0) kiu=0;
+    return {date:b.date,customer:b.customer||'–',kiu:kiu,ded:0,net:kiu,fixed:fixed,
+            seq:b.billNo||'',time:'',src:'ดิน',billNo:b.billNo||'',owner:b.plateOwner||''};
+  });
+}
 function frReportInit(){
-  // เติม datalist ทะเบียนจากข้อมูลตาชั่ง
+  // เติม datalist ทะเบียนจากข้อมูลตาชั่ง + บิลขายสินค้าอื่น (ดิน)
   var dl=document.getElementById('fr-rpt-platelist');
   if(dl){
     var plates={};
     wData.forEach(function(w){ var p=normPlate(w.plate); if(p) plates[p]=true; });
+    if(typeof osBills!=='undefined'&&osBills) osBills.forEach(function(b){
+      if(!b||b.status==='cancelled'||!b.plate) return;
+      var p=normPlate(b.plate); if(p) plates[p]=true;
+    });
     dl.innerHTML=Object.keys(plates).sort().map(function(p){return '<option value="'+p+'">';}).join('');
   }
 }
@@ -4476,15 +4499,18 @@ function frReportRun(){
   if(!from||!to){ setMsg('fr-rpt-msg','❌ เลือกช่วงวันที่','err'); res.innerHTML=''; return; }
   if(from>to){ setMsg('fr-rpt-msg','❌ วันเริ่มต้องน้อยกว่าวันสิ้นสุด','err'); return; }
 
-  // ดึงทุกเที่ยวของทะเบียนนี้ในช่วงวันที่
-  var trips=wData.filter(function(w){
+  // ดึงทุกเที่ยวของทะเบียนนี้ในช่วงวันที่ — ทราย (ตาชั่ง) + ดิน/สินค้าอื่น (os_bills)
+  var sandTrips=wData.filter(function(w){
     return normPlate(w.plate)===plateIn && w.date>=from && w.date<=to;
   }).map(function(w){
     var kiu=w.kg/KPC;
     var ded=(typeof dData!=='undefined'&&dData[w._id])?dData[w._id]:0;
-    return {date:w.date,customer:w.customer||'–',kiu:kiu,ded:ded,net:kiu-ded,
-            seq:w.seq||'',time:w.time||''};
-  }).sort(function(a,b){return a.date.localeCompare(b.date)||String(a.seq).localeCompare(String(b.seq));});
+    return {date:w.date,customer:w.customer||'–',kiu:kiu,ded:ded,net:kiu-ded,fixed:0,
+            seq:w.seq||'',time:w.time||'',src:'ทราย',billNo:''};
+  });
+  var dirtTrips=_dirtTripsOfPlate(plateIn,from,to);
+  var trips=sandTrips.concat(dirtTrips)
+    .sort(function(a,b){return a.date.localeCompare(b.date)||String(a.seq).localeCompare(String(b.seq));});
 
   if(!trips.length){
     setMsg('fr-rpt-msg','⚠️ ไม่พบเที่ยวของทะเบียน '+plateIn+' ในช่วงวันที่นี้','warn');
@@ -4492,31 +4518,40 @@ function frReportRun(){
   }
 
   var v=lookupVeh(plateIn);
-  var owner=(v&&v.canonical)||'❓ ไม่ทราบเจ้าของ';
+  var ownerFromBill='';
+  dirtTrips.forEach(function(t){ if(!ownerFromBill&&t.owner) ownerFromBill=t.owner; });
+  var owner=(v&&v.canonical)||ownerFromBill||'❓ ไม่ทราบเจ้าของ';
   var sumKiu=trips.reduce(function(s,t){return s+t.kiu;},0);
   var sumDed=trips.reduce(function(s,t){return s+t.ded;},0);
   var sumNet=trips.reduce(function(s,t){return s+t.net;},0);
+  var sumFixed=trips.reduce(function(s,t){return s+(t.fixed||0);},0);
+  var hasDirt=dirtTrips.length>0;
 
   // สรุปตามลูกค้า (ใช้คิวสุทธิ)
   var custAgg={};
   trips.forEach(function(t){
-    if(!custAgg[t.customer]) custAgg[t.customer]={kiu:0,ded:0,net:0,count:0};
+    if(!custAgg[t.customer]) custAgg[t.customer]={kiu:0,ded:0,net:0,fixed:0,count:0};
     custAgg[t.customer].kiu+=t.kiu;
     custAgg[t.customer].ded+=t.ded;
     custAgg[t.customer].net+=t.net;
+    custAgg[t.customer].fixed+=(t.fixed||0);
     custAgg[t.customer].count++;
   });
   var custList2=Object.keys(custAgg).sort(function(a,b){return custAgg[b].net-custAgg[a].net;});
 
-  _frRptData={plate:plateIn,owner:owner,from:from,to:to,trips:trips,sumKiu:sumKiu,sumDed:sumDed,sumNet:sumNet,custAgg:custAgg,custList:custList2};
+  _frRptData={plate:plateIn,owner:owner,from:from,to:to,trips:trips,sumKiu:sumKiu,sumDed:sumDed,sumNet:sumNet,
+              sumFixed:sumFixed,custAgg:custAgg,custList:custList2,
+              sandCount:sandTrips.length,dirtCount:dirtTrips.length};
 
   var rows=trips.map(function(t){
     return '<tr>'
       +'<td>'+invDateFmt(t.date)+'</td>'
+      +'<td>'+(t.src==='ดิน'?'<span style="color:#c98a2e">🟤 ดิน</span>':'<span style="color:var(--muted)">ทราย</span>')+'</td>'
       +'<td>'+t.customer+'</td>'
-      +'<td class="r">'+fmt3(t.kiu)+'</td>'
+      +'<td class="r">'+(t.kiu>0?fmt3(t.kiu):'–')+'</td>'
       +'<td class="r">'+(t.ded>0?fmt3(t.ded):'–')+'</td>'
-      +'<td class="r gold">'+fmt3(t.net)+'</td>'
+      +'<td class="r gold">'+(t.net>0?fmt3(t.net):'–')+'</td>'
+      +'<td class="r">'+(t.fixed>0?t.fixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'–')+'</td>'
       +'</tr>';
   }).join('');
 
@@ -4524,50 +4559,66 @@ function frReportRun(){
   var custRows=custList2.map(function(c){
     return '<tr><td>'+c+'</td>'
       +'<td class="r">'+custAgg[c].count+'</td>'
-      +'<td class="r gold">'+fmt3(custAgg[c].net)+'</td></tr>';
+      +'<td class="r gold">'+fmt3(custAgg[c].net)+'</td>'
+      +'<td class="r">'+(custAgg[c].fixed>0?custAgg[c].fixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'–')+'</td></tr>';
   }).join('');
+
+  var warn='';
+  if(from<_osCutDate()) warn='<div style="margin-top:8px;font-size:12px;color:#e0a030">⚠️ ช่วงวันที่ย้อนหลังเกิน 400 วัน — เที่ยวดินที่เก่ากว่านั้นอาจไม่ถูกดึงมา</div>';
 
   res.innerHTML='<div style="margin-bottom:10px;font-size:14px">'
     +'🚛 ทะเบียน <b style="color:var(--gold)">'+plateIn+'</b> &nbsp;|&nbsp; เจ้าของ: <b>'+owner+'</b><br>'
-    +'<span style="color:var(--muted);font-size:12px">ช่วง '+invDateFmt(from)+' – '+invDateFmt(to)+' &nbsp;|&nbsp; รวม '+trips.length+' เที่ยว</span></div>'
+    +'<span style="color:var(--muted);font-size:12px">ช่วง '+invDateFmt(from)+' – '+invDateFmt(to)+' &nbsp;|&nbsp; รวม '+trips.length+' เที่ยว'
+    +' (ทราย '+sandTrips.length+' / ดิน '+dirtTrips.length+')</span></div>'
     +'<div class="table-wrap"><table>'
-    +'<thead><tr><th>วันที่</th><th>ลูกค้า</th><th class="r">คิว</th><th class="r">หักทรายเปียก</th><th class="r">คิวสุทธิ</th></tr></thead>'
+    +'<thead><tr><th>วันที่</th><th>ประเภท</th><th>ลูกค้า</th><th class="r">คิว</th><th class="r">หักทรายเปียก</th><th class="r">คิวสุทธิ</th><th class="r">ค่าเที่ยวกรอกเอง (บาท)</th></tr></thead>'
     +'<tbody>'+rows
     +'<tr style="border-top:2px solid var(--border);font-weight:700">'
-    +'<td colspan="2"><b>รวม '+trips.length+' เที่ยว</b></td>'
+    +'<td colspan="3"><b>รวม '+trips.length+' เที่ยว</b></td>'
     +'<td class="r"><b>'+fmt3(sumKiu)+'</b></td>'
     +'<td class="r"><b>'+fmt3(sumDed)+'</b></td>'
     +'<td class="r gold"><b>'+fmt3(sumNet)+'</b></td>'
+    +'<td class="r"><b>'+(sumFixed>0?sumFixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'–')+'</b></td>'
     +'</tr>'
     +'</tbody></table></div>'
     // สรุปตามลูกค้า
     +'<div style="margin-top:18px;font-size:14px;font-weight:700;color:var(--gold)">📊 สรุปตามลูกค้า (คิวสุทธิ)</div>'
-    +'<div class="table-wrap" style="margin-top:6px;max-width:480px"><table>'
-    +'<thead><tr><th>ลูกค้า</th><th class="r">เที่ยว</th><th class="r">คิวสุทธิ</th></tr></thead>'
+    +'<div class="table-wrap" style="margin-top:6px;max-width:640px"><table>'
+    +'<thead><tr><th>ลูกค้า</th><th class="r">เที่ยว</th><th class="r">คิวสุทธิ</th><th class="r">ค่าเที่ยวกรอกเอง (บาท)</th></tr></thead>'
     +'<tbody>'+custRows
     +'<tr style="border-top:2px solid var(--border);font-weight:700">'
     +'<td><b>ผลรวม</b></td><td class="r"><b>'+trips.length+'</b></td>'
-    +'<td class="r gold"><b>'+fmt3(sumNet)+'</b></td></tr>'
-    +'</tbody></table></div>';
-  setMsg('fr-rpt-msg','✅ พบ '+trips.length+' เที่ยว','ok');
+    +'<td class="r gold"><b>'+fmt3(sumNet)+'</b></td>'
+    +'<td class="r"><b>'+(sumFixed>0?sumFixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'–')+'</b></td></tr>'
+    +'</tbody></table></div>'
+    +(hasDirt?'<div style="margin-top:10px;font-size:12px;color:var(--muted)">หมายเหตุ: เที่ยวดินนับเฉพาะรายการที่หน่วยเป็น "คิว" และเป็นรถร่วม (บิลรถบริษัทไม่นับ) — บิลที่พนักงานกรอกค่าเที่ยวเป็นบาทไว้ จะแสดงในคอลัมน์ขวาสุดแทนคิว</div>':'')
+    +warn;
+  setMsg('fr-rpt-msg','✅ พบ '+trips.length+' เที่ยว (ทราย '+sandTrips.length+' / ดิน '+dirtTrips.length+')','ok');
 }
 
 function frReportPrint(){
   if(!_frRptData){ setMsg('fr-rpt-msg','❌ ค้นหาก่อนพิมพ์','err'); return; }
   var d=_frRptData;
+  var showFixed=(d.sumFixed||0)>0;
   var rows=d.trips.map(function(t){
-    return '<tr><td>'+invDateFmt(t.date)+'</td><td>'+t.customer+'</td>'
-      +'<td style="text-align:right">'+fmt3(t.kiu)+'</td>'
+    return '<tr><td>'+invDateFmt(t.date)+'</td><td>'+(t.src||'ทราย')+'</td><td>'+t.customer+'</td>'
+      +'<td style="text-align:right">'+(t.kiu>0?fmt3(t.kiu):'-')+'</td>'
       +'<td style="text-align:right">'+(t.ded>0?fmt3(t.ded):'-')+'</td>'
-      +'<td style="text-align:right">'+fmt3(t.net)+'</td></tr>';
+      +'<td style="text-align:right">'+(t.net>0?fmt3(t.net):'-')+'</td>'
+      +(showFixed?('<td style="text-align:right">'+(t.fixed>0?t.fixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'-')+'</td>'):'')
+      +'</tr>';
   }).join('')
-  +'<tr style="font-weight:700;background:#f5f0e8"><td colspan="2">รวม '+d.trips.length+' เที่ยว</td>'
+  +'<tr style="font-weight:700;background:#f5f0e8"><td colspan="3">รวม '+d.trips.length+' เที่ยว</td>'
   +'<td style="text-align:right">'+fmt3(d.sumKiu)+'</td>'
   +'<td style="text-align:right">'+fmt3(d.sumDed)+'</td>'
-  +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td></tr>';
+  +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td>'
+  +(showFixed?('<td style="text-align:right">'+(d.sumFixed).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'):'')
+  +'</tr>';
   var custRows=(d.custList||[]).map(function(c){
     return '<tr><td>'+c+'</td><td style="text-align:right">'+d.custAgg[c].count+'</td>'
-      +'<td style="text-align:right">'+fmt3(d.custAgg[c].net)+'</td></tr>';
+      +'<td style="text-align:right">'+fmt3(d.custAgg[c].net)+'</td>'
+      +(showFixed?('<td style="text-align:right">'+(d.custAgg[c].fixed>0?d.custAgg[c].fixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'-')+'</td>'):'')
+      +'</tr>';
   }).join('');
   var html='<html><head><meta charset="UTF-8"><title>รายงานทะเบียน '+d.plate+'</title>'
     +'<style>'
@@ -4589,17 +4640,22 @@ function frReportPrint(){
     +'<div class="sheet">'
     +'<div class="hd"><div><h2>รายงานค่าเที่ยวรถร่วม — ตามทะเบียน</h2>'
     +'<p>ทะเบียน: <b>'+d.plate+'</b> | เจ้าของ: <b>'+d.owner+'</b></p>'
-    +'<p>ช่วงวันที่: <b>'+invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)+'</b></p></div>'
+    +'<p>ช่วงวันที่: <b>'+invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)+'</b></p>'
+    +'<p>เที่ยวทราย <b>'+(d.sandCount||0)+'</b> เที่ยว | เที่ยวดิน/สินค้าอื่น <b>'+(d.dirtCount||0)+'</b> เที่ยว</p></div>'
     +'<div class="company"><b>หจก.ธนเศรษฐ์ศิริ 2546</b><br>274 ม.2 ต.ผาตั้ง อ.สังคม<br>จ.หนองคาย 43160<br>โทร 0818714977</div></div>'
     +'<h3 style="color:#0c5226;margin:6px 0 4px">สรุปตามลูกค้า (คิวสุทธิ)</h3>'
-    +'<table style="max-width:120mm"><thead><tr><th>ลูกค้า</th><th style="text-align:right">เที่ยว</th><th style="text-align:right">คิวสุทธิ</th></tr></thead>'
+    +'<table style="max-width:150mm"><thead><tr><th>ลูกค้า</th><th style="text-align:right">เที่ยว</th><th style="text-align:right">คิวสุทธิ</th>'
+    +(showFixed?'<th style="text-align:right">ค่าเที่ยวกรอกเอง (บาท)</th>':'')+'</tr></thead>'
     +'<tbody>'+custRows
     +'<tr style="font-weight:700;background:#f5f0e8"><td>ผลรวม</td>'
     +'<td style="text-align:right">'+d.trips.length+'</td>'
-    +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td></tr>'
+    +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td>'
+    +(showFixed?('<td style="text-align:right">'+(d.sumFixed).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'):'')
+    +'</tr>'
     +'</tbody></table>'
     +'<h3 style="color:#0c5226;margin:14px 0 4px">รายละเอียดรายเที่ยว</h3>'
-    +'<table><thead><tr><th>วันที่</th><th>ลูกค้า</th><th style="text-align:right">คิว</th><th style="text-align:right">หักทรายเปียก</th><th style="text-align:right">คิวสุทธิ</th></tr></thead>'
+    +'<table><thead><tr><th>วันที่</th><th>ประเภท</th><th>ลูกค้า</th><th style="text-align:right">คิว</th><th style="text-align:right">หักทรายเปียก</th><th style="text-align:right">คิวสุทธิ</th>'
+    +(showFixed?'<th style="text-align:right">ค่าเที่ยวกรอกเอง (บาท)</th>':'')+'</tr></thead>'
     +'<tbody>'+rows+'</tbody></table>'
     +'<button onclick="window.print()" style="margin-top:16px;padding:8px 16px;cursor:pointer">🖨️ พิมพ์</button>'
     +'<button onclick="if(window.opener||window.history.length<=1){window.close();}else{window.history.back();}" style="margin-top:16px;margin-left:8px;padding:8px 16px;cursor:pointer;background:#eee;border:1px solid #ccc;border-radius:5px">✕ ปิดรายงาน</button>'
@@ -4614,25 +4670,29 @@ function frReportExcel(){
     ['รายงานค่าเที่ยวรถร่วม — ตามทะเบียน'],
     ['ทะเบียน', d.plate, '', 'เจ้าของ', d.owner],
     ['ช่วงวันที่', invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)],
+    ['เที่ยวทราย', d.sandCount||0, 'เที่ยวดิน/สินค้าอื่น', d.dirtCount||0],
     [],
-    ['วันที่','ลูกค้า','คิว','หักทรายเปียก','คิวสุทธิ']
+    ['วันที่','ประเภท','ลูกค้า','คิว','หักทรายเปียก','คิวสุทธิ','ค่าเที่ยวกรอกเอง (บาท)']
   ];
   d.trips.forEach(function(t){
-    aoa.push([invDateFmt(t.date), t.customer,
-      parseFloat(t.kiu.toFixed(3)), parseFloat(t.ded.toFixed(3)), parseFloat(t.net.toFixed(3))]);
+    aoa.push([invDateFmt(t.date), (t.src||'ทราย'), t.customer,
+      parseFloat(t.kiu.toFixed(3)), parseFloat(t.ded.toFixed(3)), parseFloat(t.net.toFixed(3)),
+      parseFloat(((t.fixed||0)).toFixed(2))]);
   });
-  aoa.push(['รวม '+d.trips.length+' เที่ยว','',
-    parseFloat(d.sumKiu.toFixed(3)), parseFloat(d.sumDed.toFixed(3)), parseFloat(d.sumNet.toFixed(3))]);
+  aoa.push(['รวม '+d.trips.length+' เที่ยว','','',
+    parseFloat(d.sumKiu.toFixed(3)), parseFloat(d.sumDed.toFixed(3)), parseFloat(d.sumNet.toFixed(3)),
+    parseFloat(((d.sumFixed||0)).toFixed(2))]);
   // สรุปตามลูกค้า
   aoa.push([]);
   aoa.push(['สรุปตามลูกค้า (คิวสุทธิ)']);
-  aoa.push(['ลูกค้า','เที่ยว','คิวสุทธิ']);
+  aoa.push(['ลูกค้า','เที่ยว','คิวสุทธิ','ค่าเที่ยวกรอกเอง (บาท)']);
   (d.custList||[]).forEach(function(c){
-    aoa.push([c, d.custAgg[c].count, parseFloat(d.custAgg[c].net.toFixed(3))]);
+    aoa.push([c, d.custAgg[c].count, parseFloat(d.custAgg[c].net.toFixed(3)),
+      parseFloat(((d.custAgg[c].fixed||0)).toFixed(2))]);
   });
-  aoa.push(['ผลรวม', d.trips.length, parseFloat(d.sumNet.toFixed(3))]);
+  aoa.push(['ผลรวม', d.trips.length, parseFloat(d.sumNet.toFixed(3)), parseFloat(((d.sumFixed||0)).toFixed(2))]);
   var ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:12},{wch:24},{wch:10},{wch:14},{wch:10}];
+  ws['!cols']=[{wch:12},{wch:8},{wch:24},{wch:10},{wch:14},{wch:10},{wch:20}];
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'รายงาน '+d.plate);
   var fname='รายงาน_'+d.plate+'_'+d.from+'_'+d.to+'.xlsx';
