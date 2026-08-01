@@ -920,6 +920,7 @@ select{color-scheme:light;}
           <button class="btn btn-gold" id="fr-type-inv" onclick="frSetType('invoice')">📄 ใบแจ้งหนี้ลูกค้า</button>
           <button class="btn btn-ghost" id="fr-type-pay" onclick="frSetType('payment')">💸 ใบจ่ายรถร่วม</button>
           <button class="btn btn-ghost" id="fr-type-rpt" onclick="frSetType('report')">📊 รายงานตามทะเบียน</button>
+          <button class="btn btn-ghost" id="fr-type-rate" onclick="frSetType('rates')">💰 เรตค่าเที่ยว</button>
           <button class="btn btn-ghost" id="fr-type-veh" onclick="frSetType('vehicles')" style="margin-left:auto">⚙️ จัดการทะเบียนรถ</button>
         </div>
       </div>
@@ -1045,6 +1046,35 @@ select{color-scheme:light;}
           </div>
           <div id="fr-rpt-msg" class="smsg" style="margin-top:10px"></div>
           <div id="fr-rpt-result" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <!-- ── ส่วน D: เรตค่าเที่ยวเหมาต่อเที่ยว ── -->
+      <div id="fr-rates-panel" style="display:none">
+        <div class="card">
+          <div class="card-title">💰 เรตค่าเที่ยว — เหมาต่อเที่ยว (บาท/เที่ยว)</div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+            ตั้งค่าเที่ยวแบบเหมาต่อ 1 เที่ยว แยกตามลูกค้า/ปลายทาง — ใช้ทั้งรายงานตามทะเบียนและใบจ่ายรถร่วม<br>
+            1 เที่ยว = 1 แถวตาชั่ง (ทราย) หรือ 1 บิลขายสินค้าอื่น (ดิน) &nbsp;•&nbsp;
+            บิลที่พนักงานกรอกค่าเที่ยวเป็นบาทไว้เอง จะใช้ยอดที่กรอกก่อนเสมอ<br>
+            <b>ชื่อลูกค้าที่ผูก</b> = ชื่อที่บันทึกจริงในระบบ ใส่ได้หลายชื่อคั่นด้วยเครื่องหมายจุลภาค ( , )
+          </p>
+          <div class="brow" style="margin-bottom:10px;flex-wrap:wrap">
+            <input type="text" id="frr-label" placeholder="ชื่อกลุ่ม เช่น รุ่งชัย / งานนอก" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:180px">
+            <input type="number" id="frr-rate" step="1" min="0" placeholder="บาท/เที่ยว" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:110px">
+            <input type="text" id="frr-alias" list="frr-custlist" placeholder="ชื่อลูกค้าที่ผูก (คั่นด้วย ,)" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:280px">
+            <datalist id="frr-custlist"></datalist>
+            <button class="btn btn-gold" onclick="frRateSave()">💾 บันทึกเรต</button>
+            <button class="btn btn-ghost" onclick="frRateSeed()" title="ใส่เรตชุดแรกทั้งหมดในครั้งเดียว">⚡ ใส่เรตชุดแรก</button>
+          </div>
+          <div id="frr-msg" class="smsg" style="margin-bottom:8px"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>กลุ่ม/ลูกค้า</th><th class="r">บาท/เที่ยว</th><th>ชื่อลูกค้าที่ผูก</th><th></th></tr></thead>
+              <tbody id="frr-tbody"></tbody>
+            </table>
+          </div>
+          <div id="frr-unset" style="margin-top:14px"></div>
         </div>
       </div>
 
@@ -1662,7 +1692,9 @@ var wData    = [];   // weighings
 var dData    = {};   // deductions { id: cubic }
 var osBills  = [];   // os_bills (หน้าขายดิน) — เที่ยวดิน + ลงบัญชี
 var custVeh  = {};   // ชื่อลูกค้า(หน้าขายดิน) -> เจ้าของรถ(canonical)
-var unOsBills=null, unCustVeh=null;
+var unOsBills=null, unCustVeh=null, unFrRates=null;
+var frRates  = {};   // { ชื่อกลุ่ม: {perTrip:บาท, aliases:[ชื่อลูกค้าในระบบ]} }
+var frRateIdx= {};   // normCust(ชื่อ) -> {label:..., perTrip:...}
 var unit     = 'cubic';
 var vMode    = 'latest';
 var page1    = 1;
@@ -1929,6 +1961,12 @@ function listenFS() {
   unCustVeh = db.collection('os_config').doc('os_customer_vehicle').onSnapshot(function(d){
     custVeh = (d.exists && d.data().map) || {};
   }, function(e){ console.warn('custVeh',e); });
+  unFrRates = db.collection('os_config').doc('freight_rates').onSnapshot(function(d){
+    frRates = (d.exists && d.data().map) || {};
+    frBuildRateIdx();
+    var pnl=document.getElementById('fr-rates-panel');
+    if(pnl && pnl.style.display!=='none' && typeof frDrawRates==='function') frDrawRates();
+  }, function(e){ console.warn('frRates',e); });
 }
 
 /* ================================================================
@@ -4446,14 +4484,129 @@ function frSetType(type) {
   document.getElementById('fr-payment-panel').style.display  = type==='payment'  ? '' : 'none';
   document.getElementById('fr-report-panel').style.display   = type==='report'   ? '' : 'none';
   document.getElementById('fr-vehicles-panel').style.display = type==='vehicles' ? '' : 'none';
-  [['fr-type-inv','invoice'],['fr-type-pay','payment'],['fr-type-rpt','report'],['fr-type-veh','vehicles']].forEach(function(pair){
+  var _rp=document.getElementById('fr-rates-panel'); if(_rp) _rp.style.display = type==='rates' ? '' : 'none';
+  [['fr-type-inv','invoice'],['fr-type-pay','payment'],['fr-type-rpt','report'],['fr-type-rate','rates'],['fr-type-veh','vehicles']].forEach(function(pair){
     var btn=document.getElementById(pair[0]);
     if(btn) btn.className='btn '+(type===pair[1]?'btn-gold':'btn-ghost');
   });
   if(type==='invoice')  frBuildCustDropdown();
   if(type==='payment')  { frLoadInvoiceList(); loadPayHistory(); }
   if(type==='report')   frReportInit();
+  if(type==='rates')    frDrawRates();
   if(type==='vehicles') { listenVeh(); drawVeh(); }
+}
+
+/* ================================================================
+   เรตค่าเที่ยวเหมาต่อเที่ยว (os_config/freight_rates)
+================================================================ */
+/* normalize ชื่อลูกค้า: กัน "เ เ" ซ้อน, ช่องว่าง, วงเล็บ, ตัวพิมพ์ */
+function normCust(s){
+  return String(s||'')
+    .replace(/\u0e40\u0e40/g,'\u0e41')   /* เ+เ -> แ */
+    .replace(/[()\uff08\uff09\[\]]/g,'')
+    .replace(/\s+/g,'')
+    .toLowerCase();
+}
+function frBuildRateIdx(){
+  frRateIdx={};
+  Object.keys(frRates||{}).forEach(function(label){
+    var e=frRates[label]||{};
+    var per=parseFloat(e.perTrip)||0;
+    var names=[label].concat(e.aliases||[]);
+    names.forEach(function(nm){
+      var k=normCust(nm); if(k) frRateIdx[k]={label:label,perTrip:per};
+    });
+  });
+}
+/* บาท/เที่ยว ของลูกค้านี้ (0 = ยังไม่ตั้งเรต) */
+function frRateOf(cust){
+  var e=frRateIdx[normCust(cust)];
+  return e?(parseFloat(e.perTrip)||0):0;
+}
+/* รวมชื่อลูกค้าทั้งหมดที่มีในระบบ (ตาชั่ง + บิลขายอื่น) */
+function frAllCustomers(){
+  var m={};
+  (wData||[]).forEach(function(w){ if(w&&w.customer) m[w.customer]=1; });
+  if(typeof osBills!=='undefined'&&osBills) osBills.forEach(function(b){ if(b&&b.status!=='cancelled'&&b.customer) m[b.customer]=1; });
+  return Object.keys(m).sort(function(a,b){return a.localeCompare(b,'th');});
+}
+function frDrawRates(){
+  frBuildRateIdx();
+  var tb=document.getElementById('frr-tbody'); if(!tb) return;
+  var labels=Object.keys(frRates||{}).sort(function(a,b){return a.localeCompare(b,'th');});
+  tb.innerHTML=labels.length?labels.map(function(l){
+    var e=frRates[l]||{};
+    var al=(e.aliases||[]).join(', ')||'<span style="color:var(--muted)">(ใช้ชื่อกลุ่มตรงๆ)</span>';
+    var safe=l.replace(/'/g,"\\'");
+    return '<tr><td><b>'+l+'</b></td>'
+      +'<td class="r gold"><b>'+(parseFloat(e.perTrip)||0).toLocaleString('th-TH')+'</b></td>'
+      +'<td style="font-size:12px">'+al+'</td>'
+      +'<td><button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="frRateEdit(\''+safe+'\')">✏️ แก้</button> '
+      +'<button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="frRateDel(\''+safe+'\')">🗑️ ลบ</button></td></tr>';
+  }).join(''):'<tr><td colspan="4" style="color:var(--muted);font-size:12px">ยังไม่ได้ตั้งเรต</td></tr>';
+
+  /* datalist ชื่อลูกค้า + รายชื่อลูกค้าที่ยังไม่มีเรต */
+  var all=frAllCustomers();
+  var dl=document.getElementById('frr-custlist');
+  if(dl) dl.innerHTML=all.map(function(c){return '<option value="'+c.replace(/"/g,'&quot;')+'">';}).join('');
+  var miss=all.filter(function(c){ return !frRateOf(c); });
+  var box=document.getElementById('frr-unset');
+  if(box) box.innerHTML=miss.length
+    ? '<div style="font-size:12px;color:#e0a030">⚠️ ลูกค้าที่ยังไม่มีเรต ('+miss.length+'): '+miss.join(' · ')+'</div>'
+    : '<div style="font-size:12px;color:#137a3a">✅ ลูกค้าทุกรายมีเรตแล้ว</div>';
+}
+function frRateEdit(label){
+  var e=frRates[label]||{};
+  document.getElementById('frr-label').value=label;
+  document.getElementById('frr-rate').value=parseFloat(e.perTrip)||'';
+  document.getElementById('frr-alias').value=(e.aliases||[]).join(', ');
+  setMsg('frr-msg','\u270F\uFE0F แก้ไข "'+label+'" — กดบันทึกเรตเพื่อยืนยัน','warn');
+}
+function frRateSave(){
+  var label=(document.getElementById('frr-label').value||'').trim();
+  var rate=parseFloat(document.getElementById('frr-rate').value);
+  var alias=(document.getElementById('frr-alias').value||'').split(',').map(function(x){return x.trim();}).filter(Boolean);
+  if(!label){ setMsg('frr-msg','\u274C กรอกชื่อกลุ่ม/ลูกค้า','err'); return; }
+  if(!(rate>=0)){ setMsg('frr-msg','\u274C กรอกบาท/เที่ยว','err'); return; }
+  var next=JSON.parse(JSON.stringify(frRates||{}));
+  next[label]={perTrip:rate, aliases:alias};
+  db.collection('os_config').doc('freight_rates').set({map:next},{merge:false}).then(function(){
+    frRates=next; frBuildRateIdx(); frDrawRates();
+    document.getElementById('frr-label').value='';
+    document.getElementById('frr-rate').value='';
+    document.getElementById('frr-alias').value='';
+    setMsg('frr-msg','\u2705 บันทึกเรต "'+label+'" = '+rate.toLocaleString('th-TH')+' บาท/เที่ยว','ok');
+  }).catch(function(e){ setMsg('frr-msg','\u274C '+e.message+' (ถ้าเป็น permission ต้องเพิ่ม rule ให้ os_config/freight_rates)','err'); });
+}
+/* ใส่เรตชุดแรกทั้งชุดในครั้งเดียว (ของเดิมที่ตั้งไว้แล้วจะไม่ถูกทับ) */
+function frRateSeed(){
+  var seed={
+    'รุ่งชัย':          {perTrip:300, aliases:[]},
+    'งานนอก':          {perTrip:50,  aliases:['ลูกค้า (ทั่วไป)','ทั่วไป (ลูกค้าปลีก)']},
+    'เจแอนด์อาร์':      {perTrip:500, aliases:['เจเเอนด์อาร์']},
+    'อินทรี ท่าบ่อคอนกรีต':{perTrip:250, aliases:['บริษัท อินทรี ท่าบ่อคอนกรีต จำกัด']}
+  };
+  var next=JSON.parse(JSON.stringify(frRates||{}));
+  var added=[], skipped=[];
+  Object.keys(seed).forEach(function(k){
+    if(next[k]) { skipped.push(k); return; }
+    next[k]=seed[k]; added.push(k+' '+seed[k].perTrip+'฿');
+  });
+  if(!added.length){ setMsg('frr-msg','\u2139\uFE0F มีเรตชุดแรกครบแล้ว (ไม่ทับของเดิม)','warn'); return; }
+  if(!confirm('เพิ่มเรตพร้อมกัน '+added.length+' รายการ:\n'+added.join('\n')+(skipped.length?('\n\n(ข้ามที่มีอยู่แล้ว: '+skipped.join(', ')+')'):'')+'\n\nยืนยัน?')) return;
+  db.collection('os_config').doc('freight_rates').set({map:next},{merge:false}).then(function(){
+    frRates=next; frBuildRateIdx(); frDrawRates();
+    setMsg('frr-msg','\u2705 เพิ่มเรตแล้ว '+added.length+' รายการ','ok');
+  }).catch(function(e){ setMsg('frr-msg','\u274C '+e.message+' (ถ้าเป็น permission ต้องเพิ่ม rule ให้ os_config/freight_rates)','err'); });
+}
+function frRateDel(label){
+  if(!confirm('ลบเรต "'+label+'" ?')) return;
+  var next=JSON.parse(JSON.stringify(frRates||{}));
+  delete next[label];
+  db.collection('os_config').doc('freight_rates').set({map:next},{merge:false}).then(function(){
+    frRates=next; frBuildRateIdx(); frDrawRates();
+    setMsg('frr-msg','\u2705 ลบ "'+label+'" แล้ว','ok');
+  }).catch(function(e){ setMsg('frr-msg','\u274C '+e.message,'err'); });
 }
 
 /* ── รายงานค่าเที่ยวตามทะเบียน ── */
@@ -4476,6 +4629,12 @@ function _dirtTripsOfPlate(plateIn,from,to){
     return {date:b.date,customer:b.customer||'–',kiu:kiu,ded:0,net:kiu,fixed:fixed,
             seq:b.billNo||'',time:'',src:'ดิน',billNo:b.billNo||'',owner:b.plateOwner||''};
   });
+}
+/* ค่าเที่ยวของ 1 เที่ยว: กรอกเองมาก่อน → ไม่งั้นใช้เรตเหมาต่อเที่ยวของลูกค้า */
+function _tripPay(t){
+  if(t.fixed>0) return {amt:t.fixed, how:'กรอกเอง'};
+  var r=(typeof frRateOf==='function')?frRateOf(t.customer):0;
+  return r>0?{amt:r,how:'เหมา'}:{amt:0,how:''};
 }
 function frReportInit(){
   // เติม datalist ทะเบียนจากข้อมูลตาชั่ง + บิลขายสินค้าอื่น (ดิน)
@@ -4517,6 +4676,14 @@ function frReportRun(){
     res.innerHTML=''; return;
   }
 
+  /* ติดค่าเที่ยวต่อแถว */
+  var missing={};
+  trips.forEach(function(t){
+    var p=_tripPay(t); t.pay=p.amt; t.payHow=p.how;
+    if(!(p.amt>0)) missing[t.customer]=1;
+  });
+  var missList=Object.keys(missing);
+
   var v=lookupVeh(plateIn);
   var ownerFromBill='';
   dirtTrips.forEach(function(t){ if(!ownerFromBill&&t.owner) ownerFromBill=t.owner; });
@@ -4524,25 +4691,26 @@ function frReportRun(){
   var sumKiu=trips.reduce(function(s,t){return s+t.kiu;},0);
   var sumDed=trips.reduce(function(s,t){return s+t.ded;},0);
   var sumNet=trips.reduce(function(s,t){return s+t.net;},0);
-  var sumFixed=trips.reduce(function(s,t){return s+(t.fixed||0);},0);
+  var sumPay=trips.reduce(function(s,t){return s+(t.pay||0);},0);
   var hasDirt=dirtTrips.length>0;
 
-  // สรุปตามลูกค้า (ใช้คิวสุทธิ)
+  // สรุปตามลูกค้า
   var custAgg={};
   trips.forEach(function(t){
-    if(!custAgg[t.customer]) custAgg[t.customer]={kiu:0,ded:0,net:0,fixed:0,count:0};
+    if(!custAgg[t.customer]) custAgg[t.customer]={kiu:0,ded:0,net:0,pay:0,count:0,rate:((typeof frRateOf==='function')?frRateOf(t.customer):0)};
     custAgg[t.customer].kiu+=t.kiu;
     custAgg[t.customer].ded+=t.ded;
     custAgg[t.customer].net+=t.net;
-    custAgg[t.customer].fixed+=(t.fixed||0);
+    custAgg[t.customer].pay+=(t.pay||0);
     custAgg[t.customer].count++;
   });
-  var custList2=Object.keys(custAgg).sort(function(a,b){return custAgg[b].net-custAgg[a].net;});
+  var custList2=Object.keys(custAgg).sort(function(a,b){return custAgg[b].pay-custAgg[a].pay||custAgg[b].net-custAgg[a].net;});
 
   _frRptData={plate:plateIn,owner:owner,from:from,to:to,trips:trips,sumKiu:sumKiu,sumDed:sumDed,sumNet:sumNet,
-              sumFixed:sumFixed,custAgg:custAgg,custList:custList2,
-              sandCount:sandTrips.length,dirtCount:dirtTrips.length};
+              sumPay:sumPay,custAgg:custAgg,custList:custList2,
+              sandCount:sandTrips.length,dirtCount:dirtTrips.length,missList:missList};
 
+  var money=function(x){ return x.toLocaleString('th-TH',{minimumFractionDigits:2}); };
   var rows=trips.map(function(t){
     return '<tr>'
       +'<td>'+invDateFmt(t.date)+'</td>'
@@ -4550,75 +4718,81 @@ function frReportRun(){
       +'<td>'+t.customer+'</td>'
       +'<td class="r">'+(t.kiu>0?fmt3(t.kiu):'–')+'</td>'
       +'<td class="r">'+(t.ded>0?fmt3(t.ded):'–')+'</td>'
-      +'<td class="r gold">'+(t.net>0?fmt3(t.net):'–')+'</td>'
-      +'<td class="r">'+(t.fixed>0?t.fixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'–')+'</td>'
+      +'<td class="r">'+(t.net>0?fmt3(t.net):'–')+'</td>'
+      +'<td class="r gold">'+(t.pay>0?money(t.pay):'<span style="color:#c0392b">ยังไม่ตั้งเรต</span>')+'</td>'
+      +'<td style="font-size:11px;color:var(--muted)">'+(t.payHow||'')+'</td>'
       +'</tr>';
   }).join('');
 
   // ตารางสรุปตามลูกค้า
   var custRows=custList2.map(function(c){
+    var a=custAgg[c];
     return '<tr><td>'+c+'</td>'
-      +'<td class="r">'+custAgg[c].count+'</td>'
-      +'<td class="r gold">'+fmt3(custAgg[c].net)+'</td>'
-      +'<td class="r">'+(custAgg[c].fixed>0?custAgg[c].fixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'–')+'</td></tr>';
+      +'<td class="r">'+a.count+'</td>'
+      +'<td class="r">'+(a.rate>0?money(a.rate):'<span style="color:#c0392b">–</span>')+'</td>'
+      +'<td class="r">'+fmt3(a.net)+'</td>'
+      +'<td class="r gold"><b>'+money(a.pay)+'</b></td></tr>';
   }).join('');
 
   var warn='';
-  if(from<_osCutDate()) warn='<div style="margin-top:8px;font-size:12px;color:#e0a030">⚠️ ช่วงวันที่ย้อนหลังเกิน 400 วัน — เที่ยวดินที่เก่ากว่านั้นอาจไม่ถูกดึงมา</div>';
+  if(from<_osCutDate()) warn+='<div style="margin-top:8px;font-size:12px;color:#e0a030">⚠️ ช่วงวันที่ย้อนหลังเกิน 400 วัน — เที่ยวดินที่เก่ากว่านั้นอาจไม่ถูกดึงมา</div>';
+  if(missList.length) warn+='<div style="margin-top:8px;font-size:12px;color:#c0392b">⚠️ ยังไม่ได้ตั้งเรตค่าเที่ยวของ: <b>'+missList.join(' · ')+'</b> — ไปตั้งที่ปุ่ม 💰 เรตค่าเที่ยว แล้วกดค้นหาใหม่</div>';
 
   res.innerHTML='<div style="margin-bottom:10px;font-size:14px">'
     +'🚛 ทะเบียน <b style="color:var(--gold)">'+plateIn+'</b> &nbsp;|&nbsp; เจ้าของ: <b>'+owner+'</b><br>'
     +'<span style="color:var(--muted);font-size:12px">ช่วง '+invDateFmt(from)+' – '+invDateFmt(to)+' &nbsp;|&nbsp; รวม '+trips.length+' เที่ยว'
-    +' (ทราย '+sandTrips.length+' / ดิน '+dirtTrips.length+')</span></div>'
+    +' (ทราย '+sandTrips.length+' / ดิน '+dirtTrips.length+')</span>'
+    +'<div style="margin-top:8px;padding:9px 12px;background:rgba(212,175,55,.10);border:1px solid var(--border);border-radius:8px;display:inline-block">'
+    +'💰 ค่าเที่ยวรวม: <b style="color:var(--gold);font-size:17px">'+money(sumPay)+'</b> บาท</div></div>'
     +'<div class="table-wrap"><table>'
-    +'<thead><tr><th>วันที่</th><th>ประเภท</th><th>ลูกค้า</th><th class="r">คิว</th><th class="r">หักทรายเปียก</th><th class="r">คิวสุทธิ</th><th class="r">ค่าเที่ยวกรอกเอง (บาท)</th></tr></thead>'
+    +'<thead><tr><th>วันที่</th><th>ประเภท</th><th>ลูกค้า</th><th class="r">คิว</th><th class="r">หักทรายเปียก</th><th class="r">คิวสุทธิ</th><th class="r">ค่าเที่ยว (บาท)</th><th>ที่มา</th></tr></thead>'
     +'<tbody>'+rows
     +'<tr style="border-top:2px solid var(--border);font-weight:700">'
     +'<td colspan="3"><b>รวม '+trips.length+' เที่ยว</b></td>'
     +'<td class="r"><b>'+fmt3(sumKiu)+'</b></td>'
     +'<td class="r"><b>'+fmt3(sumDed)+'</b></td>'
-    +'<td class="r gold"><b>'+fmt3(sumNet)+'</b></td>'
-    +'<td class="r"><b>'+(sumFixed>0?sumFixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'–')+'</b></td>'
+    +'<td class="r"><b>'+fmt3(sumNet)+'</b></td>'
+    +'<td class="r gold"><b>'+money(sumPay)+'</b></td><td></td>'
     +'</tr>'
     +'</tbody></table></div>'
     // สรุปตามลูกค้า
-    +'<div style="margin-top:18px;font-size:14px;font-weight:700;color:var(--gold)">📊 สรุปตามลูกค้า (คิวสุทธิ)</div>'
-    +'<div class="table-wrap" style="margin-top:6px;max-width:640px"><table>'
-    +'<thead><tr><th>ลูกค้า</th><th class="r">เที่ยว</th><th class="r">คิวสุทธิ</th><th class="r">ค่าเที่ยวกรอกเอง (บาท)</th></tr></thead>'
+    +'<div style="margin-top:18px;font-size:14px;font-weight:700;color:var(--gold)">📊 สรุปตามลูกค้า</div>'
+    +'<div class="table-wrap" style="margin-top:6px;max-width:680px"><table>'
+    +'<thead><tr><th>ลูกค้า</th><th class="r">เที่ยว</th><th class="r">บาท/เที่ยว</th><th class="r">คิวสุทธิ</th><th class="r">ค่าเที่ยว (บาท)</th></tr></thead>'
     +'<tbody>'+custRows
     +'<tr style="border-top:2px solid var(--border);font-weight:700">'
-    +'<td><b>ผลรวม</b></td><td class="r"><b>'+trips.length+'</b></td>'
-    +'<td class="r gold"><b>'+fmt3(sumNet)+'</b></td>'
-    +'<td class="r"><b>'+(sumFixed>0?sumFixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'–')+'</b></td></tr>'
+    +'<td><b>ผลรวม</b></td><td class="r"><b>'+trips.length+'</b></td><td></td>'
+    +'<td class="r"><b>'+fmt3(sumNet)+'</b></td>'
+    +'<td class="r gold"><b>'+money(sumPay)+'</b></td></tr>'
     +'</tbody></table></div>'
-    +(hasDirt?'<div style="margin-top:10px;font-size:12px;color:var(--muted)">หมายเหตุ: เที่ยวดินนับเฉพาะรายการที่หน่วยเป็น "คิว" และเป็นรถร่วม (บิลรถบริษัทไม่นับ) — บิลที่พนักงานกรอกค่าเที่ยวเป็นบาทไว้ จะแสดงในคอลัมน์ขวาสุดแทนคิว</div>':'')
+    +(hasDirt?'<div style="margin-top:10px;font-size:12px;color:var(--muted)">หมายเหตุ: เที่ยวดินนับเฉพาะรถร่วม (บิลรถบริษัทไม่นับ) — บิลที่พนักงานกรอกค่าเที่ยวเป็นบาทไว้ จะใช้ยอดที่กรอก (ที่มา = "กรอกเอง") แทนเรตเหมา</div>':'')
     +warn;
-  setMsg('fr-rpt-msg','✅ พบ '+trips.length+' เที่ยว (ทราย '+sandTrips.length+' / ดิน '+dirtTrips.length+')','ok');
+  setMsg('fr-rpt-msg','✅ พบ '+trips.length+' เที่ยว (ทราย '+sandTrips.length+' / ดิน '+dirtTrips.length+') — ค่าเที่ยวรวม '+money(sumPay)+' บาท','ok');
 }
 
 function frReportPrint(){
   if(!_frRptData){ setMsg('fr-rpt-msg','❌ ค้นหาก่อนพิมพ์','err'); return; }
   var d=_frRptData;
-  var showFixed=(d.sumFixed||0)>0;
+  var money=function(x){ return x.toLocaleString('th-TH',{minimumFractionDigits:2}); };
   var rows=d.trips.map(function(t){
     return '<tr><td>'+invDateFmt(t.date)+'</td><td>'+(t.src||'ทราย')+'</td><td>'+t.customer+'</td>'
       +'<td style="text-align:right">'+(t.kiu>0?fmt3(t.kiu):'-')+'</td>'
       +'<td style="text-align:right">'+(t.ded>0?fmt3(t.ded):'-')+'</td>'
       +'<td style="text-align:right">'+(t.net>0?fmt3(t.net):'-')+'</td>'
-      +(showFixed?('<td style="text-align:right">'+(t.fixed>0?t.fixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'-')+'</td>'):'')
+      +'<td style="text-align:right">'+(t.pay>0?money(t.pay):'-')+'</td>'
       +'</tr>';
   }).join('')
   +'<tr style="font-weight:700;background:#f5f0e8"><td colspan="3">รวม '+d.trips.length+' เที่ยว</td>'
   +'<td style="text-align:right">'+fmt3(d.sumKiu)+'</td>'
   +'<td style="text-align:right">'+fmt3(d.sumDed)+'</td>'
   +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td>'
-  +(showFixed?('<td style="text-align:right">'+(d.sumFixed).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'):'')
-  +'</tr>';
+  +'<td style="text-align:right">'+money(d.sumPay)+'</td></tr>';
   var custRows=(d.custList||[]).map(function(c){
-    return '<tr><td>'+c+'</td><td style="text-align:right">'+d.custAgg[c].count+'</td>'
-      +'<td style="text-align:right">'+fmt3(d.custAgg[c].net)+'</td>'
-      +(showFixed?('<td style="text-align:right">'+(d.custAgg[c].fixed>0?d.custAgg[c].fixed.toLocaleString('th-TH',{minimumFractionDigits:2}):'-')+'</td>'):'')
-      +'</tr>';
+    var a=d.custAgg[c];
+    return '<tr><td>'+c+'</td><td style="text-align:right">'+a.count+'</td>'
+      +'<td style="text-align:right">'+(a.rate>0?money(a.rate):'-')+'</td>'
+      +'<td style="text-align:right">'+fmt3(a.net)+'</td>'
+      +'<td style="text-align:right">'+money(a.pay)+'</td></tr>';
   }).join('');
   var html='<html><head><meta charset="UTF-8"><title>รายงานทะเบียน '+d.plate+'</title>'
     +'<style>'
@@ -4634,6 +4808,7 @@ function frReportPrint(){
     +'h3{font-size:12px;margin:12px 0 4px}'
     +'.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0c5226;padding-bottom:8px;margin-bottom:10px}'
     +'.company{font-size:10px;color:#555;text-align:right;line-height:1.4}'
+    +'.big{font-size:13px;font-weight:700;color:#0c5226}'
     +'@media print{button{display:none}.sheet{width:auto}}'
     +'</style>'
     +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet"></head><body>'
@@ -4641,21 +4816,20 @@ function frReportPrint(){
     +'<div class="hd"><div><h2>รายงานค่าเที่ยวรถร่วม — ตามทะเบียน</h2>'
     +'<p>ทะเบียน: <b>'+d.plate+'</b> | เจ้าของ: <b>'+d.owner+'</b></p>'
     +'<p>ช่วงวันที่: <b>'+invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)+'</b></p>'
-    +'<p>เที่ยวทราย <b>'+(d.sandCount||0)+'</b> เที่ยว | เที่ยวดิน/สินค้าอื่น <b>'+(d.dirtCount||0)+'</b> เที่ยว</p></div>'
+    +'<p>เที่ยวทราย <b>'+(d.sandCount||0)+'</b> | เที่ยวดิน/สินค้าอื่น <b>'+(d.dirtCount||0)+'</b> | รวม <b>'+d.trips.length+'</b> เที่ยว</p>'
+    +'<p class="big">ค่าเที่ยวรวม '+money(d.sumPay)+' บาท</p></div>'
     +'<div class="company"><b>หจก.ธนเศรษฐ์ศิริ 2546</b><br>274 ม.2 ต.ผาตั้ง อ.สังคม<br>จ.หนองคาย 43160<br>โทร 0818714977</div></div>'
-    +'<h3 style="color:#0c5226;margin:6px 0 4px">สรุปตามลูกค้า (คิวสุทธิ)</h3>'
-    +'<table style="max-width:150mm"><thead><tr><th>ลูกค้า</th><th style="text-align:right">เที่ยว</th><th style="text-align:right">คิวสุทธิ</th>'
-    +(showFixed?'<th style="text-align:right">ค่าเที่ยวกรอกเอง (บาท)</th>':'')+'</tr></thead>'
+    +((d.missList&&d.missList.length)?('<p style="color:#c0392b;font-size:10px">* ยังไม่ได้ตั้งเรตค่าเที่ยวของ: '+d.missList.join(', ')+'</p>'):'')
+    +'<h3 style="color:#0c5226;margin:6px 0 4px">สรุปตามลูกค้า</h3>'
+    +'<table style="max-width:160mm"><thead><tr><th>ลูกค้า</th><th style="text-align:right">เที่ยว</th><th style="text-align:right">บาท/เที่ยว</th><th style="text-align:right">คิวสุทธิ</th><th style="text-align:right">ค่าเที่ยว (บาท)</th></tr></thead>'
     +'<tbody>'+custRows
     +'<tr style="font-weight:700;background:#f5f0e8"><td>ผลรวม</td>'
-    +'<td style="text-align:right">'+d.trips.length+'</td>'
+    +'<td style="text-align:right">'+d.trips.length+'</td><td></td>'
     +'<td style="text-align:right">'+fmt3(d.sumNet)+'</td>'
-    +(showFixed?('<td style="text-align:right">'+(d.sumFixed).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'):'')
-    +'</tr>'
+    +'<td style="text-align:right">'+money(d.sumPay)+'</td></tr>'
     +'</tbody></table>'
     +'<h3 style="color:#0c5226;margin:14px 0 4px">รายละเอียดรายเที่ยว</h3>'
-    +'<table><thead><tr><th>วันที่</th><th>ประเภท</th><th>ลูกค้า</th><th style="text-align:right">คิว</th><th style="text-align:right">หักทรายเปียก</th><th style="text-align:right">คิวสุทธิ</th>'
-    +(showFixed?'<th style="text-align:right">ค่าเที่ยวกรอกเอง (บาท)</th>':'')+'</tr></thead>'
+    +'<table><thead><tr><th>วันที่</th><th>ประเภท</th><th>ลูกค้า</th><th style="text-align:right">คิว</th><th style="text-align:right">หักทรายเปียก</th><th style="text-align:right">คิวสุทธิ</th><th style="text-align:right">ค่าเที่ยว (บาท)</th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table>'
     +'<button onclick="window.print()" style="margin-top:16px;padding:8px 16px;cursor:pointer">🖨️ พิมพ์</button>'
     +'<button onclick="if(window.opener||window.history.length<=1){window.close();}else{window.history.back();}" style="margin-top:16px;margin-left:8px;padding:8px 16px;cursor:pointer;background:#eee;border:1px solid #ccc;border-radius:5px">✕ ปิดรายงาน</button>'
@@ -4671,28 +4845,31 @@ function frReportExcel(){
     ['ทะเบียน', d.plate, '', 'เจ้าของ', d.owner],
     ['ช่วงวันที่', invDateFmt(d.from)+' ถึง '+invDateFmt(d.to)],
     ['เที่ยวทราย', d.sandCount||0, 'เที่ยวดิน/สินค้าอื่น', d.dirtCount||0],
+    ['ค่าเที่ยวรวม (บาท)', parseFloat((d.sumPay||0).toFixed(2))],
     [],
-    ['วันที่','ประเภท','ลูกค้า','คิว','หักทรายเปียก','คิวสุทธิ','ค่าเที่ยวกรอกเอง (บาท)']
+    ['วันที่','ประเภท','ลูกค้า','คิว','หักทรายเปียก','คิวสุทธิ','ค่าเที่ยว (บาท)','ที่มา']
   ];
   d.trips.forEach(function(t){
     aoa.push([invDateFmt(t.date), (t.src||'ทราย'), t.customer,
       parseFloat(t.kiu.toFixed(3)), parseFloat(t.ded.toFixed(3)), parseFloat(t.net.toFixed(3)),
-      parseFloat(((t.fixed||0)).toFixed(2))]);
+      parseFloat(((t.pay||0)).toFixed(2)), t.payHow||'']);
   });
   aoa.push(['รวม '+d.trips.length+' เที่ยว','','',
     parseFloat(d.sumKiu.toFixed(3)), parseFloat(d.sumDed.toFixed(3)), parseFloat(d.sumNet.toFixed(3)),
-    parseFloat(((d.sumFixed||0)).toFixed(2))]);
+    parseFloat(((d.sumPay||0)).toFixed(2)),'']);
   // สรุปตามลูกค้า
   aoa.push([]);
-  aoa.push(['สรุปตามลูกค้า (คิวสุทธิ)']);
-  aoa.push(['ลูกค้า','เที่ยว','คิวสุทธิ','ค่าเที่ยวกรอกเอง (บาท)']);
+  aoa.push(['สรุปตามลูกค้า']);
+  aoa.push(['ลูกค้า','เที่ยว','บาท/เที่ยว','คิวสุทธิ','ค่าเที่ยว (บาท)']);
   (d.custList||[]).forEach(function(c){
-    aoa.push([c, d.custAgg[c].count, parseFloat(d.custAgg[c].net.toFixed(3)),
-      parseFloat(((d.custAgg[c].fixed||0)).toFixed(2))]);
+    var a=d.custAgg[c];
+    aoa.push([c, a.count, parseFloat((a.rate||0).toFixed(2)),
+      parseFloat(a.net.toFixed(3)), parseFloat((a.pay||0).toFixed(2))]);
   });
-  aoa.push(['ผลรวม', d.trips.length, parseFloat(d.sumNet.toFixed(3)), parseFloat(((d.sumFixed||0)).toFixed(2))]);
+  aoa.push(['ผลรวม', d.trips.length, '', parseFloat(d.sumNet.toFixed(3)), parseFloat((d.sumPay||0).toFixed(2))]);
+  if(d.missList&&d.missList.length){ aoa.push([]); aoa.push(['* ยังไม่ได้ตั้งเรตค่าเที่ยวของ', d.missList.join(', ')]); }
   var ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:12},{wch:8},{wch:24},{wch:10},{wch:14},{wch:10},{wch:20}];
+  ws['!cols']=[{wch:12},{wch:8},{wch:26},{wch:10},{wch:14},{wch:10},{wch:16},{wch:10}];
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'รายงาน '+d.plate);
   var fname='รายงาน_'+d.plate+'_'+d.from+'_'+d.to+'.xlsx';
@@ -5429,6 +5606,12 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
   /* แยกข้อมูลตาม customer → owner(canonical) → plate */
   var custMap={};  /* { customer: { canonical: { plate: netKiu } } } */
   var fixedMap={};  /* { customer: { canonical: บาทค่าเที่ยวที่พนักงานกรอก } } */
+  var cntMap={};    /* { customer: { canonical: { plate: จำนวนเที่ยว } } } — ใช้กับเรตเหมาต่อเที่ยว */
+  function _bump(c,o,pl){
+    if(!cntMap[c]) cntMap[c]={};
+    if(!cntMap[c][o]) cntMap[c][o]={};
+    cntMap[c][o][pl]=(cntMap[c][o][pl]||0)+1;
+  }
   wData.forEach(function(w){
     if(!custSet[w.customer]) return;
     if(w.date<from||w.date>to) return;
@@ -5441,6 +5624,7 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
     if(!custMap[w.customer][canon]) custMap[w.customer][canon]={};
     if(!custMap[w.customer][canon][np]) custMap[w.customer][canon][np]=0;
     custMap[w.customer][canon][np]+=net;
+    _bump(w.customer,canon,np);
   });
   osBills.forEach(function(b){
     if(b.status==='cancelled'||b.isFreight===false||!b.plate) return;
@@ -5463,12 +5647,13 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
     if(!custMap[b.customer][canon]) custMap[b.customer][canon]={};
     if(!custMap[b.customer][canon][np]) custMap[b.customer][canon][np]=0;
     custMap[b.customer][canon][np]+=kiu;
+    _bump(b.customer,canon,np);
   });
   var custs=Object.keys(custMap).sort(function(a,b){return a.localeCompare(b,'th');});
   if(!custs.length){ setMsg('fr-pay-msg','\u26A0\uFE0F \u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e02\u0e2d\u0e07\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e43\u0e19\u0e0a\u0e48\u0e27\u0e07\u0e27\u0e31\u0e19','warn'); document.getElementById('fr-pay-owners').style.display='none'; return; }
 
   /* เก็บ context ไว้คำนวณ/บันทึก/พิมพ์ — rate เก็บแยกต่อลูกค้า */
-  window._frManCtx={from:from,to:to,custMap:custMap,fixedMap:fixedMap,rates:{},refInvoice:refInvoice||''};
+  window._frManCtx={from:from,to:to,custMap:custMap,fixedMap:fixedMap,cntMap:cntMap,rates:{},refInvoice:refInvoice||''};
 
   var html=custs.map(function(cust,ci){
     var safeCust=cust.replace(/'/g,"\\'").replace(/"/g,'&quot;');
@@ -5477,36 +5662,41 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
     /* รวมคิวทั้งลูกค้า เพื่อโชว์ */
     var custTotalKiu=0;
     owners.forEach(function(o){ Object.keys(ownerMap[o]).forEach(function(p){ custTotalKiu+=ownerMap[o][p]; }); });
+    var perTrip=(typeof frRateOf==='function')?frRateOf(cust):0;
 
     var ownerCards=owners.map(function(own){
       var plates=Object.keys(ownerMap[own]).sort();
-      var trips=plates.map(function(p){return {plate:p,netKiu:ownerMap[own][p]};}).filter(function(t){return t.netKiu>0.0001;});
+      var cnts=(cntMap[cust]&&cntMap[cust][own])||{};
+      var trips=plates.map(function(p){return {plate:p,netKiu:ownerMap[own][p],cnt:(cnts[p]||0)};}).filter(function(t){return t.netKiu>0.0001||t.cnt>0;});
       var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
+      var totalCnt=trips.reduce(function(s,t){return s+t.cnt;},0);
       var fixed=(fixedMap[cust]&&fixedMap[cust][own])||0;
       var safeOwn=own.replace(/'/g,"\\'");
       var oc=ownerOutstandingCredit(own);
       var rows=trips.map(function(t){
         return '<tr><td style="padding-left:20px;color:var(--muted)">\u2514 '+t.plate+'</td>'
+          +'<td class="r">'+t.cnt+'</td>'
           +'<td class="r">'+fmt3(t.netKiu)+'</td>'
-          +'<td class="r fr-amt" data-ci="'+ci+'" data-kiu="'+t.netKiu+'">\u2013</td></tr>';
+          +'<td class="r fr-amt" data-ci="'+ci+'" data-kiu="'+t.netKiu+'" data-trips="'+t.cnt+'" data-pertrip="'+perTrip+'">\u2013</td></tr>';
       }).join('');
-      var fixedRow=fixed>0?('<tr><td style="padding-left:20px;color:#137a3a">\u2514 \u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e01\u0e23\u0e2d\u0e01\u0e40\u0e2d\u0e07</td><td class="r">-</td><td class="r" style="color:#137a3a">'+fixed.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>'):'';
+      var fixedRow=fixed>0?('<tr><td style="padding-left:20px;color:#137a3a">\u2514 \u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e01\u0e23\u0e2d\u0e01\u0e40\u0e2d\u0e07</td><td class="r">-</td><td class="r">-</td><td class="r" style="color:#137a3a">'+fixed.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>'):'';
       return '<div class="fr-owner-card"><div class="fr-owner-hdr">'
         +'<span class="fr-owner-name">\uD83D\uDE9B '+own+'</span>'
-        +'<span class="fr-owner-total"> \u0e23\u0e27\u0e21 '+fmt3(total)+' \u0e04\u0e34\u0e27 | <b class="fr-owner-amt" data-ci="'+ci+'" data-kiu="'+total+'" data-fixed="'+fixed+'">\u2013</b></span>'
+        +'<span class="fr-owner-total"> \u0e23\u0e27\u0e21 '+totalCnt+' \u0e40\u0e17\u0e35\u0e48\u0e22\u0e27 / '+fmt3(total)+' \u0e04\u0e34\u0e27 | <b class="fr-owner-amt" data-ci="'+ci+'" data-kiu="'+total+'" data-trips="'+totalCnt+'" data-pertrip="'+perTrip+'" data-fixed="'+fixed+'">\u2013</b></span>'
         +'<button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px;font-size:11px" onclick="frSaveManual(\''+safeCust+'\',\''+safeOwn+'\','+ci+')">\uD83D\uDCBE \u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01</button>'
         +'<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="frPrintManual(\''+safeCust+'\',\''+safeOwn+'\','+ci+')">\uD83D\uDDA8\uFE0F \u0e1e\u0e34\u0e21\u0e1e\u0e4c</button>'
         +'<div class="table-wrap"><table>'
-        +'<thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th class="r">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th class="r">\u0e40\u0e07\u0e34\u0e19</th></tr></thead>'
+        +'<thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th class="r">\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27</th><th class="r">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th class="r">\u0e40\u0e07\u0e34\u0e19</th></tr></thead>'
         +'<tbody>'+rows+fixedRow
         +'<tr style="border-top:1px solid var(--border)"><td><b>\u0e23\u0e27\u0e21</b></td>'
+        +'<td class="r gold"><b>'+totalCnt+'</b></td>'
         +'<td class="r gold"><b>'+fmt3(total)+'</b></td>'
-        +'<td class="r gold fr-owner-amt2" data-ci="'+ci+'" data-kiu="'+total+'" data-fixed="'+fixed+'"><b>\u2013</b></td></tr>'
+        +'<td class="r gold fr-owner-amt2" data-ci="'+ci+'" data-kiu="'+total+'" data-trips="'+totalCnt+'" data-pertrip="'+perTrip+'" data-fixed="'+fixed+'"><b>\u2013</b></td></tr>'
         +'</tbody></table></div>'
         +(oc.total>0?('<div style="padding:7px 10px;font-size:12px;border-top:1px dashed var(--border);background:rgba(192,57,43,.06)">'
-          +'ค่าเที่ยว: <b class="fr-gross" data-ci="'+ci+'" data-kiu="'+total+'" data-fixed="'+fixed+'">-</b>'
+          +'ค่าเที่ยว: <b class="fr-gross" data-ci="'+ci+'" data-kiu="'+total+'" data-trips="'+totalCnt+'" data-pertrip="'+perTrip+'" data-fixed="'+fixed+'">-</b>'
           +' &nbsp;|&nbsp; หักลงบัญชีค้าง: <b style="color:#c0392b">-'+oc.total.toLocaleString('th-TH',{minimumFractionDigits:2})+'</b>'
-          +' &nbsp;|&nbsp; จ่ายสุทธิ: <b class="fr-net-amt" style="color:#137a3a" data-ci="'+ci+'" data-kiu="'+total+'" data-fixed="'+fixed+'" data-credit="'+oc.total+'">-</b>'
+          +' &nbsp;|&nbsp; จ่ายสุทธิ: <b class="fr-net-amt" style="color:#137a3a" data-ci="'+ci+'" data-kiu="'+total+'" data-trips="'+totalCnt+'" data-pertrip="'+perTrip+'" data-fixed="'+fixed+'" data-credit="'+oc.total+'">-</b>'
           +'<div style="color:var(--muted);font-size:10px;margin-top:3px">* ตัดยอดลงบัญชีจริงตอนกดบันทึก (บิลเก่าก่อน) — '+oc.bills.length+' บิล</div>'
           +'</div>'):'')
         +'</div>';
@@ -5516,7 +5706,9 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
       +'<div class="fr-cust-hdr">'
       +'<span class="fr-cust-name">\uD83D\uDC64 '+cust+'</span>'
       +'<span style="font-size:11px;color:var(--muted)">'+owners.length+' \u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16 | \u0e23\u0e27\u0e21 '+fmt3(custTotalKiu)+' \u0e04\u0e34\u0e27</span>'
-      +'<span class="fr-cust-rate" style="margin-left:auto">\u0e23\u0e32\u0e04\u0e32/\u0e04\u0e34\u0e27 '
+      +'<span style="font-size:11px;'+(perTrip>0?'color:#137a3a':'color:#c0392b')+'">'
+      +(perTrip>0?('\u0e40\u0e2b\u0e21\u0e32 '+perTrip.toLocaleString('th-TH')+' \u0e1a\u0e32\u0e17/\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27'):'\u26A0\uFE0F \u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e15\u0e31\u0e49\u0e07\u0e40\u0e23\u0e15\u0e40\u0e2b\u0e21\u0e32')+'</span>'
+      +'<span class="fr-cust-rate" style="margin-left:auto">\u0e23\u0e32\u0e04\u0e32/\u0e04\u0e34\u0e27 (\u0e17\u0e31\u0e1a\u0e40\u0e2b\u0e21\u0e32) '
       +'<input type="number" step="0.01" min="0" data-ci="'+ci+'" placeholder="0.00" oninput="frManRate('+ci+',this.value)"></span>'
       +'</div>'
       +'<div class="fr-cust-body">'+ownerCards+'</div>'
@@ -5526,61 +5718,80 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
   var box=document.getElementById('fr-pay-owners');
   box.innerHTML=html; box.style.display='';
   custs.forEach(function(_,ci){ frManRate(ci, (document.querySelector('.fr-cust-rate input[data-ci="'+ci+'"]')||{}).value||''); });
-  setMsg('fr-pay-msg','\u2705 \u0e1e\u0e1a '+custs.length+' \u0e25\u0e39\u0e01\u0e04\u0e49\u0e32 \u2014 \u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e04\u0e32\u0e41\u0e15\u0e48\u0e25\u0e30\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32 \u0e41\u0e25\u0e49\u0e27\u0e01\u0e14\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e41\u0e22\u0e01\u0e15\u0e32\u0e21\u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16','ok');
+  setMsg('fr-pay-msg','\u2705 \u0e1e\u0e1a '+custs.length+' \u0e25\u0e39\u0e01\u0e04\u0e49\u0e32 \u2014 \u0e04\u0e34\u0e14\u0e15\u0e32\u0e21\u0e40\u0e23\u0e15\u0e40\u0e2b\u0e21\u0e32\u0e15\u0e48\u0e2d\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e43\u0e2b\u0e49\u0e2d\u0e31\u0e15\u0e42\u0e19\u0e21\u0e31\u0e15\u0e34 (\u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e04\u0e32/\u0e04\u0e34\u0e27 = \u0e17\u0e31\u0e1a\u0e40\u0e2b\u0e21\u0e32) \u2014 \u0e01\u0e14\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e41\u0e22\u0e01\u0e15\u0e32\u0e21\u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16','ok');
 }
 
 /* อัปเดตเงินสดทุกช่องของลูกค้านั้นเมื่อกรอกราคา */
+/* ค่าเที่ยวของ element: ถ้ากรอกราคา/คิว → คิว×เรต (ทับ), ไม่งั้น → เที่ยว×เหมา */
+function _frElAmt(el,rate){
+  var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
+  var trips=parseFloat(el.getAttribute('data-trips'))||0;
+  var per=parseFloat(el.getAttribute('data-pertrip'))||0;
+  return rate>0 ? (kiu*rate) : (trips*per);
+}
 function frManRate(ci,val){
   var rate=parseFloat(val)||0;
   if(window._frManCtx) window._frManCtx.rates[ci]=rate;
   var fmt2=function(x){ return x.toLocaleString('th-TH',{minimumFractionDigits:2}); };
-  /* แถวรายคัน (คิว×เรต) */
+  /* แถวรายคัน */
   document.querySelectorAll('.fr-amt[data-ci="'+ci+'"]').forEach(function(el){
-    var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
-    el.textContent=rate>0?fmt2(kiu*rate):'\u2013';
+    var a=_frElAmt(el,rate);
+    el.textContent=a>0?fmt2(a):'\u2013';
   });
-  /* ยอดรวมเจ้าของ = คิว×เรต + ค่าเที่ยวกรอกเอง */
+  /* ยอดรวมเจ้าของ = ค่าเที่ยว + ค่าเที่ยวกรอกเอง */
   ['.fr-owner-amt','.fr-owner-amt2'].forEach(function(sel){
     document.querySelectorAll(sel+'[data-ci="'+ci+'"]').forEach(function(el){
-      var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
       var fixed=parseFloat(el.getAttribute('data-fixed'))||0;
-      var amt=kiu*rate+fixed;
+      var amt=_frElAmt(el,rate)+fixed;
       var txt=(amt>0)?(fmt2(amt)+' \u0e1a\u0e32\u0e17'):'\u2013';
       el.innerHTML=sel==='.fr-owner-amt2'?'<b>'+txt+'</b>':txt;
     });
   });
   document.querySelectorAll('.fr-gross[data-ci="'+ci+'"]').forEach(function(el){
-    var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
     var fixed=parseFloat(el.getAttribute('data-fixed'))||0;
-    var amt=kiu*rate+fixed;
+    var amt=_frElAmt(el,rate)+fixed;
     el.textContent=amt>0?fmt2(amt):'-';
   });
   document.querySelectorAll('.fr-net-amt[data-ci="'+ci+'"]').forEach(function(el){
-    var kiu=parseFloat(el.getAttribute('data-kiu'))||0;
     var fixed=parseFloat(el.getAttribute('data-fixed'))||0;
     var credit=parseFloat(el.getAttribute('data-credit'))||0;
-    var amt=kiu*rate+fixed;
+    var amt=_frElAmt(el,rate)+fixed;
     el.textContent=(amt>0)?fmt2(amt-credit):'-';
   });
+}
+/* ยอดค่าเที่ยวของ (ลูกค้า, เจ้าของ) ตาม ctx — ใช้ร่วมกันทั้งบันทึกและพิมพ์ */
+function _frCalcOwner(ctx,cust,owner,ci){
+  var rate=ctx.rates[ci]||0;
+  var perTrip=(typeof frRateOf==='function')?frRateOf(cust):0;
+  var fixed=(ctx.fixedMap&&ctx.fixedMap[cust]&&ctx.fixedMap[cust][owner])||0;
+  var cnts=(ctx.cntMap&&ctx.cntMap[cust]&&ctx.cntMap[cust][owner])||{};
+  var plates=Object.keys(ctx.custMap[cust][owner]).sort();
+  var trips=plates.map(function(p){return {plate:p,canonical:owner,netKiu:ctx.custMap[cust][owner][p],cnt:(cnts[p]||0)};})
+                  .filter(function(t){return t.netKiu>0.0001||t.cnt>0;});
+  var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
+  var totalCnt=trips.reduce(function(s,t){return s+t.cnt;},0);
+  var base=rate>0?(total*rate):(totalCnt*perTrip);
+  return {rate:rate,perTrip:perTrip,fixed:fixed,trips:trips,total:total,totalCnt:totalCnt,
+          base:base,gross:base+fixed,mode:(rate>0?'per_kiu':'per_trip')};
 }
 
 function frSaveManual(cust,owner,ci){
   var ctx=window._frManCtx;
   if(!ctx||!ctx.custMap[cust]||!ctx.custMap[cust][owner]){ setMsg('fr-pay-msg','\u274C ไม่มีข้อมูล','err'); return; }
-  var rate=ctx.rates[ci]||0;
-  var fixed=(ctx.fixedMap&&ctx.fixedMap[cust]&&ctx.fixedMap[cust][owner])||0;
-  var plates=Object.keys(ctx.custMap[cust][owner]);
-  var trips=plates.map(function(p){return {plate:p,canonical:owner,netKiu:ctx.custMap[cust][owner][p]};}).filter(function(t){return t.netKiu>0.0001;});
-  var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
-  if(total>0.0001 && !(rate>0)){ setMsg('fr-pay-msg','\u274C กรอกราคา/คิว ของลูกค้า '+cust+' ก่อน','err'); return; }
-  var gross=total*rate+fixed;
+  var C=_frCalcOwner(ctx,cust,owner,ci);
+  var rate=C.rate, fixed=C.fixed, trips=C.trips, total=C.total;
+  if(!(C.base>0) && !(fixed>0)){ setMsg('fr-pay-msg','\u274C ลูกค้า '+cust+' ยังไม่มีเรตเหมาต่อเที่ยว — ตั้งที่ปุ่ม 💰 เรตค่าเที่ยว หรือกรอกราคา/คิว ก่อน','err'); return; }
+  var gross=C.gross;
   if(!(gross>0)){ setMsg('fr-pay-msg','\u274C ไม่มียอดค่าเที่ยว (คิว×เรต หรือ ค่าเที่ยวกรอกเอง)','err'); return; }
   var oc=ownerOutstandingCredit(owner);
   var consumed=[], acc=0;
   oc.bills.forEach(function(b){ if(acc+(b.grandTotal||0) <= gross+0.001){ consumed.push(b); acc+=(b.grandTotal||0); } });
   var creditDeducted=parseFloat(acc.toFixed(2));
   var netPaid=parseFloat((gross-creditDeducted).toFixed(2));
-  var cm='จ่ายค่าเที่ยว '+owner+' ('+cust+')\nค่าเที่ยว: '+gross.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท'+(fixed>0?(' (รวมค่าเที่ยวกรอกเอง '+fixed.toLocaleString('th-TH',{minimumFractionDigits:2})+')'):'');
+  var _how=(C.mode==='per_kiu')
+    ? ('คิดจาก '+fmt3(total)+' คิว × '+rate.toLocaleString('th-TH')+' บาท/คิว')
+    : ('คิดจาก '+C.totalCnt+' เที่ยว × '+C.perTrip.toLocaleString('th-TH')+' บาท/เที่ยว');
+  var cm='จ่ายค่าเที่ยว '+owner+' ('+cust+')\n'+_how+'\nค่าเที่ยว: '+gross.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท'+(fixed>0?(' (รวมค่าเที่ยวกรอกเอง '+fixed.toLocaleString('th-TH',{minimumFractionDigits:2})+')'):'');
   if(creditDeducted>0) cm+='\nหักยอดลงบัญชี '+consumed.length+' บิล: -'+creditDeducted.toLocaleString('th-TH',{minimumFractionDigits:2})+'\nจ่ายสุทธิ: '+netPaid.toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท';
   if(oc.total>creditDeducted+0.001) cm+='\n(ยอดลงบัญชีคงเหลือ '+(oc.total-creditDeducted).toLocaleString('th-TH',{minimumFractionDigits:2})+' บาท ยังไม่ถูกตัด เพราะค่าเที่ยวไม่พอหัก)';
   cm+='\n\nยืนยันบันทึก?';
@@ -5588,6 +5799,7 @@ function frSaveManual(cust,owner,ci){
   nextDocNo().then(function(docNo){
     var data={docNo:docNo,type:'truck',refInvoice:(ctx&&ctx.refInvoice)||'',customer:cust,
       canonical:owner,dateFrom:ctx.from,dateTo:ctx.to,rateForTruck:rate,
+      payMode:C.mode, ratePerTrip:C.perTrip, tripCount:C.totalCnt,
       totalNetKiu:parseFloat(total.toFixed(3)),
       freightFixed:parseFloat(fixed.toFixed(2)),
       totalAmount:parseFloat(gross.toFixed(2)),
@@ -5607,25 +5819,28 @@ function frSaveManual(cust,owner,ci){
 function frPrintManual(cust,owner,ci){
   var ctx=window._frManCtx;
   if(!ctx||!ctx.custMap[cust]||!ctx.custMap[cust][owner]) return;
-  var rate=ctx.rates[ci]||0;
-  var fixed=(ctx.fixedMap&&ctx.fixedMap[cust]&&ctx.fixedMap[cust][owner])||0;
-  var plates=Object.keys(ctx.custMap[cust][owner]).sort();
-  var trips=plates.map(function(p){return {plate:p,netKiu:ctx.custMap[cust][owner][p]};}).filter(function(t){return t.netKiu>0.0001;});
-  var total=trips.reduce(function(s,t){return s+t.netKiu;},0);
-  if(total>0.0001 && !(rate>0)){ setMsg('fr-pay-msg','\u274C \u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e04\u0e32 '+cust+' \u0e01\u0e48\u0e2d\u0e19\u0e1e\u0e34\u0e21\u0e1e\u0e4c','err'); return; }
-  var totalAmt=total*rate+fixed;
+  var C=_frCalcOwner(ctx,cust,owner,ci);
+  var rate=C.rate, fixed=C.fixed, trips=C.trips, total=C.total;
+  if(!(C.base>0) && !(fixed>0)){ setMsg('fr-pay-msg','\u274C \u0e25\u0e39\u0e01\u0e04\u0e49\u0e32 '+cust+' \u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e40\u0e23\u0e15 \u2014 \u0e15\u0e31\u0e49\u0e07\u0e40\u0e23\u0e15\u0e2b\u0e23\u0e37\u0e2d\u0e01\u0e23\u0e2d\u0e01\u0e23\u0e32\u0e04\u0e32/\u0e04\u0e34\u0e27\u0e01\u0e48\u0e2d\u0e19','err'); return; }
+  var totalAmt=C.gross;
   var _oc=ownerOutstandingCredit(owner);
   var _cons=[], _acc=0;
   _oc.bills.forEach(function(b){ if(_acc+(b.grandTotal||0)<=totalAmt+0.001){_cons.push(b);_acc+=(b.grandTotal||0);} });
   var _credit=parseFloat(_acc.toFixed(2)), _net=parseFloat((totalAmt-_credit).toFixed(2));
+  var _m2=function(x){ return x.toLocaleString('th-TH',{minimumFractionDigits:2}); };
   var rows=trips.map(function(t){
+    var amt=(rate>0)?(t.netKiu*rate):(t.cnt*C.perTrip);
     return '<tr><td>'+t.plate+'</td>'
+      +'<td style="text-align:right">'+t.cnt+'</td>'
       +'<td style="text-align:right">'+fmt3(t.netKiu)+'</td>'
-      +'<td style="text-align:right">'+(t.netKiu*rate).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+      +'<td style="text-align:right">'+_m2(amt)+'</td></tr>';
   }).join('')
+  +(fixed>0?('<tr><td style="color:#137a3a">\u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e01\u0e23\u0e2d\u0e01\u0e40\u0e2d\u0e07 (\u0e1a\u0e34\u0e25\u0e02\u0e32\u0e22\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32\u0e2d\u0e37\u0e48\u0e19)</td><td style="text-align:right">-</td><td style="text-align:right">-</td>'
+    +'<td style="text-align:right">'+_m2(fixed)+'</td></tr>'):'')
   +'<tr style="font-weight:700;font-size:14px"><td>\u0e23\u0e27\u0e21</td>'
+  +'<td style="text-align:right">'+C.totalCnt+'</td>'
   +'<td style="text-align:right">'+fmt3(total)+'</td>'
-  +'<td style="text-align:right;color:#137a3a">'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>';
+  +'<td style="text-align:right;color:#137a3a">'+_m2(totalAmt)+'</td></tr>';
   var html='<html><head><meta charset="UTF-8"><title>\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27</title>'
     +'<style>body{font-family:Sarabun,sans-serif;font-size:13px;padding:24px;color:#111}'
     +'h2{color:#0c5226}table{width:100%;border-collapse:collapse;margin-top:12px}'
@@ -5635,8 +5850,8 @@ function frPrintManual(cust,owner,ci){
     +'</head><body><h2>\u0e43\u0e1a\u0e08\u0e48\u0e32\u0e22\u0e04\u0e48\u0e32\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27\u0e23\u0e16\u0e23\u0e48\u0e27\u0e21 \u2014 \u0e2b\u0e08\u0e01.\u0e18\u0e19\u0e40\u0e28\u0e23\u0e29\u0e10\u0e4c\u0e28\u0e34\u0e23\u0e34</h2>'
     +'<p>\u0e40\u0e08\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e23\u0e16: <b>'+owner+'</b></p>'
     +'<p>\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32: <b>'+cust+'</b> | \u0e0a\u0e48\u0e27\u0e07: <b>'+ctx.from+' \u0e16\u0e36\u0e07 '+ctx.to+'</b></p>'
-    +'<p>\u0e23\u0e32\u0e04\u0e32: <b>'+rate+' \u0e1a\u0e32\u0e17/\u0e04\u0e34\u0e27</b></p>'
-    +'<table><thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th style="text-align:right">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th style="text-align:right">\u0e08\u0e33\u0e19\u0e27\u0e19\u0e40\u0e07\u0e34\u0e19</th></tr></thead>'
+    +'<p>\u0e23\u0e32\u0e04\u0e32: <b>'+((rate>0)?(rate+' \u0e1a\u0e32\u0e17/\u0e04\u0e34\u0e27'):(C.perTrip.toLocaleString('th-TH')+' \u0e1a\u0e32\u0e17/\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27 (\u0e40\u0e2b\u0e21\u0e32)'))+'</b></p>'
+    +'<table><thead><tr><th>\u0e17\u0e30\u0e40\u0e1a\u0e35\u0e22\u0e19</th><th style="text-align:right">\u0e40\u0e17\u0e35\u0e48\u0e22\u0e27</th><th style="text-align:right">\u0e04\u0e34\u0e27\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th style="text-align:right">\u0e08\u0e33\u0e19\u0e27\u0e19\u0e40\u0e07\u0e34\u0e19</th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table>'
     +(_credit>0?('<table style="margin-top:10px;max-width:340px"><tbody>'
       +'<tr><td>รวมค่าเที่ยว</td><td style="text-align:right">'+totalAmt.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>'
