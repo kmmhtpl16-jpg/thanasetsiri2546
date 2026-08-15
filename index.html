@@ -3031,6 +3031,7 @@ async function renderCycleSummary(){
 }
 
 async function settleCycle(){
+  if(curRole!=='admin'){ toast('❌ เฉพาะเจ้าของ/CFO เท่านั้นที่ปิดงวดได้'); return; }
   const ym = document.getElementById('cycMonth').value || currentYM();
   const period = document.getElementById('cycPeriodSel').value;
   const periodLabel = period==='1-15' ? 'รอบที่ 1 (1–15)' : 'รอบที่ 2 (16–สิ้นเดือน)';
@@ -3041,28 +3042,40 @@ async function settleCycle(){
   if(!confirm('ยืนยันจ่ายยอดรอรับ '+periodLabel+'\nรวม '+fmtBaht(total)+' ฿ ('+rows.length+' คน)\n\nระบบจะบันทึกการจ่ายและปิดงวด — ยอดรอรับจะเป็น 0 และกันการจ่ายซ้ำ')) return;
   toast('⏳ กำลังบันทึกการจ่าย...');
   try{
-    const entries=[];
+    // เขียนแบบ batch = สำเร็จทั้งหมดหรือไม่ทำเลย (กันค้างครึ่งทางแล้วกดซ้ำกลายเป็นจ่ายซ้อน)
+    const batch = prDb().batch();
+    const entries=[], newWds=[];
     for(const r of rows){
-      await prSaveWithdrawal({
+      const ref = prDb().collection('withdrawals').doc();
+      const data = {
         empId:r.emp.id, period, month:ym, date:todayYMD(),
         amount:r.pending, kind:'settle', note:'จ่ายปิดงวด '+periodLabel,
         earnedAtTime:r.earned, socialDeducted:false, isOverdrawn:false,
-        recordedBy: typeof curEmail!=='undefined'?curEmail:'admin'
-      });
+        recordedBy: typeof curEmail!=='undefined'?curEmail:'admin',
+        fsId:ref.id, createdAt:new Date().toISOString()
+      };
+      batch.set(ref, data);
+      newWds.push(data);
       entries.push({empId:r.emp.id, amount:r.pending});
     }
     const doc = { ym, period, settledAt:new Date().toISOString(),
       settledBy: typeof curEmail!=='undefined'?curEmail:'admin',
       total, count:rows.length, entries };
-    await prDb().collection('settlements').doc(cycleKey(ym,period)).set(doc);
+    batch.set(prDb().collection('settlements').doc(cycleKey(ym,period)), doc);
+    await batch.commit();
+    newWds.forEach(w=> prWithdrawals.push(w));
     prSettlements[cycleKey(ym,period)] = {fsId:cycleKey(ym,period), ...doc};
     await renderCycleSummary();
     toast('✅ ปิดงวดแล้ว จ่ายรวม '+fmtBaht(total)+' ฿');
     if(typeof tgNotify==='function') tgNotify('💰 <b>จ่ายเงินเดือน (ปิดงวด)</b>\n'+periodLabel+' · '+ym+'\n'+rows.length+' คน รวม '+fmtBaht(total)+' ฿');
-  }catch(e){ toast('❌ '+e.message); }
+  }catch(e){
+    const permErr = e && /permission/i.test(e.message||'');
+    toast(permErr ? '❌ สิทธิ์ไม่พอ (Firestore rules ของ settlements) — ยังไม่มีข้อมูลถูกบันทึก' : ('❌ '+e.message));
+  }
 }
 
 async function unsettleCycle(){
+  if(curRole!=='admin'){ toast('❌ เฉพาะเจ้าของ/CFO เท่านั้น'); return; }
   const ym = document.getElementById('cycMonth').value || currentYM();
   const period = document.getElementById('cycPeriodSel').value;
   const key = cycleKey(ym,period);
