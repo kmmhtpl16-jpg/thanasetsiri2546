@@ -2928,6 +2928,10 @@ var _cycInit = false;
 var prSettlements = {};
 function cycleKey(ym, period){ return ym+'__'+period; }
 function isCycleSettled(ym, period){ return !!prSettlements[cycleKey(ym,period)]; }
+// รายการ withdrawals kind='settle' ของงวดนี้ (ใช้จับกรณีเขียนค้างครึ่งทาง = มีรายการจ่ายแต่ไม่มี doc settlements)
+function cycleSettleEntries(ym, period){
+  return (prWithdrawals||[]).filter(w=> w.month===ym && w.period===period && w.kind==='settle');
+}
 async function prLoadSettlements(ym){
   try{
     const snap = await prDb().collection('settlements').where('ym','==',ym).get();
@@ -2983,10 +2987,21 @@ async function renderCycleSummary(){
       <td style="font-family:var(--font-mono);font-weight:800;color:${r.pending<0?'var(--accent-red)':(r.pending===0?'var(--text-secondary)':'var(--accent-green)')};">${fmtBaht(r.pending)} ฿</td>
     </tr>`).join('');
 
+  const settleEntries = cycleSettleEntries(ym, period);
+  const orphanTotal   = settleEntries.reduce((s,w)=> s + (Number(w.amount)||0), 0);
+  const hasOrphan     = !settled && settleEntries.length>0;
+
   const settleBar = settled
     ? `<div style="background:rgba(16,185,129,0.12);border:1px solid var(--accent-green);border-radius:var(--radius-sm);padding:12px 16px;margin-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
          <div style="font-size:13px;color:var(--accent-green);font-weight:700;">✅ ปิดงวดแล้ว — จ่ายยอดรอรับ ${fmtBaht(settled.total)} ฿ (${settled.count} คน) เมื่อ ${isoToBE((settled.settledAt||'').slice(0,10))}</div>
          <button class="btn btn-ghost" style="font-size:12px;" onclick="unsettleCycle()">🔓 ยกเลิกปิดงวด</button>
+       </div>`
+    : hasOrphan
+    ? `<div style="background:rgba(239,68,68,0.12);border:1px solid var(--accent-red);border-radius:var(--radius-sm);padding:12px 16px;margin-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+         <div style="font-size:13px;color:var(--accent-red);font-weight:700;">⚠️ งวดนี้ไม่มีบันทึกปิดงวด แต่มีรายการ “จ่ายปิดงวด” ค้างอยู่ ${settleEntries.length} รายการ รวม ${fmtBaht(orphanTotal)} ฿
+           <div style="font-weight:400;color:var(--text-secondary);font-size:12px;margin-top:4px;line-height:1.6;">เกิดจากกดปุ่มปิดงวดแล้วบันทึกไม่ครบ — กด “ล้างรายการที่ค้าง” แล้วค่อยกด “✅ ยืนยันจ่าย &amp; ปิดงวด” ใหม่ 1 ครั้ง (เงินสดจ่ายจริงไม่กระทบ)</div>
+         </div>
+         <button class="btn btn-ghost" style="font-size:12px;" onclick="unsettleCycle()">🔓 ล้างรายการที่ค้าง</button>
        </div>`
     : `<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;background:var(--bg-card);border:1px dashed var(--border-light);border-radius:var(--radius-sm);padding:12px 16px;">
          <div style="font-size:12px;color:var(--text-secondary);">จ่ายเงินงวดนี้แล้วให้กดยืนยัน — ระบบจะบันทึกการจ่าย <b style="color:var(--accent-green);">${fmtBaht(cashToPay)} ฿</b> แล้วล็อกงวด (ยอดรอรับเป็น 0 กันจ่ายซ้ำ/จ่ายเกินรอบหน้า)</div>
@@ -3036,6 +3051,8 @@ async function settleCycle(){
   const period = document.getElementById('cycPeriodSel').value;
   const periodLabel = period==='1-15' ? 'รอบที่ 1 (1–15)' : 'รอบที่ 2 (16–สิ้นเดือน)';
   if(isCycleSettled(ym,period)){ toast('⚠️ งวดนี้ปิดแล้ว'); return; }
+  const stale = cycleSettleEntries(ym,period);
+  if(stale.length){ toast('⚠️ งวดนี้มีรายการจ่ายปิดงวดค้างอยู่ '+stale.length+' รายการ — กด “🔓 ล้างรายการที่ค้าง” ก่อน'); return; }
   const rows = cycleBuildRows(ym, period).filter(r=> r.pending>0);
   if(!rows.length){ toast('⚠️ ไม่มียอดรอรับให้จ่าย'); return; }
   const total = rows.reduce((s,r)=> s + r.pending, 0);
@@ -3079,17 +3096,25 @@ async function unsettleCycle(){
   const ym = document.getElementById('cycMonth').value || currentYM();
   const period = document.getElementById('cycPeriodSel').value;
   const key = cycleKey(ym,period);
-  if(!prSettlements[key]){ toast('งวดนี้ยังไม่ได้ปิด'); return; }
-  if(!confirm('ยกเลิกการปิดงวดนี้?\nระบบจะลบรายการ "จ่ายปิดงวด" ที่บันทึกไว้ (ยอดรอรับจะกลับมาแสดง)')) return;
+  const hasDoc = !!prSettlements[key];
+  await prLoadWithdrawals(ym);
+  const settleWds = cycleSettleEntries(ym, period);
+  if(!hasDoc && !settleWds.length){ toast('งวดนี้ยังไม่ได้ปิด'); return; }
+  const sumWd = settleWds.reduce((s,w)=> s + (Number(w.amount)||0), 0);
+  const msg = hasDoc
+    ? 'ยกเลิกการปิดงวดนี้?\nระบบจะลบรายการ "จ่ายปิดงวด" '+settleWds.length+' รายการ รวม '+fmtBaht(sumWd)+' ฿ (ยอดรอรับจะกลับมาแสดง)'
+    : 'ล้างรายการ "จ่ายปิดงวด" ที่ค้างอยู่ '+settleWds.length+' รายการ รวม '+fmtBaht(sumWd)+' ฿?\n\nงวดนี้ไม่มีบันทึกปิดงวด แต่มีรายการจ่ายค้างจากการกดปุ่มที่บันทึกไม่ครบ\nลบแล้วยอดรอรับจะกลับมาตามจริง แล้วค่อยกด "✅ ยืนยันจ่าย & ปิดงวด" ใหม่ 1 ครั้ง';
+  if(!confirm(msg)) return;
   toast('⏳ กำลังยกเลิก...');
   try{
-    await prLoadWithdrawals(ym);
-    const settleWds = prWithdrawals.filter(w=> w.month===ym && w.period===period && w.kind==='settle');
-    for(const w of settleWds){ if(w.fsId) await prDb().collection('withdrawals').doc(w.fsId).delete(); }
-    await prDb().collection('settlements').doc(key).delete();
+    const batch = prDb().batch();
+    for(const w of settleWds){ if(w.fsId) batch.delete(prDb().collection('withdrawals').doc(w.fsId)); }
+    if(hasDoc) batch.delete(prDb().collection('settlements').doc(key));
+    await batch.commit();
     delete prSettlements[key];
+    prWithdrawals = prWithdrawals.filter(w=> !(w.month===ym && w.period===period && w.kind==='settle'));
     await renderCycleSummary();
-    toast('↩️ ยกเลิกปิดงวดแล้ว');
+    toast('↩️ ล้างรายการปิดงวดแล้ว ('+settleWds.length+' รายการ)');
   }catch(e){ toast('❌ '+e.message); }
 }
 
