@@ -921,6 +921,7 @@ select{color-scheme:light;}
           <button class="btn btn-ghost" id="fr-type-pay" onclick="frSetType('payment')">💸 ใบจ่ายรถร่วม</button>
           <button class="btn btn-ghost" id="fr-type-rpt" onclick="frSetType('report')">📊 รายงานตามทะเบียน</button>
           <button class="btn btn-ghost" id="fr-type-rate" onclick="frSetType('rates')">💰 เรตค่าเที่ยว</button>
+          <button class="btn btn-ghost ta-adm" id="fr-type-rc" onclick="frSetType('rclink')" style="display:none">🔗 ส่งไปโปรแกรมรุ่งชัย</button>
           <button class="btn btn-ghost" id="fr-type-veh" onclick="frSetType('vehicles')" style="margin-left:auto">⚙️ จัดการทะเบียนรถ</button>
         </div>
       </div>
@@ -1046,6 +1047,27 @@ select{color-scheme:light;}
           </div>
           <div id="fr-rpt-msg" class="smsg" style="margin-top:10px"></div>
           <div id="fr-rpt-result" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <!-- ── ส่วน RC: ส่งข้อมูลไปโปรแกรมค่าเที่ยว รุ่งชัย น้ำโสม ── -->
+      <div id="fr-rc-panel" style="display:none">
+        <div class="card">
+          <div class="card-title">🔗 ส่งข้อมูลไปโปรแกรมค่าเที่ยว รุ่งชัย น้ำโสม</div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+            ส่งเฉพาะ<b>ข้อมูลดิบ</b> — วันที่ · ทะเบียน · ลูกค้า · คิว · หักทรายเปียก · คิวสุทธิ
+            <b>ไม่ส่งยอดเงิน</b> เพราะรุ่งชัยตั้งค่าเที่ยวเอง<br>
+            รวมเป็นบรรทัดเดียวต่อ <b>วัน + คัน + ลูกค้า</b> · ส่งซ้ำได้ ฝั่งรุ่งชัยกันรับซ้ำให้อยู่แล้ว
+          </p>
+          <div class="frow" style="flex-wrap:wrap;gap:10px;align-items:flex-end">
+            <label>เดือน<input id="rc-month" type="month" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:var(--font);"></label>
+            <label>ทะเบียนรถของรุ่งชัย (คั่นด้วย ,)
+              <input id="rc-plates" type="text" placeholder="82-6888, 83-4567" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:var(--font);width:300px"></label>
+            <button class="btn btn-ghost" onclick="rcSavePlates()">💾 จำทะเบียนไว้</button>
+            <button class="btn btn-gold" onclick="rcBuild()">🔍 รวบรวมข้อมูล</button>
+          </div>
+          <div id="rc-msg" class="smsg" style="margin-top:10px"></div>
+          <div id="rc-result" style="margin-top:12px"></div>
         </div>
       </div>
 
@@ -1923,6 +1945,8 @@ function applyRole() {
   document.querySelectorAll('.ta').forEach(function(el){ el.style.display=show; });
   // sub-tab น้ำมันที่เป็นข้อมูลต้นทุนธุรกิจ (ต้นทุนรายเดือน/รายงาน) — เฉพาะเจ้าของ
   document.querySelectorAll('.ta-fuel').forEach(function(el){ el.style.display = curRole==='admin' ? '' : 'none'; });
+  /* ปุ่มส่งข้อมูลไปรุ่งชัย — เฉพาะเจ้าของ/CFO (ใช้คลาสแยกจาก .ta เพราะ .ta ตั้ง display:flex ซึ่งไม่เหมาะกับปุ่มในแถว) */
+  document.querySelectorAll('.ta-adm').forEach(function(el){ el.style.display = curRole==='admin' ? '' : 'none'; });
 }
 
 function doLogout() {
@@ -4523,16 +4547,176 @@ function frSetType(type) {
   document.getElementById('fr-report-panel').style.display   = type==='report'   ? '' : 'none';
   document.getElementById('fr-vehicles-panel').style.display = type==='vehicles' ? '' : 'none';
   var _rp=document.getElementById('fr-rates-panel'); if(_rp) _rp.style.display = type==='rates' ? '' : 'none';
-  [['fr-type-inv','invoice'],['fr-type-pay','payment'],['fr-type-rpt','report'],['fr-type-rate','rates'],['fr-type-veh','vehicles']].forEach(function(pair){
+  var _rc=document.getElementById('fr-rc-panel');    if(_rc) _rc.style.display    = type==='rclink' ? '' : 'none';
+  [['fr-type-inv','invoice'],['fr-type-pay','payment'],['fr-type-rpt','report'],['fr-type-rate','rates'],['fr-type-rc','rclink'],['fr-type-veh','vehicles']].forEach(function(pair){
     var btn=document.getElementById(pair[0]);
-    if(btn) btn.className='btn '+(type===pair[1]?'btn-gold':'btn-ghost');
+    if(!btn) return;
+    var keep=(pair[0]==='fr-type-rc') ? ' ta-adm' : '';
+    btn.className='btn '+(type===pair[1]?'btn-gold':'btn-ghost')+keep;
   });
   if(type==='invoice')  frBuildCustDropdown();
   if(type==='payment')  { frLoadInvoiceList(); loadPayHistory(); }
   if(type==='report')   frReportInit();
   if(type==='rates')    frDrawRates();
   if(type==='vehicles') { listenVeh(); drawVeh(); }
+  if(type==='rclink')   rcInit();
 }
+
+/* ================================================================
+   ส่งข้อมูลไปโปรแกรมค่าเที่ยว รุ่งชัย น้ำโสม
+   ------------------------------------------------------------------
+   Why ส่งข้ามแท็บ ไม่ยิงเข้าฐานข้อมูลรุ่งชัยตรงๆ:
+     ถ้ายิงตรง ต้องฝังกุญแจของรุ่งชัยไว้ในหน้านี้ ซึ่ง repo เป็น public
+     ใครเปิดดูโค้ดก็เอาไปเขียนข้อมูลรุ่งชัยได้ทันที
+     ทางนี้ไม่มีกุญแจของรุ่งชัยอยู่ฝั่งนี้เลย — คนกดคือเจ้าของที่ล็อกอินรุ่งชัยอยู่แล้ว
+     ข้อมูลถูกเขียนด้วยสิทธิ์ของเจ้าของเอง
+   ส่งเฉพาะข้อมูลดิบ ไม่ส่งยอดเงิน เพราะ 58% ของเที่ยวในระบบนี้ยังไม่ได้ตั้งเรต
+     ถ้าเอายอดไปจ่ายคนขับจะได้ขาดกว่าครึ่งโดยดูเผินๆ เหมือนถูก
+================================================================ */
+var RC_URL       = 'https://rungchainamsom.github.io/rungchai-trip/';
+var RC_ORIGIN    = 'https://rungchainamsom.github.io';
+var RC_PLATES_DEF= ['82-6888','83-4567','83-4888','85-1056','85-1289'];
+var _rcPayload=null, _rcWin=null, _rcTimer=null, _rcPlates=null;
+
+function rcPlatesInput(){
+  var raw=(document.getElementById('rc-plates')||{}).value||'';
+  return raw.split(',').map(function(x){ return normPlate(x); }).filter(function(x){ return x; });
+}
+function rcInit(){
+  var m=document.getElementById('rc-month');
+  if(m && !m.value){
+    var d=new Date();
+    m.value=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);
+  }
+  var inp=document.getElementById('rc-plates');
+  if(inp && !inp.value) inp.value=(_rcPlates||RC_PLATES_DEF).join(', ');
+  db.collection('os_config').doc('rc_link').get().then(function(d){
+    if(d.exists && Array.isArray(d.data().plates) && d.data().plates.length){
+      _rcPlates=d.data().plates;
+      if(inp) inp.value=_rcPlates.join(', ');
+    }
+  }).catch(function(){});
+}
+function rcSavePlates(){
+  var list=rcPlatesInput();
+  if(!list.length){ setMsg('rc-msg','❌ ยังไม่ได้ใส่ทะเบียน','err'); return; }
+  db.collection('os_config').doc('rc_link').set({plates:list},{merge:true}).then(function(){
+    _rcPlates=list;
+    document.getElementById('rc-plates').value=list.join(', ');
+    setMsg('rc-msg','✅ จำทะเบียน '+list.length+' คันไว้แล้ว ครั้งหน้าไม่ต้องพิมพ์อีก','ok');
+  }).catch(function(e){ setMsg('rc-msg','❌ '+e.message,'err'); });
+}
+function rcBuild(){
+  var ym=(document.getElementById('rc-month')||{}).value||'';
+  if(!/^\d{4}-\d{2}$/.test(ym)){ setMsg('rc-msg','❌ เลือกเดือนก่อน','err'); return; }
+  var y=parseInt(ym.slice(0,4),10), mo=parseInt(ym.slice(5,7),10);
+  var last=new Date(y,mo,0).getDate();
+  var from=ym+'-01', to=ym+'-'+('0'+last).slice(-2);
+  var plates=rcPlatesInput();
+  if(!plates.length){ setMsg('rc-msg','❌ ยังไม่ได้ใส่ทะเบียน','err'); return; }
+
+  var groups={};
+  function put(p,date,customer,src,kiuV,dedV,netV,ref){
+    var k=date+'|'+p+'|'+(customer||'–')+'|'+src;
+    if(!groups[k]) groups[k]={date:date,plate:p,customer:customer||'–',src:src,trips:0,kiu:0,ded:0,net:0,refs:[]};
+    var g=groups[k];
+    g.trips++; g.kiu+=kiuV||0; g.ded+=dedV||0; g.net+=netV||0;
+    if(ref) g.refs.push(ref);
+  }
+  plates.forEach(function(p){
+    /* เที่ยวทราย — จากตาชั่ง (doc id = วันที่_เลขตั๋ว ไม่ซ้ำ ใช้อ้างอิงได้) */
+    wData.forEach(function(w){
+      if(normPlate(w.plate)!==p || !w.date || w.date<from || w.date>to) return;
+      var kiuV=(w.kg||0)/KPC;
+      var dedV=(typeof dData!=='undefined'&&dData[w._id])?dData[w._id]:0;
+      put(p,w.date,w.customer,'ทราย',kiuV,dedV,kiuV-dedV,w._id);
+    });
+    /* เที่ยวดิน — จากบิลขายสินค้าอื่น (นับเฉพาะรถร่วม ตัวกรองอยู่ใน _dirtTripsOfPlate) */
+    _dirtTripsOfPlate(p,from,to).forEach(function(t){
+      put(p,t.date,t.customer,'ดิน',t.kiu,0,t.net,t.billNo||'');
+    });
+  });
+
+  var keys=Object.keys(groups).sort();
+  if(!keys.length){
+    _rcPayload=null;
+    document.getElementById('rc-result').innerHTML='';
+    setMsg('rc-msg','⚠️ ไม่พบเที่ยวของทะเบียนเหล่านี้ในเดือน '+ym,'warn');
+    return;
+  }
+  var r3=function(x){ return Math.round((x||0)*1000)/1000; };
+  var rows=keys.map(function(k){
+    var g=groups[k];
+    g.kiu=r3(g.kiu); g.ded=r3(g.ded); g.net=r3(g.net);
+    return g;
+  });
+  _rcPayload={app:'thanasetsiri-freight', v:1, type:'rows', month:ym, sentAt:new Date().toISOString(), rows:rows};
+
+  var tTrips=rows.reduce(function(s,g){return s+g.trips;},0);
+  var tNet  =r3(rows.reduce(function(s,g){return s+g.net;},0));
+  var byPlate={};
+  rows.forEach(function(g){
+    if(!byPlate[g.plate]) byPlate[g.plate]={trips:0,net:0,rows:0};
+    byPlate[g.plate].trips+=g.trips; byPlate[g.plate].net+=g.net; byPlate[g.plate].rows++;
+  });
+  var f3=function(x){ return (typeof fmt3==='function')?fmt3(x):(Math.round((x||0)*1000)/1000); };
+  var h='<div style="margin-bottom:10px;font-size:13px">รวม <b>'+rows.length+'</b> บรรทัด · '+
+        tTrips+' เที่ยว · คิวสุทธิรวม <b>'+f3(tNet)+'</b></div>';
+  h+='<table style="width:100%;font-size:12px"><thead><tr><th>ทะเบียน</th><th class="r">บรรทัด</th><th class="r">เที่ยว</th><th class="r">คิวสุทธิ</th></tr></thead><tbody>';
+  Object.keys(byPlate).sort().forEach(function(p){
+    h+='<tr><td>'+p+'</td><td class="r">'+byPlate[p].rows+'</td><td class="r">'+byPlate[p].trips+'</td><td class="r">'+f3(r3(byPlate[p].net))+'</td></tr>';
+  });
+  h+='</tbody></table>';
+  h+='<div class="brow" style="margin-top:14px">'+
+     '<button class="btn btn-gold" onclick="rcSend()">📤 เปิดโปรแกรมรุ่งชัยแล้วส่ง</button>'+
+     '<button class="btn btn-ghost" onclick="rcCopy()">📋 คัดลอกข้อมูล (ทางสำรอง)</button>'+
+     '</div>'+
+     '<p style="font-size:12px;color:var(--muted);margin-top:8px">'+
+     'ถ้าเบราว์เซอร์บล็อกป๊อปอัป หรือส่งไม่ถึง ให้กดคัดลอก แล้วไปที่โปรแกรมรุ่งชัย → แท็บสรุปสิ้นเดือน → ปุ่ม “วางข้อมูลเอง”</p>';
+  document.getElementById('rc-result').innerHTML=h;
+  setMsg('rc-msg','✅ รวบรวมแล้ว '+rows.length+' บรรทัด — ตรวจตัวเลขก่อนส่ง','ok');
+}
+function rcSend(){
+  if(!_rcPayload){ setMsg('rc-msg','❌ ยังไม่ได้กดรวบรวมข้อมูล','err'); return; }
+  _rcWin=window.open(RC_URL,'rc_trip');
+  if(!_rcWin){ setMsg('rc-msg','⚠️ เบราว์เซอร์บล็อกป๊อปอัป — ใช้ปุ่ม “คัดลอกข้อมูล” แทน','warn'); return; }
+  try{ _rcWin.focus(); }catch(e){}
+  setMsg('rc-msg','⏳ เปิดโปรแกรมรุ่งชัยแล้ว — ถ้ายังไม่ได้เข้าสู่ระบบให้เข้าด้วย LINE ก่อน ระบบจะส่งให้เองเมื่อพร้อม','warn');
+  if(_rcTimer) clearInterval(_rcTimer);
+  var n=0;
+  _rcTimer=setInterval(function(){
+    if(!_rcWin || _rcWin.closed || ++n>240){ clearInterval(_rcTimer); _rcTimer=null; return; }
+    try{ _rcWin.postMessage({app:'thanasetsiri-freight', type:'ping'}, RC_ORIGIN); }catch(e){}
+  }, 1000);
+}
+function rcCopy(){
+  if(!_rcPayload){ setMsg('rc-msg','❌ ยังไม่ได้กดรวบรวมข้อมูล','err'); return; }
+  var txt=JSON.stringify(_rcPayload);
+  var done=function(){ setMsg('rc-msg','✅ คัดลอกแล้ว — ไปวางที่โปรแกรมรุ่งชัย แท็บสรุปสิ้นเดือน ปุ่ม “วางข้อมูลเอง”','ok'); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done).catch(function(){ rcCopyFallback(txt,done); });
+  } else rcCopyFallback(txt,done);
+}
+function rcCopyFallback(txt,done){
+  var ta=document.createElement('textarea');
+  ta.value=txt; ta.style.position='fixed'; ta.style.left='-9999px';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); }
+  catch(e){ setMsg('rc-msg','❌ คัดลอกอัตโนมัติไม่ได้ ลองใหม่อีกครั้ง','err'); }
+  document.body.removeChild(ta);
+}
+window.addEventListener('message', function(ev){
+  if(ev.origin!==RC_ORIGIN) return;                 /* รับเฉพาะจากโปรแกรมรุ่งชัยเท่านั้น */
+  var d=ev.data;
+  if(!d || d.app!=='rungchai-trip') return;
+  if(d.type==='ready' && _rcPayload){
+    try{ ev.source.postMessage(_rcPayload, RC_ORIGIN); }catch(e){}
+  }
+  if(d.type==='got'){
+    if(_rcTimer){ clearInterval(_rcTimer); _rcTimer=null; }
+    setMsg('rc-msg','✅ ส่งถึงโปรแกรมรุ่งชัยแล้ว '+(d.count||0)+' บรรทัด — ไปกดรับที่แท็บ “สรุปสิ้นเดือน”','ok');
+  }
+}, false);
 
 /* ================================================================
    เรตค่าเที่ยวเหมาต่อเที่ยว (os_config/freight_rates)
