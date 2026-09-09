@@ -120,7 +120,7 @@ async function buildSummary(idToken, today) {
   const dMap = {}; deds.forEach(function (d) { dMap[docId(d)] = fval(d, 'cubic') || 0; });
 
   // ── น้ำหนัก + รายได้ขายทราย ──
-  let sandRev = 0, kgTot = 0, dedTot = 0, netQTot = 0;
+  let sandRev = 0, kgTot = 0, dedTot = 0, netQTot = 0, noPrice = 0;
   const byProd = {};
   weigh.forEach(function (w) {
     const id = docId(w);
@@ -134,7 +134,7 @@ async function buildSummary(idToken, today) {
 
     const unit = fval(w, 'sale_unit');
     if (unit === 'เหมา') { sandRev += fval(w, 'sale_amount') || 0; return; }
-    const price = fval(w, 'price') || 0; if (price <= 0) return;
+    const price = fval(w, 'price') || 0; if (price <= 0) { noPrice++; return; }
     const qty = (unit === 'ตัก') ? (fval(w, 'scoop') || 0) : ((unit === 'ตัน') ? net * TON_PER_CUBIC : net);
     sandRev += qty * price;
   });
@@ -179,6 +179,7 @@ async function buildSummary(idToken, today) {
   L.push('  รวมรายได้: <b>' + fmt(totalRev) + ' ฿</b>');
   L.push('  💵 เงินเข้าจริง: ' + fmt(received) + ' ฿');
   L.push('  📒 ค้างชำระ: ' + fmt(osCredit) + ' ฿');
+  if (noPrice > 0) L.push('  ⚠️ ใบชั่งยังไม่ใส่ราคา: <b>' + noPrice + '/' + weigh.length + ' ใบ</b> — ยอดขายจริงสูงกว่านี้');
   L.push('');
 
   // ⬇️ บล็อกใหม่: น้ำมัน
