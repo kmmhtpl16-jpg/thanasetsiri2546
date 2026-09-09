@@ -12,6 +12,9 @@ const KPC        = 1500;              // 1 คิว = 1,500 กก.
 
 const FS = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents`;
 
+// ล้าง "ปุ่มค้าง" ใต้ช่องพิมพ์ (reply keyboard เก่าที่ยังโผล่อยู่ในแชท)
+const HIDE_KB = { reply_markup: { remove_keyboard: true } };
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   // กันคนอื่นยิง webhook ปลอม: ตรวจ secret token ที่ตั้งตอน setWebhook
@@ -38,12 +41,14 @@ export async function onRequestPost(context) {
       const m = msg.reply_to_message.text.match(/ราคา\s+([\d.]+)\s+บาท[\s\S]*?สำหรับ\s+"([^"]+)"/);
       if (m) text = `วางบิล ${m[2]} ${m[1]} ${vatKeyword(bareVat)}`;
     }
-    if (/^\/?start|^เมนู|^help|^ช่วย/i.test(text)) {
+    if (/^ปิดเมนู|^ซ่อนเมนู|^ปิดปุ่ม|^ซ่อนปุ่ม|^\/hide/i.test(text)) {
+      await tgSend(token, chatId, '✅ ซ่อนปุ่มด้านล่างให้แล้ว — พิมพ์ "เมนู" เมื่ออยากเรียกปุ่มกลับมา', HIDE_KB);
+    } else if (/^\/?start|^เมนู|^help|^ช่วย/i.test(text)) {
       await tgSend(token, chatId, menuText(), { reply_markup: menuKeyboard(), reply_to_message_id: msg.message_id });
     } else if (/^ยืนยันวางบิล/.test(text)) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
       const r = await confirmIssueInvoiceFor(text);
-      if (typeof r === 'string') await tgSend(token, chatId, r);
+      if (typeof r === 'string') await tgSend(token, chatId, r, HIDE_KB);
       else await tgSend(token, chatId, r.text, Object.assign({ reply_to_message_id: msg.message_id }, r.extra));
     } else if (/^วางบิล\s*$/.test(text)) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
@@ -52,7 +57,7 @@ export async function onRequestPost(context) {
     } else if (/^วางบิล/.test(text)) {
       if (fromId !== OWNER_ID) { await tgSend(token, chatId, '⛔ คำสั่งนี้เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
       const r = await prepareInvoiceFor(text);
-      if (typeof r === 'string') await tgSend(token, chatId, r);
+      if (typeof r === 'string') await tgSend(token, chatId, r, HIDE_KB);
       else await tgSend(token, chatId, r.text, Object.assign({ reply_to_message_id: msg.message_id }, r.extra));
     } else if (/^ค่าแรง|^เงินเดือน/.test(text)) {
       const ym = parseYM(text);
@@ -65,7 +70,7 @@ export async function onRequestPost(context) {
         ], resize_keyboard: true, one_time_keyboard: true, selective: true };
         await tgSend(token, chatId, '💵 เลือกแบบที่จะดู:\n• <b>ค่าแรง</b> = ดูทั้งก้อน (รอรับรายคน)\n• <b>เบิก</b> = เฉพาะเอกสารเบิกเงิน\n(รอบ1 = 1–15 / รอบ2 = 16–สิ้นเดือน)', { reply_markup: kb, reply_to_message_id: msg.message_id });
       } else {
-        await tgSend(token, chatId, await reportPayroll(ym, period));
+        await tgSend(token, chatId, await reportPayroll(ym, period), HIDE_KB);
       }
     } else if (/^เบิก(\s|$|รอบ|[12])/.test(text)) {
       const ym = parseYM(text);
@@ -74,10 +79,10 @@ export async function onRequestPost(context) {
         const kb = { keyboard: [[{ text: 'เบิก รอบ1' }, { text: 'เบิก รอบ2' }], [{ text: 'เมนู' }]], resize_keyboard: true, one_time_keyboard: true, selective: true };
         await tgSend(token, chatId, '🧾 ดูเอกสารเบิกงวดไหน?\n• รอบ1 = 1–15 / รอบ2 = 16–สิ้นเดือน', { reply_markup: kb, reply_to_message_id: msg.message_id });
       } else {
-        await tgSend(token, chatId, await reportWithdrawals(ym, period));
+        await tgSend(token, chatId, await reportWithdrawals(ym, period), HIDE_KB);
       }
     } else if (/น้ำมัน/.test(text)) {
-      await tgSend(token, chatId, await reportFuel());
+      await tgSend(token, chatId, await reportFuel(), HIDE_KB);
     }
     // ข้อความอื่นๆ: เงียบ (ไม่สแปมในกลุ่ม)
   } catch (e) {
@@ -478,7 +483,7 @@ async function tgSend(token, chatId, text, extra) {
   });
 }
 function menuText() {
-  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n👇 กดปุ่มด้านล่างได้เลย (หรือพิมพ์เองก็ได้)\n\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>ค่าแรง</b> — ดูค่าแรงพนักงานตามงวด (รอบ1/รอบ2) รอรับเท่าไหร่\n• <b>วางบิล</b> — เลือกลูกค้าที่จะวางบิลจากรายชื่อ (เฉพาะคุณหลิง)\n   หรือพิมพ์ "วางบิล &lt;ชื่อลูกค้า&gt;" ตรงๆ ก็ได้\n   ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105" แล้วบอทจะถามว่ารวม VAT หรือ no VAT\n   (หรือพิมพ์รวดเดียว เช่น "วางบิล โพนแก้ว 105 novat")';
+  return '🤖 <b>คำสั่งบอทท่าทราย</b>\n👇 กดปุ่มด้านล่างได้เลย (หรือพิมพ์เองก็ได้)\n\n• <b>ยอดน้ำมัน</b> — ดูน้ำมันคงเหลือในสต็อก\n• <b>ค่าแรง</b> — ดูค่าแรงพนักงานตามงวด (รอบ1/รอบ2) รอรับเท่าไหร่\n• <b>วางบิล</b> — เลือกลูกค้าที่จะวางบิลจากรายชื่อ (เฉพาะคุณหลิง)\n   หรือพิมพ์ "วางบิล &lt;ชื่อลูกค้า&gt;" ตรงๆ ก็ได้\n   ลูกค้าใหม่ใส่ราคาต่อท้าย เช่น "วางบิล โพนแก้ว 105" แล้วบอทจะถามว่ารวม VAT หรือ no VAT\n   (หรือพิมพ์รวดเดียว เช่น "วางบิล โพนแก้ว 105 novat")\n\n• <b>ปิดเมนู</b> — ซ่อนปุ่มด้านล่างให้หายไป';
 }
 // ปุ่มเมนูหลัก (reply keyboard — กดแล้วส่งคำสั่งเป็นข้อความทันที)
 function menuKeyboard() {
