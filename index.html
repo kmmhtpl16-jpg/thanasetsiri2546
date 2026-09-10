@@ -3645,6 +3645,7 @@ function parseAndSave(rows, fname) {
   var existIds=new Set(wData.map(function(w){return w._id;}));
   var batch=db.batch();
   var imp=0, skip=0;
+  var impDates={};
 
   for(var i=hr+2; i<rows.length; i++){
     var r=rows[i];
@@ -3679,15 +3680,31 @@ function parseAndSave(rows, fname) {
       fileName:fname
     });
     imp++;
+    impDates[dateStr]=1;
   }
 
   if(imp>0){
     batch.commit()
-      .then(function(){ setMsg('s1','✅ นำเข้า '+imp+' รายการ (ซ้ำ '+skip+')','ok'); vMode='latest'; updVBtn(); })
+      .then(function(){ setMsg('s1','✅ นำเข้า '+imp+' รายการ (ซ้ำ '+skip+')','ok'); vMode='latest'; updVBtn(); pushDailySummary(impDates); })
       .catch(function(e){ setMsg('s1','❌ Firestore: '+e.message,'err'); });
   } else {
     setMsg('s1','⚠️ ไม่มีรายการใหม่ (ซ้ำ '+skip+')','warn');
   }
+}
+
+/* ── ยิงสรุปประจำวันเข้า Telegram ทันทีที่นำเข้าใบชั่งเสร็จ (10 ก.ย. 2569) ── */
+function pushDailySummary(dates){
+  var ds = Object.keys(dates||{}).sort();
+  if(!ds.length) return;
+  ds = ds.slice(-2);                    // ยิงมากสุด 2 วันล่าสุด กันสแปมตอนนำเข้าย้อนหลัง
+  ds.forEach(function(d){
+    fetch('/api/daily-summary?force=1&date='+encodeURIComponent(d))
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(j && j.ok) setMsg('s1','✅ นำเข้าแล้ว · ส่งสรุปวันที่ '+d+' เข้ากลุ่มเรียบร้อย','ok');
+      })
+      .catch(function(){});
+  });
 }
 
 function toggleView() {
