@@ -606,6 +606,7 @@ select{color-scheme:light;}
     <button class="tab-btn ta" data-tab="3" onclick="goTab(3)" style="display:none">📄 ใบแจ้งหนี้ลูกค้า</button>
     <button class="tab-btn ta" data-tab="4" onclick="goTab(4)" style="display:none">👑 สรุปผู้บริหาร</button>
     <button class="tab-btn ta" data-tab="8" onclick="goTab(8)" style="display:none">💸 รายจ่าย</button>
+    <button class="tab-btn ta" data-tab="9" onclick="goTab(9)" style="display:none">🧑‍💼 ลูกค้า</button>
   </nav>
 
   <main class="main-content">
@@ -1610,6 +1611,68 @@ select{color-scheme:light;}
       </div><!-- /exContent -->
     </section>
 
+    <!-- ══════════ TAB 9 — ลูกค้า (ราคาขาย) · เพิ่ม 15 ก.ย. 2569 ══════════ -->
+    <section class="tab-pane" id="tp9" style="padding:16px;">
+      <div class="card">
+        <div class="card-title">🧑‍💼 ราคาขายต่อลูกค้า</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="c9search" placeholder="🔍 ค้นหาชื่อลูกค้า…"
+                 oninput="draw9()" class="filter-input" style="min-width:220px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--muted);user-select:none">
+            <input type="checkbox" id="c9onlyNoRate" onchange="draw9()"> เฉพาะรายที่ยังไม่ตั้งราคา
+          </label>
+          <button class="btn btn-ghost" onclick="draw9()" style="margin-left:auto">🔄 รีเฟรช</button>
+        </div>
+        <div id="c9sum" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+        <div class="table-wrap" style="margin-top:10px;max-height:46vh;overflow:auto">
+          <table class="data-table">
+            <thead><tr>
+              <th>ลูกค้า</th><th>ราคาที่เปิดใช้</th>
+              <th class="r">ใบชั่งทั้งหมด</th><th class="r">ยังไม่ใส่ราคา</th><th style="width:150px"></th>
+            </tr></thead>
+            <tbody id="c9body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="c9editor" style="display:none;margin-top:14px">
+        <div class="card-title">
+          <span id="c9name">—</span>
+          <button class="btn btn-ghost" onclick="c9Close()" style="margin-left:auto;padding:4px 10px;font-size:11px">✕ ปิด</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+          ติ๊กหัวข้อที่ใช้กับลูกค้ารายนี้ · ที่ไม่ติ๊กจะไม่ถูกนำไปคิดเงิน · ราคาทุกช่องเป็น <b>บาท/คิว</b>
+        </div>
+        <div id="c9rows"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-ghost" onclick="c9AddTopic()">➕ เพิ่มหัวข้อใหม่</button>
+          <button class="btn btn-gold" onclick="c9Save()" style="margin-left:auto">💾 บันทึกราคา</button>
+        </div>
+        <div id="c9msg" class="smsg" style="margin-top:8px"></div>
+
+        <div id="c9npWrap" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-size:13px;font-weight:700;color:var(--warn);margin-bottom:8px">
+            ⚠️ ใบชั่งของลูกค้ารายนี้ที่ยังไม่ใส่ราคา <span id="c9npN">0</span> ใบ
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+            <label style="font-size:12px;color:var(--muted)">ใส่ราคา (บาท/คิว)
+              <input type="number" id="c9npPrice" min="0" step="0.01" class="filter-input" style="width:140px" oninput="c9NpCalc()">
+            </label>
+            <button class="btn btn-ghost" onclick="c9NpAll(true)">เลือกทั้งหมด</button>
+            <button class="btn btn-ghost" onclick="c9NpAll(false)">ล้าง</button>
+            <button class="btn btn-gold" id="c9npBtn" onclick="c9NpSave()">ใส่ราคาให้ใบที่เลือก</button>
+          </div>
+          <div id="c9npSum" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
+          <div class="table-wrap" style="max-height:34vh;overflow:auto">
+            <table class="data-table">
+              <thead><tr><th style="width:38px"></th><th>เลขที่</th><th>ทะเบียน</th><th>วันที่</th><th class="r">คิวสุทธิ</th></tr></thead>
+              <tbody id="c9npBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
 
   </main>
 </div>
@@ -1985,6 +2048,11 @@ function listenFS() {
   unCustVeh = db.collection('os_config').doc('os_customer_vehicle').onSnapshot(function(d){
     custVeh = (d.exists && d.data().map) || {};
   }, function(e){ console.warn('custVeh',e); });
+  unCustRates = db.collection('os_config').doc('customer_rates').onSnapshot(function(d){
+    custRates = (d.exists && d.data().map) || {};
+    var tp9=document.getElementById('tp9');
+    if(tp9 && tp9.classList.contains('active') && typeof draw9==='function') draw9();
+  }, function(e){ console.warn('custRates',e); });
   unFrRates = db.collection('os_config').doc('freight_rates').onSnapshot(function(d){
     frRates = (d.exists && d.data().map) || {};
     frBuildRateIdx();
@@ -1997,7 +2065,7 @@ function listenFS() {
    TAB SWITCHING
 ================================================================ */
 function goTab(n) {
-  if((n===3||n===4||n===8) && curRole!=='admin') return;
+  if((n===3||n===4||n===8||n===9) && curRole!=='admin') return;
   document.querySelectorAll('.tab-btn').forEach(function(b){
     b.classList.toggle('active', parseInt(b.dataset.tab)===n);
   });
@@ -2008,6 +2076,7 @@ function goTab(n) {
   if(n===6) initPayrollTab();
   if(n===7) initFuelTab();
   if(n===8) initExpenseTab();
+  if(n===9) draw9();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3644,7 +3713,7 @@ function parseAndSave(rows, fname) {
 
   var existIds=new Set(wData.map(function(w){return w._id;}));
   var batch=db.batch();
-  var imp=0, skip=0;
+  var imp=0, skip=0, _autoPriced=0;
   var impDates={};
 
   for(var i=hr+2; i<rows.length; i++){
@@ -3669,23 +3738,34 @@ function parseAndSave(rows, fname) {
     var id=dateStr+'_'+seq;
     if(existIds.has(id)){skip++;continue;}
 
-    batch.set(db.collection('weighings').doc(id),{
+    var _cust = String(r[iCust] ||'').trim()||'ลูกค้า (ทั่วไป)';
+    var _doc = {
       seq:seq, date:dateStr, time:timeStr,
       plate:   String(r[iPlate]||'').trim().replace(/[^0-9\-]/g,''),
-      customer:String(r[iCust] ||'').trim()||'ลูกค้า (ทั่วไป)',
+      customer:_cust,
       product: String(r[iProd] ||'').trim()||'ทราย',
       kg:kg,
       importedAt:new Date().toISOString(),
       importedBy:curEmail,
       fileName:fname
-    });
+    };
+    /* เติมราคาให้อัตโนมัติถ้าลูกค้ารายนี้ตั้งราคาไว้ (15 ก.ย. 69)
+       ใส่แค่ price — ยอดเงินคำนวณตอนอ่าน (price × คิวสุทธิ) จึงไม่เพี้ยนเมื่อหักน้ำหนักทีหลัง */
+    var _p = (typeof crPriceOf==='function') ? crPriceOf(_cust) : 0;
+    if(_p>0){ _doc.price=_p; _doc.sale_unit='คิว'; _doc.priceSource='auto'; _autoPriced++; }
+    batch.set(db.collection('weighings').doc(id), _doc);
     imp++;
     impDates[dateStr]=1;
   }
 
   if(imp>0){
     batch.commit()
-      .then(function(){ setMsg('s1','✅ นำเข้า '+imp+' รายการ (ซ้ำ '+skip+')','ok'); vMode='latest'; updVBtn(); pushDailySummary(impDates); })
+      .then(function(){
+        setMsg('s1','✅ นำเข้า '+imp+' รายการ (ซ้ำ '+skip+')'
+          +(_autoPriced>0?(' · เติมราคาให้อัตโนมัติ '+_autoPriced+' ใบ'):'')
+          +((imp-_autoPriced)>0?(' · ยังไม่มีราคา '+(imp-_autoPriced)+' ใบ'):''),'ok');
+        vMode='latest'; updVBtn(); pushDailySummary(impDates);
+      })
       .catch(function(e){ setMsg('s1','❌ Firestore: '+e.message,'err'); });
   } else {
     setMsg('s1','⚠️ ไม่มีรายการใหม่ (ซ้ำ '+skip+')','warn');
@@ -3869,6 +3949,15 @@ function ecFillPriceForCust(){
   var cust=(document.getElementById('ecNew')||{}).value.trim();
   var u=(document.getElementById('ecUnit')||{}).value||'คิว';
   if(!cust) return;
+  /* ราคาที่ตั้งไว้ในหน้าลูกค้ามาก่อน (เฉพาะหน่วยคิว เพราะราคาที่เก็บเป็นบาท/คิว) — 15 ก.ย. 69 */
+  if(u==='คิว' && typeof crPriceOf==='function'){
+    var _cr=crPriceOf(cust);
+    if(_cr>0){
+      var _pe=document.getElementById('ecPrice');
+      if(_pe){ _pe.value=_cr; ecPriceCalc(); }
+      return;
+    }
+  }
   var prev=(typeof wData!=='undefined'?wData:[]).filter(function(w){ return w.customer===cust && w._id!==_editId && (w.sale_unit||'คิว')===u; });
   prev.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
   if(!prev.length) return;
@@ -3905,9 +3994,30 @@ function confirmEditCust(){
     var logEntry={from:r.customer,to:newCust,by:(typeof curEmail!=='undefined'?curEmail:''),at:new Date().toISOString(),reason:reason};
     upd.editLog=(Array.isArray(r.editLog)?r.editLog:[]).concat([logEntry]);
   }
+  /* ── ราคาต่างจากที่ตั้งไว้ → ถามว่าใช้กับใบไหน (15 ก.ย. 69) ── */
+  var _applyAlso=false;
+  if(unit==='คิว' && price>0 && typeof crPriceOf==='function'){
+    var _cur=crPriceOf(newCust);
+    if(_cur!==price){
+      var _msg='ราคา '+price.toLocaleString('th-TH')+' ฿/คิว ของ '+newCust+'\n\n'
+        +'• กด "ตกลง"  = ใบนี้ และหลังจากนี้\n'
+        +'   (ตั้งเป็นราคาของลูกค้าด้วย ใบที่ชั่งหลังจากนี้จะได้ราคานี้อัตโนมัติ)\n\n'
+        +'• กด "ยกเลิก" = เฉพาะใบนี้\n'
+        +'   (ราคาของลูกค้ายังเป็น '+(_cur>0?_cur.toLocaleString('th-TH')+' ฿/คิว':'ยังไม่ได้ตั้ง')+' เหมือนเดิม)';
+      _applyAlso = confirm(_msg);
+    }
+  }
   db.collection('weighings').doc(_editId).update(upd).then(function(){
     closeEditModal();
     setMsg('s1','✅ บันทึกแล้ว: '+newCust+(amount>0?(' · '+amount.toLocaleString('th-TH',{minimumFractionDigits:2})+' ฿'):''),'ok');
+    if(_applyAlso){
+      var _ps=crPricesOf(newCust).map(function(x){return {label:x.label,on:x.on,v:x.v,vat:x.vat,wht:x.wht,custom:x.custom};});
+      var _t=_ps.filter(function(x){return x.on;})[0] || _ps[0];
+      if(_t){ _t.on=true; _t.v=price; }
+      crSave(newCust,_ps)
+        .then(function(){ setMsg('s1','✅ บันทึกแล้ว · ตั้งเป็นราคาของ '+newCust+' แล้ว ('+price.toLocaleString('th-TH')+' ฿/คิว)','ok'); })
+        .catch(function(e){ setMsg('s1','⚠️ บันทึกใบชั่งแล้ว แต่ตั้งราคาลูกค้าไม่สำเร็จ: '+e.message,'warn'); });
+    }
   }).catch(function(e){
     setMsg('s1','❌ แก้ไม่สำเร็จ: '+e.message,'err');
   });
@@ -4535,6 +4645,241 @@ var FR_RATES = {
   'ธีรนพ':    { rateFromCustomer:0,  rateForTruck:30, withholdingTax:0,    vatRate:0.07, sellingPriceWithVat:145 }
 };
 var FUZZY_THRESHOLD = 0.75;
+/* ════════════════════════════════════════════════════════════════
+   ราคาต่อลูกค้า — customer_rates  (เพิ่ม 15 ก.ย. 2569)
+   เก็บที่ os_config/customer_rates field `map` (แบบเดียวกับ freight_rates)
+   จึงไม่ต้องเพิ่ม Firestore rule ใหม่
+   map = { "ชื่อลูกค้า": { prices:[{label,on,v,vat,wht,custom}], updatedAt, updatedBy } }
+   ราคาทุกตัวเป็น "บาท ต่อ คิว"
+════════════════════════════════════════════════════════════════ */
+var custRates = {};
+var unCustRates = null;
+var CR_TPL = [
+  { label:'ราคาทรายรับเอง',      on:false, v:0, vat:'ไม่มีแวต', wht:0 },
+  { label:'ราคาทรายรวมค่าขนส่ง', on:false, v:0, vat:'ไม่มีแวต', wht:0 },
+  { label:'ราคาค่าขนส่ง',        on:false, v:0, vat:'ไม่มีแวต', wht:0 }
+];
+function crTpl(){ return CR_TPL.map(function(t){ return {label:t.label,on:false,v:0,vat:t.vat,wht:t.wht}; }); }
+function crPricesOf(cust){
+  var r = custRates[cust];
+  return (r && Array.isArray(r.prices) && r.prices.length) ? r.prices : crTpl();
+}
+/* หัวข้อราคาที่ "เปิดใช้" และมีตัวเลข — ใช้ตัวแรกเป็นราคาหลัก */
+function crActive(cust){
+  return crPricesOf(cust).filter(function(x){ return x.on && (+x.v)>0; });
+}
+function crPriceOf(cust){
+  var a = crActive(cust);
+  return a.length ? (+a[0].v) : 0;
+}
+function crSave(cust, prices){
+  var next = JSON.parse(JSON.stringify(custRates||{}));
+  next[cust] = {
+    prices: prices.map(function(x){
+      return {label:String(x.label||'').trim(), on:!!x.on, v:(+x.v)||0,
+              vat:x.vat||'ไม่มีแวต', wht:(+x.wht)||0, custom:!!x.custom};
+    }),
+    updatedAt: new Date().toISOString(),
+    updatedBy: (typeof curEmail!=='undefined'?curEmail:'')
+  };
+  return db.collection('os_config').doc('customer_rates').set({map:next},{merge:false});
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TAB 9 — ลูกค้า (ราคาขาย)   · เพิ่ม 15 ก.ย. 2569
+════════════════════════════════════════════════════════════════ */
+var c9list = [];        // ชื่อลูกค้าเรียงตามที่แสดง
+var c9cur  = '';        // ลูกค้าที่กำลังแก้
+var c9draft= [];        // ร่างรายการราคา
+var c9np   = [];        // ใบชั่งที่ยังไม่ใส่ราคาของลูกค้ารายนี้ [{id,seq,plate,date,net,sel}]
+
+function c9NetKiu(w){
+  var g=(w.kg||0)/KPC;
+  var d=(typeof dData!=='undefined' && dData[w._id]) ? dData[w._id] : 0;
+  return Math.max(0, g-d);
+}
+function c9HasPrice(w){
+  if(w.sale_unit==='เหมา') return (w.sale_amount||0)>0;
+  return (w.price||0)>0;
+}
+function c9Stats(){
+  var m={};
+  (typeof wData!=='undefined'?wData:[]).forEach(function(w){
+    var c=w.customer||'ลูกค้า (ทั่วไป)';
+    if(!m[c]) m[c]={n:0,noPrice:0};
+    m[c].n++;
+    if(!c9HasPrice(w)) m[c].noPrice++;
+  });
+  Object.keys(custRates||{}).forEach(function(c){ if(!m[c]) m[c]={n:0,noPrice:0}; });
+  return m;
+}
+function c9RateText(cust){
+  var a=crActive(cust);
+  if(!a.length) return '<span style="color:var(--warn);font-weight:700">ยังไม่ตั้งราคา</span>';
+  return a.map(function(x){
+    return '<div style="margin:1px 0"><b>'+(+x.v).toLocaleString('th-TH')+'</b> ฿/คิว '
+      +'<span style="color:var(--muted);font-size:.9em">· '+x.label
+      +(x.vat?(' · '+x.vat):'')+(x.wht?(' · หัก ณ ที่จ่าย '+x.wht+'%'):'')+'</span></div>';
+  }).join('');
+}
+function draw9(){
+  var body=document.getElementById('c9body'); if(!body) return;
+  var q=((document.getElementById('c9search')||{}).value||'').trim().toLowerCase();
+  var onlyNo=!!(document.getElementById('c9onlyNoRate')||{}).checked;
+  var st=c9Stats();
+  var names=Object.keys(st).sort(function(a,b){ return a.localeCompare(b,'th'); });
+  if(q)      names=names.filter(function(c){ return c.toLowerCase().indexOf(q)>=0; });
+  if(onlyNo) names=names.filter(function(c){ return crActive(c).length===0; });
+  c9list=names;
+
+  var totNo=0, totNoPrice=0;
+  Object.keys(st).forEach(function(c){
+    if(crActive(c).length===0) totNo++;
+    totNoPrice+=st[c].noPrice;
+  });
+  var sum=document.getElementById('c9sum');
+  if(sum) sum.innerHTML='ลูกค้าทั้งหมด <b>'+Object.keys(st).length+'</b> ราย'
+    +' · ยังไม่ตั้งราคา <b style="color:var(--warn)">'+totNo+'</b> ราย'
+    +' · ใบชั่งที่ยังไม่ใส่ราคา <b style="color:var(--warn)">'+totNoPrice+'</b> ใบ';
+
+  if(!names.length){ body.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:18px">ไม่พบลูกค้า</td></tr>'; return; }
+  body.innerHTML=names.map(function(c,i){
+    var s=st[c];
+    return '<tr>'
+      +'<td><b>'+c+'</b></td>'
+      +'<td>'+c9RateText(c)+'</td>'
+      +'<td class="r">'+s.n.toLocaleString('th-TH')+'</td>'
+      +'<td class="r">'+(s.noPrice?('<b style="color:var(--warn)">'+s.noPrice+'</b>'):'—')+'</td>'
+      +'<td><button class="btn btn-gold" style="padding:4px 12px;font-size:12px" onclick="c9Open('+i+')">💰 ตั้งราคา</button></td>'
+      +'</tr>';
+  }).join('');
+}
+function c9Open(i){
+  var cust=c9list[i]; if(!cust) return;
+  c9cur=cust;
+  c9draft=crPricesOf(cust).map(function(x){
+    return {label:x.label,on:!!x.on,v:(+x.v)||0,vat:x.vat||'ไม่มีแวต',wht:(+x.wht)||0,custom:!!x.custom};
+  });
+  document.getElementById('c9name').textContent='💰 '+cust;
+  document.getElementById('c9editor').style.display='';
+  setMsg('c9msg','','');
+  c9Render();
+  c9LoadNoPrice();
+  document.getElementById('c9editor').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function c9Close(){ document.getElementById('c9editor').style.display='none'; c9cur=''; }
+function c9Render(){
+  var box=document.getElementById('c9rows'); if(!box) return;
+  box.innerHTML=c9draft.map(function(x,i){
+    return '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;'
+      +(x.on?'background:rgba(21,128,61,.06)':'')+'">'
+      +'<label style="display:flex;align-items:center;gap:9px;cursor:pointer">'
+      +'<input type="checkbox" '+(x.on?'checked':'')+' onchange="c9Tog('+i+',this.checked)">'
+      +(x.custom
+         ? '<input type="text" value="'+String(x.label).replace(/"/g,'&quot;')+'" placeholder="ชื่อหัวข้อ" '
+           +'oninput="c9Set('+i+',\'label\',this.value)" class="filter-input" style="flex:1;font-weight:700">'
+         : '<b style="flex:1">'+x.label+'</b>')
+      +(x.custom?'<button class="btn btn-ghost" style="padding:3px 9px;font-size:11px" onclick="c9Del('+i+')">ลบ</button>':'')
+      +'</label>'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;padding-left:27px">'
+      +'<label style="font-size:11px;color:var(--muted)">ราคา (บาท/คิว)'
+      +'<input type="number" min="0" step="0.01" value="'+(x.v||'')+'" oninput="c9Set('+i+',\'v\',this.value)" class="filter-input" style="width:120px;display:block"></label>'
+      +'<label style="font-size:11px;color:var(--muted)">VAT'
+      +'<select onchange="c9Set('+i+',\'vat\',this.value)" class="filter-input" style="display:block">'
+      +'<option'+(x.vat==='ไม่มีแวต'?' selected':'')+'>ไม่มีแวต</option>'
+      +'<option'+(x.vat==='รวม VAT 7%'?' selected':'')+'>รวม VAT 7%</option>'
+      +'</select></label>'
+      +'<label style="font-size:11px;color:var(--muted)">หัก ณ ที่จ่าย'
+      +'<select onchange="c9Set('+i+',\'wht\',this.value)" class="filter-input" style="display:block">'
+      +'<option value="0"'+(!x.wht?' selected':'')+'>ไม่หัก</option>'
+      +'<option value="1"'+(x.wht===1?' selected':'')+'>หัก 1%</option>'
+      +'<option value="3"'+(x.wht===3?' selected':'')+'>หัก 3%</option>'
+      +'</select></label>'
+      +'</div></div>';
+  }).join('');
+}
+function c9Tog(i,v){ c9draft[i].on=!!v; c9Render(); }
+function c9Set(i,k,v){ c9draft[i][k] = (k==='v'||k==='wht') ? ((+v)||0) : v; }
+function c9Del(i){ c9draft.splice(i,1); c9Render(); }
+function c9AddTopic(){ c9draft.push({label:'',on:true,v:0,vat:'ไม่มีแวต',wht:0,custom:true}); c9Render(); }
+function c9Save(){
+  if(!c9cur) return;
+  var noName=c9draft.filter(function(x){ return !String(x.label||'').trim(); });
+  if(noName.length){ setMsg('c9msg','❌ มีหัวข้อที่ยังไม่ได้ตั้งชื่อ','err'); return; }
+  var bad=c9draft.filter(function(x){ return x.on && !(x.v>0); });
+  if(bad.length){ setMsg('c9msg','❌ "'+bad[0].label+'" ติ๊กไว้แต่ยังไม่ใส่ราคา','err'); return; }
+  setMsg('c9msg','⏳ กำลังบันทึก…','');
+  crSave(c9cur, c9draft).then(function(){
+    var k=c9draft.filter(function(x){return x.on&&x.v>0;}).length;
+    setMsg('c9msg', k?('✅ บันทึกแล้ว — เปิดใช้ '+k+' หัวข้อราคา · ใบชั่งที่นำเข้าหลังจากนี้จะได้ราคาอัตโนมัติ')
+                    :'✅ บันทึกแล้ว — ยังไม่ได้เปิดใช้ราคาไหนเลย','ok');
+    draw9();
+  }).catch(function(e){ setMsg('c9msg','❌ '+e.message+' (ถ้าเป็น permission ต้องเพิ่ม rule ให้ os_config/customer_rates)','err'); });
+}
+
+/* ── ใบชั่งที่ยังไม่ใส่ราคา: เลือกหลายใบแล้วใส่ราคาทีเดียว ── */
+function c9LoadNoPrice(){
+  var list=(typeof wData!=='undefined'?wData:[]).filter(function(w){
+    return (w.customer||'ลูกค้า (ทั่วไป)')===c9cur && !c9HasPrice(w) && (w.sale_unit||'คิว')==='คิว';
+  });
+  list.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  c9np=list.slice(0,200).map(function(w){
+    return {id:w._id, seq:w.seq||'', plate:w.plate||'', date:w.date||'', net:c9NetKiu(w), sel:true};
+  });
+  var wrap=document.getElementById('c9npWrap');
+  if(!c9np.length){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  document.getElementById('c9npN').textContent=c9np.length;
+  var pe=document.getElementById('c9npPrice');
+  if(pe && !pe.value){ var cr=crPriceOf(c9cur); if(cr>0) pe.value=cr; }
+  document.getElementById('c9npBody').innerHTML=c9np.map(function(r,i){
+    return '<tr>'
+      +'<td><input type="checkbox" '+(r.sel?'checked':'')+' onchange="c9NpTog('+i+',this.checked)"></td>'
+      +'<td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
+      +'<td class="r">'+fmt3(r.net)+'</td></tr>';
+  }).join('');
+  c9NpCalc();
+}
+function c9NpTog(i,v){ c9np[i].sel=!!v; c9NpCalc(); }
+function c9NpAll(v){
+  c9np.forEach(function(r){ r.sel=!!v; });
+  document.querySelectorAll('#c9npBody input[type=checkbox]').forEach(function(el){ el.checked=!!v; });
+  c9NpCalc();
+}
+function c9NpCalc(){
+  var p=parseFloat((document.getElementById('c9npPrice')||{}).value)||0;
+  var sel=c9np.filter(function(r){return r.sel;});
+  var kiu=sel.reduce(function(a,r){return a+r.net;},0);
+  var el=document.getElementById('c9npSum');
+  if(el) el.innerHTML = sel.length
+    ? ('เลือกไว้ <b>'+sel.length+' ใบ</b> · รวม <b>'+fmt3(kiu)+' คิว</b> × '+p.toLocaleString('th-TH')
+       +' ฿ = <b style="color:var(--ok)">'+Math.round(kiu*p).toLocaleString('th-TH')+' ฿</b>')
+    : 'ยังไม่ได้เลือกใบไหนเลย';
+  var b=document.getElementById('c9npBtn');
+  if(b){ b.disabled=!sel.length||!(p>0); b.textContent='💾 ใส่ราคาให้ '+sel.length+' ใบ'; }
+}
+function c9NpSave(){
+  var p=parseFloat((document.getElementById('c9npPrice')||{}).value)||0;
+  var sel=c9np.filter(function(r){return r.sel;});
+  if(!sel.length||!(p>0)){ setMsg('c9msg','❌ เลือกใบชั่งและใส่ราคาก่อน','err'); return; }
+  if(!confirm('ใส่ราคา '+p.toLocaleString('th-TH')+' ฿/คิว ให้ใบชั่ง '+sel.length+' ใบ ของ '+c9cur+' ?')) return;
+  setMsg('c9msg','⏳ กำลังบันทึก '+sel.length+' ใบ…','');
+  var batch=db.batch(), dates={};
+  sel.forEach(function(r){
+    batch.update(db.collection('weighings').doc(r.id), {
+      price:p, sale_unit:'คิว', sale_amount:Math.round(r.net*p*100)/100, priceSource:'bulk'
+    });
+    if(r.date) dates[r.date]=1;
+  });
+  batch.commit().then(function(){
+    setMsg('c9msg','✅ ใส่ราคาให้ '+sel.length+' ใบแล้ว · กำลังยิงสรุปรายวันใหม่','ok');
+    if(typeof pushDailySummary==='function') pushDailySummary(dates);
+    draw9();
+    setTimeout(function(){ if(c9cur) c9LoadNoPrice(); }, 1200);
+  }).catch(function(e){ setMsg('c9msg','❌ '+e.message,'err'); });
+}
+
+
 
 /* ── normalize ทะเบียน: ลบจุด/ช่องว่าง/อักขระแปลก เหลือแค่ตัวเลข ตัวอักษรไทย-อังกฤษ และ - ── */
 function normPlate(p){
