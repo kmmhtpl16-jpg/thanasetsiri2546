@@ -1640,22 +1640,37 @@ select{color-scheme:light;}
           <span id="c9name">—</span>
           <button class="btn btn-ghost" onclick="c9Close()" style="margin-left:auto;padding:4px 10px;font-size:11px">✕ ปิด</button>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+        <div id="c9modeBar" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"></div>
+        <div id="c9hint" style="font-size:12px;color:var(--muted);margin-bottom:10px">
           ติ๊กหัวข้อที่ใช้กับลูกค้ารายนี้ · ที่ไม่ติ๊กจะไม่ถูกนำไปคิดเงิน · ราคาทุกช่องเป็น <b>บาท/คิว</b>
         </div>
         <div id="c9rows"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-          <button class="btn btn-ghost" onclick="c9AddTopic()">➕ เพิ่มหัวข้อใหม่</button>
+          <button class="btn btn-ghost" id="c9addBtn" onclick="c9AddTopic()">➕ เพิ่มหัวข้อใหม่</button>
           <button class="btn btn-gold" onclick="c9Save()" style="margin-left:auto">💾 บันทึกราคา</button>
         </div>
         <div id="c9msg" class="smsg" style="margin-top:8px"></div>
+
+        <div id="c9platesWrap" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px">🚚 ชนิดรถตามทะเบียน</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">เลือกครั้งเดียว บันทึกทันที · ชนิดรถผูกกับทะเบียน ใช้ร่วมกับทุกลูกค้าที่รถคันนี้มาขน</div>
+          <div id="c9platesSum" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
+          <div class="table-wrap" style="max-height:34vh;overflow:auto">
+            <table class="data-table">
+              <thead><tr><th>ทะเบียน</th><th class="r">ใบชั่ง</th><th style="width:170px">ชนิดรถ</th></tr></thead>
+              <tbody id="c9platesBody"></tbody>
+            </table>
+          </div>
+          <div id="c9ptMsg" class="smsg" style="margin-top:6px"></div>
+        </div>
 
         <div id="c9npWrap" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
           <div style="font-size:13px;font-weight:700;color:var(--warn);margin-bottom:8px">
             ⚠️ ใบชั่งของลูกค้ารายนี้ที่ยังไม่ใส่ราคา <span id="c9npN">0</span> ใบ
           </div>
+          <div id="c9npModeWarn" style="display:none;font-size:12px;color:var(--err);font-weight:700;margin-bottom:8px">⚠️ เปลี่ยนแบบขายแล้วแต่ยังไม่ได้บันทึก — กด 💾 บันทึกราคา ก่อน จึงจะใส่ราคาให้ใบเก่าได้</div>
           <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
-            <label style="font-size:12px;color:var(--muted)">ใส่ราคา (บาท/คิว)
+            <label id="c9npPriceLbl" style="font-size:12px;color:var(--muted)">ใส่ราคา (บาท/คิว)
               <input type="number" id="c9npPrice" min="0" step="0.01" class="filter-input" style="width:140px" oninput="c9NpCalc()">
             </label>
             <button class="btn btn-ghost" onclick="c9NpAll(true)">เลือกทั้งหมด</button>
@@ -1665,7 +1680,7 @@ select{color-scheme:light;}
           <div id="c9npSum" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
           <div class="table-wrap" style="max-height:34vh;overflow:auto">
             <table class="data-table">
-              <thead><tr><th style="width:38px"></th><th>เลขที่</th><th>ทะเบียน</th><th>วันที่</th><th class="r">คิวสุทธิ</th></tr></thead>
+              <thead><tr><th style="width:38px"></th><th>เลขที่</th><th>ทะเบียน</th><th>วันที่</th><th class="r">คิวสุทธิ</th><th id="c9npExtraTh" style="display:none">ชนิดรถ · ยอด</th></tr></thead>
               <tbody id="c9npBody"></tbody>
             </table>
           </div>
@@ -2053,6 +2068,14 @@ function listenFS() {
     var tp9=document.getElementById('tp9');
     if(tp9 && tp9.classList.contains('active') && typeof draw9==='function') draw9();
   }, function(e){ console.warn('custRates',e); });
+  unPlateTypes = db.collection('os_config').doc('plate_types').onSnapshot(function(d){
+    plateTypes = (d.exists && d.data().map) || {};
+    var tp9=document.getElementById('tp9');
+    if(tp9 && tp9.classList.contains('active') && typeof draw9==='function'){
+      draw9();
+      if(c9cur){ c9RenderPlates(); c9LoadNoPrice(); }
+    }
+  }, function(e){ console.warn('plateTypes',e); });
   unFrRates = db.collection('os_config').doc('freight_rates').onSnapshot(function(d){
     frRates = (d.exists && d.data().map) || {};
     frBuildRateIdx();
@@ -3713,7 +3736,7 @@ function parseAndSave(rows, fname) {
 
   var existIds=new Set(wData.map(function(w){return w._id;}));
   var batch=db.batch();
-  var imp=0, skip=0, _autoPriced=0;
+  var imp=0, skip=0, _autoPriced=0, _noTruckType=0;
   var impDates={};
 
   for(var i=hr+2; i<rows.length; i++){
@@ -3751,8 +3774,19 @@ function parseAndSave(rows, fname) {
     };
     /* เติมราคาให้อัตโนมัติถ้าลูกค้ารายนี้ตั้งราคาไว้ (15 ก.ย. 69)
        ใส่แค่ price — ยอดเงินคำนวณตอนอ่าน (price × คิวสุทธิ) จึงไม่เพี้ยนเมื่อหักน้ำหนักทีหลัง */
-    var _p = (typeof crPriceOf==='function') ? crPriceOf(_cust) : 0;
-    if(_p>0){ _doc.price=_p; _doc.sale_unit='คิว'; _doc.priceSource='auto'; _autoPriced++; }
+    if(typeof crMode==='function' && crMode(_cust)==='truck'){
+      /* ลูกค้าขายตามคัน (เฟส 1.1): ยอดเหมาตามชนิดรถของทะเบียน — ไม่รู้ชนิด/ไม่มีราคา = ปล่อยว่าง ไม่เดา */
+      var _t = crTruckPriceOf(_cust, _doc.plate);
+      if(_t){
+        var _nk = kg/KPC;
+        _doc.sale_unit='เหมา'; _doc.sale_amount=_t.v; _doc.scoop=0;
+        _doc.price=(_nk>0?Math.round(_t.v/_nk*100)/100:0);
+        _doc.truckType=_t.type; _doc.priceSource='auto'; _autoPriced++;
+      } else { _noTruckType++; }
+    } else {
+      var _p = (typeof crPriceOf==='function') ? crPriceOf(_cust) : 0;
+      if(_p>0){ _doc.price=_p; _doc.sale_unit='คิว'; _doc.priceSource='auto'; _autoPriced++; }
+    }
     batch.set(db.collection('weighings').doc(id), _doc);
     imp++;
     impDates[dateStr]=1;
@@ -3763,7 +3797,9 @@ function parseAndSave(rows, fname) {
       .then(function(){
         setMsg('s1','✅ นำเข้า '+imp+' รายการ (ซ้ำ '+skip+')'
           +(_autoPriced>0?(' · เติมราคาให้อัตโนมัติ '+_autoPriced+' ใบ'):'')
-          +((imp-_autoPriced)>0?(' · ยังไม่มีราคา '+(imp-_autoPriced)+' ใบ'):''),'ok');
+          +((imp-_autoPriced)>0?(' · ยังไม่มีราคา '+(imp-_autoPriced)+' ใบ'):'')
+          +(_noTruckType>0?(' (ในนั้น '+_noTruckType+' ใบเป็นลูกค้าขายตามคันที่ทะเบียนยังไม่ระบุชนิดรถ — ตั้งได้ในแท็บลูกค้า)'):''),
+          _noTruckType>0?'warn':'ok');
         vMode='latest'; updVBtn(); pushDailySummary(impDates);
       })
       .catch(function(e){ setMsg('s1','❌ Firestore: '+e.message,'err'); });
@@ -3875,6 +3911,10 @@ function openEditModal(id){
     }).catch(function(){});
   ecTab(1);
   document.getElementById('ecUnit').value = r.sale_unit||'คิว';
+  /* ลูกค้าขายตามคัน + ใบยังไม่มีราคา → ตั้งหน่วยเป็นเหมาให้ (เฟส 1.1) */
+  if(!r.sale_unit && !(r.price>0) && typeof crMode==='function' && crMode(r.customer)==='truck'){
+    document.getElementById('ecUnit').value='เหมา';
+  }
   document.getElementById('ecScoop').value = r.scoop||'';
   document.getElementById('ecPrice').value = (r.price!=null&&r.price!=='')?r.price:'';
   var _aEl=document.getElementById('ecAmount'); if(_aEl) _aEl.value=((r.sale_unit==='เหมา')&&r.sale_amount)?r.sale_amount:'';
@@ -3949,6 +3989,13 @@ function ecFillPriceForCust(){
   var cust=(document.getElementById('ecNew')||{}).value.trim();
   var u=(document.getElementById('ecUnit')||{}).value||'คิว';
   if(!cust) return;
+  /* ลูกค้าขายตามคัน: ยอดเหมาตามชนิดรถของทะเบียนใบนี้ (เฟส 1.1) */
+  if(u==='เหมา' && typeof crTruckPriceOf==='function' && crMode(cust)==='truck'){
+    var _er=wData.find(function(w){ return w._id===_editId; });
+    var _tp=_er ? crTruckPriceOf(cust, _er.plate) : null;
+    if(_tp){ var _ae=document.getElementById('ecAmount'); if(_ae) _ae.value=_tp.v; ecPriceCalc(); }
+    return;   /* ไม่รู้ชนิดรถ/ชนิดนั้นยังไม่ตั้งราคา → ปล่อยว่าง ไม่เดาจากใบก่อน (คนละชนิดรถ ราคาคนละตัว) */
+  }
   /* ราคาที่ตั้งไว้ในหน้าลูกค้ามาก่อน (เฉพาะหน่วยคิว เพราะราคาที่เก็บเป็นบาท/คิว) — 15 ก.ย. 69 */
   if(u==='คิว' && typeof crPriceOf==='function'){
     var _cr=crPriceOf(cust);
@@ -3996,7 +4043,7 @@ function confirmEditCust(){
   }
   /* ── ราคาต่างจากที่ตั้งไว้ → ถามว่าใช้กับใบไหน (15 ก.ย. 69) ── */
   var _applyAlso=false;
-  if(unit==='คิว' && price>0 && typeof crPriceOf==='function'){
+  if(unit==='คิว' && price>0 && typeof crPriceOf==='function' && crMode(newCust)!=='truck'){
     var _cur=crPriceOf(newCust);
     if(_cur!==price){
       var _msg='ราคา '+price.toLocaleString('th-TH')+' ฿/คิว ของ '+newCust+'\n\n'
@@ -4005,6 +4052,23 @@ function confirmEditCust(){
         +'• กด "ยกเลิก" = เฉพาะใบนี้\n'
         +'   (ราคาของลูกค้ายังเป็น '+(_cur>0?_cur.toLocaleString('th-TH')+' ฿/คิว':'ยังไม่ได้ตั้ง')+' เหมือนเดิม)';
       _applyAlso = confirm(_msg);
+    }
+  }
+  /* ── ลูกค้าขายตามคัน: ยอดต่างจากราคาชนิดรถ → ถามว่าใช้กับใบไหน (เฟส 1.1) ── */
+  var _applyTruck='';
+  if(unit==='เหมา' && typeof crMode==='function' && crMode(newCust)==='truck'){
+    var _ty=ptTypeOf(r.plate);
+    if(_ty) upd.truckType=_ty;
+    if(_ty && amount>0){
+      var _tc=crTruckOf(newCust).types[_ty]||0;
+      if(_tc!==amount){
+        var _m2='ยอด '+amount.toLocaleString('th-TH')+' ฿/คัน ของ '+newCust+' (รถ'+_ty+')\n\n'
+          +'• กด "ตกลง"  = ใบนี้ และหลังจากนี้\n'
+          +'   (ตั้งเป็นราคารถ'+_ty+'ของลูกค้าด้วย ใบที่ชั่งหลังจากนี้จะได้ยอดนี้อัตโนมัติ)\n\n'
+          +'• กด "ยกเลิก" = เฉพาะใบนี้\n'
+          +'   (ราคารถ'+_ty+'ยังเป็น '+(_tc>0?_tc.toLocaleString('th-TH')+' ฿/คัน':'ยังไม่ได้ตั้ง')+' เหมือนเดิม)';
+        if(confirm(_m2)) _applyTruck=_ty;
+      }
     }
   }
   db.collection('weighings').doc(_editId).update(upd).then(function(){
@@ -4016,6 +4080,12 @@ function confirmEditCust(){
       if(_t){ _t.on=true; _t.v=price; }
       crSave(newCust,_ps)
         .then(function(){ setMsg('s1','✅ บันทึกแล้ว · ตั้งเป็นราคาของ '+newCust+' แล้ว ('+price.toLocaleString('th-TH')+' ฿/คิว)','ok'); })
+        .catch(function(e){ setMsg('s1','⚠️ บันทึกใบชั่งแล้ว แต่ตั้งราคาลูกค้าไม่สำเร็จ: '+e.message,'warn'); });
+    }
+    if(_applyTruck){
+      var _tr=crTruckOf(newCust); _tr.types[_applyTruck]=amount;
+      crSave(newCust, crPricesOf(newCust), {truck:_tr})
+        .then(function(){ setMsg('s1','✅ บันทึกแล้ว · ตั้งราคารถ'+_applyTruck+'ของ '+newCust+' = '+amount.toLocaleString('th-TH')+' ฿/คัน','ok'); })
         .catch(function(e){ setMsg('s1','⚠️ บันทึกใบชั่งแล้ว แต่ตั้งราคาลูกค้าไม่สำเร็จ: '+e.message,'warn'); });
     }
   }).catch(function(e){
@@ -4646,14 +4716,21 @@ var FR_RATES = {
 };
 var FUZZY_THRESHOLD = 0.75;
 /* ════════════════════════════════════════════════════════════════
-   ราคาต่อลูกค้า — customer_rates  (เพิ่ม 15 ก.ย. 2569)
+   ราคาต่อลูกค้า — customer_rates  (เพิ่ม 15 ก.ย. 2569 · เฟส 1.1 ขายตามคัน 15 ก.ย. 2569)
    เก็บที่ os_config/customer_rates field `map` (แบบเดียวกับ freight_rates)
    จึงไม่ต้องเพิ่ม Firestore rule ใหม่
-   map = { "ชื่อลูกค้า": { prices:[{label,on,v,vat,wht,custom}], updatedAt, updatedBy } }
-   ราคาทุกตัวเป็น "บาท ต่อ คิว"
+   map = { "ชื่อลูกค้า": { mode:'kiu'|'truck',
+                           prices:[{label,on,v,vat,wht,custom}],          ← mode kiu   : บาท ต่อ คิว
+                           truck:{types:{'6 ล้อ':฿,'พ่วง':฿,'10 ล้อ':฿},vat,wht}, ← mode truck : บาท ต่อ คัน
+                           updatedAt, updatedBy } }
+   ลูกค้า 1 ราย ใช้แบบเดียว · ขายตามคัน = 1 ใบชั่ง 1 คัน → ใบชั่งหน่วย 'เหมา' (sale_amount = ราคาชนิดรถ)
+   ชนิดรถผูกกับทะเบียน: os_config/plate_types field `map` = { normPlate(ทะเบียน): '6 ล้อ'|'พ่วง'|'10 ล้อ' }
 ════════════════════════════════════════════════════════════════ */
 var custRates = {};
 var unCustRates = null;
+var plateTypes = {};
+var unPlateTypes = null;
+var TRUCK_TYPES = ['6 ล้อ','พ่วง','10 ล้อ'];
 var CR_TPL = [
   { label:'ราคาทรายรับเอง',      on:false, v:0, vat:'ไม่มีแวต', wht:0 },
   { label:'ราคาทรายรวมค่าขนส่ง', on:false, v:0, vat:'ไม่มีแวต', wht:0 },
@@ -4664,21 +4741,67 @@ function crPricesOf(cust){
   var r = custRates[cust];
   return (r && Array.isArray(r.prices) && r.prices.length) ? r.prices : crTpl();
 }
-/* หัวข้อราคาที่ "เปิดใช้" และมีตัวเลข — ใช้ตัวแรกเป็นราคาหลัก */
+/* แบบขายของลูกค้า: 'kiu' (ตามคิว · ค่าตั้งต้น) หรือ 'truck' (ตามคัน) */
+function crMode(cust){
+  var r = custRates[cust];
+  return (r && r.mode==='truck') ? 'truck' : 'kiu';
+}
+/* ราคาต่อคันของลูกค้า (คืนสำเนาเสมอ ครบทุกชนิดรถ) */
+function crTruckOf(cust){
+  var r=custRates[cust], t=(r&&r.truck)||{}, ty=t.types||{};
+  var out={types:{}, vat:t.vat||'ไม่มีแวต', wht:(+t.wht)||0};
+  TRUCK_TYPES.forEach(function(k){ out.types[k]=(+ty[k])||0; });
+  return out;
+}
+/* หัวข้อราคา "ต่อคิว" ที่เปิดใช้และมีตัวเลข — ใช้ตัวแรกเป็นราคาหลัก · ลูกค้าขายตามคันไม่มีราคาต่อคิว */
 function crActive(cust){
+  if(crMode(cust)==='truck') return [];
   return crPricesOf(cust).filter(function(x){ return x.on && (+x.v)>0; });
 }
 function crPriceOf(cust){
   var a = crActive(cust);
   return a.length ? (+a[0].v) : 0;
 }
-function crSave(cust, prices){
+/* ตั้งราคาไว้แล้วหรือยัง (ดูตามแบบขาย) */
+function crHasRate(cust){
+  if(crMode(cust)==='truck'){
+    var t=crTruckOf(cust);
+    return TRUCK_TYPES.some(function(k){ return t.types[k]>0; });
+  }
+  return crActive(cust).length>0;
+}
+/* ── ชนิดรถตามทะเบียน ── */
+function ptKey(plate){ return (typeof normPlate==='function') ? normPlate(plate) : String(plate||'').trim(); }
+function ptTypeOf(plate){ var k=ptKey(plate); return (k && plateTypes[k]) || ''; }
+/* ราคาต่อคันของใบชั่ง 1 ใบ → {type, v} หรือ null (ไม่ใช่ลูกค้าตามคัน / ทะเบียนไม่ระบุชนิด / ชนิดนั้นยังไม่ตั้งราคา) — ไม่เดา */
+function crTruckPriceOf(cust, plate){
+  if(crMode(cust)!=='truck') return null;
+  var ty=ptTypeOf(plate); if(!ty) return null;
+  var v=crTruckOf(cust).types[ty]||0; if(!(v>0)) return null;
+  return {type:ty, v:v};
+}
+function ptSave(plate, type){
+  var k=ptKey(plate); if(!k) return Promise.reject(new Error('ไม่มีทะเบียน'));
+  var m={}; m[k] = type ? type : firebase.firestore.FieldValue.delete();
+  return db.collection('os_config').doc('plate_types').set({map:m},{merge:true});
+}
+/* บันทึกราคาลูกค้า — extra = {mode, truck} (ไม่ส่ง = คงของเดิมไว้) */
+function crSave(cust, prices, extra){
   var next = JSON.parse(JSON.stringify(custRates||{}));
+  var old = next[cust] || {}, ex = extra || {};
+  var mode = ex.mode || old.mode || 'kiu';
+  var tIn = ex.truck || old.truck || null, truck = null;
+  if(tIn){
+    truck = {types:{}, vat:tIn.vat||'ไม่มีแวต', wht:(+tIn.wht)||0};
+    TRUCK_TYPES.forEach(function(k){ truck.types[k]=(+((tIn.types||{})[k]))||0; });
+  }
   next[cust] = {
-    prices: prices.map(function(x){
+    mode: mode,
+    prices: (prices||[]).map(function(x){
       return {label:String(x.label||'').trim(), on:!!x.on, v:(+x.v)||0,
               vat:x.vat||'ไม่มีแวต', wht:(+x.wht)||0, custom:!!x.custom};
     }),
+    truck: truck,
     updatedAt: new Date().toISOString(),
     updatedBy: (typeof curEmail!=='undefined'?curEmail:'')
   };
@@ -4686,12 +4809,15 @@ function crSave(cust, prices){
 }
 
 /* ════════════════════════════════════════════════════════════════
-   TAB 9 — ลูกค้า (ราคาขาย)   · เพิ่ม 15 ก.ย. 2569
+   TAB 9 — ลูกค้า (ราคาขาย)   · เพิ่ม 15 ก.ย. 2569 · เฟส 1.1 ขายตามคัน
 ════════════════════════════════════════════════════════════════ */
 var c9list = [];        // ชื่อลูกค้าเรียงตามที่แสดง
 var c9cur  = '';        // ลูกค้าที่กำลังแก้
-var c9draft= [];        // ร่างรายการราคา
-var c9np   = [];        // ใบชั่งที่ยังไม่ใส่ราคาของลูกค้ารายนี้ [{id,seq,plate,date,net,sel}]
+var c9draft= [];        // ร่างรายการราคาต่อคิว
+var c9mode = 'kiu';     // ร่างแบบขาย
+var c9truck= null;      // ร่างราคาต่อคัน {types,vat,wht}
+var c9np   = [];        // ใบชั่งที่ยังไม่ใส่ราคาของลูกค้ารายนี้ [{id,seq,plate,date,net,type,v,sel}]
+var c9plates = [];      // ทะเบียนของลูกค้ารายนี้ [{plate,n}]
 
 function c9NetKiu(w){
   var g=(w.kg||0)/KPC;
@@ -4706,16 +4832,27 @@ function c9Stats(){
   var m={};
   (typeof wData!=='undefined'?wData:[]).forEach(function(w){
     var c=w.customer||'ลูกค้า (ทั่วไป)';
-    if(!m[c]) m[c]={n:0,noPrice:0};
+    if(!m[c]) m[c]={n:0,noPrice:0,plates:{}};
     m[c].n++;
     if(!c9HasPrice(w)) m[c].noPrice++;
+    var k=ptKey(w.plate); if(k) m[c].plates[k]=1;
   });
-  Object.keys(custRates||{}).forEach(function(c){ if(!m[c]) m[c]={n:0,noPrice:0}; });
+  Object.keys(custRates||{}).forEach(function(c){ if(!m[c]) m[c]={n:0,noPrice:0,plates:{}}; });
   return m;
 }
 function c9RateText(cust){
+  if(!crHasRate(cust)) return '<span style="color:var(--warn);font-weight:700">ยังไม่ตั้งราคา</span>'
+    +(crMode(cust)==='truck'?' <span style="color:var(--muted);font-size:.9em">(ขายตามคัน)</span>':'');
+  if(crMode(cust)==='truck'){
+    var t=crTruckOf(cust);
+    return '<div style="margin:1px 0;font-size:.9em;color:var(--muted)">🚚 ขายตามคัน'
+      +(t.vat?(' · '+t.vat):'')+(t.wht?(' · หัก ณ ที่จ่าย '+t.wht+'%'):'')+'</div>'
+      +TRUCK_TYPES.filter(function(k){ return t.types[k]>0; }).map(function(k){
+        return '<div style="margin:1px 0"><b>'+t.types[k].toLocaleString('th-TH')+'</b> ฿/คัน '
+          +'<span style="color:var(--muted);font-size:.9em">· '+k+'</span></div>';
+      }).join('');
+  }
   var a=crActive(cust);
-  if(!a.length) return '<span style="color:var(--warn);font-weight:700">ยังไม่ตั้งราคา</span>';
   return a.map(function(x){
     return '<div style="margin:1px 0"><b>'+(+x.v).toLocaleString('th-TH')+'</b> ฿/คิว '
       +'<span style="color:var(--muted);font-size:.9em">· '+x.label
@@ -4729,25 +4866,30 @@ function draw9(){
   var st=c9Stats();
   var names=Object.keys(st).sort(function(a,b){ return a.localeCompare(b,'th'); });
   if(q)      names=names.filter(function(c){ return c.toLowerCase().indexOf(q)>=0; });
-  if(onlyNo) names=names.filter(function(c){ return crActive(c).length===0; });
+  if(onlyNo) names=names.filter(function(c){ return !crHasRate(c); });
   c9list=names;
 
-  var totNo=0, totNoPrice=0;
+  var totNo=0, totNoPrice=0, noType={};
   Object.keys(st).forEach(function(c){
-    if(crActive(c).length===0) totNo++;
+    if(!crHasRate(c)) totNo++;
     totNoPrice+=st[c].noPrice;
+    if(crMode(c)==='truck') Object.keys(st[c].plates).forEach(function(k){ if(!plateTypes[k]) noType[k]=1; });
   });
+  var nNoType=Object.keys(noType).length;
   var sum=document.getElementById('c9sum');
   if(sum) sum.innerHTML='ลูกค้าทั้งหมด <b>'+Object.keys(st).length+'</b> ราย'
     +' · ยังไม่ตั้งราคา <b style="color:var(--warn)">'+totNo+'</b> ราย'
-    +' · ใบชั่งที่ยังไม่ใส่ราคา <b style="color:var(--warn)">'+totNoPrice+'</b> ใบ';
+    +' · ใบชั่งที่ยังไม่ใส่ราคา <b style="color:var(--warn)">'+totNoPrice+'</b> ใบ'
+    +(nNoType?(' · 🚚 ทะเบียนของลูกค้าขายตามคันที่ยังไม่ระบุชนิดรถ <b style="color:var(--warn)">'+nNoType+'</b> คัน'):'');
 
   if(!names.length){ body.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:18px">ไม่พบลูกค้า</td></tr>'; return; }
   body.innerHTML=names.map(function(c,i){
     var s=st[c];
+    var miss=(crMode(c)==='truck') ? Object.keys(s.plates).filter(function(k){ return !plateTypes[k]; }).length : 0;
     return '<tr>'
       +'<td><b>'+c+'</b></td>'
-      +'<td>'+c9RateText(c)+'</td>'
+      +'<td>'+c9RateText(c)
+      +(miss?('<div style="color:var(--warn);font-size:.85em;font-weight:700">⚠️ ทะเบียนยังไม่ระบุชนิดรถ '+miss+' คัน</div>'):'')+'</td>'
       +'<td class="r">'+s.n.toLocaleString('th-TH')+'</td>'
       +'<td class="r">'+(s.noPrice?('<b style="color:var(--warn)">'+s.noPrice+'</b>'):'—')+'</td>'
       +'<td><button class="btn btn-gold" style="padding:4px 12px;font-size:12px" onclick="c9Open('+i+')">💰 ตั้งราคา</button></td>'
@@ -4760,16 +4902,49 @@ function c9Open(i){
   c9draft=crPricesOf(cust).map(function(x){
     return {label:x.label,on:!!x.on,v:(+x.v)||0,vat:x.vat||'ไม่มีแวต',wht:(+x.wht)||0,custom:!!x.custom};
   });
+  c9mode=crMode(cust);
+  c9truck=crTruckOf(cust);
   document.getElementById('c9name').textContent='💰 '+cust;
   document.getElementById('c9editor').style.display='';
   setMsg('c9msg','','');
+  setMsg('c9ptMsg','','');
+  var pe=document.getElementById('c9npPrice'); if(pe) pe.value='';
   c9Render();
+  c9RenderPlates();
   c9LoadNoPrice();
   document.getElementById('c9editor').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function c9Close(){ document.getElementById('c9editor').style.display='none'; c9cur=''; }
+function c9SetMode(m){
+  c9mode=(m==='truck')?'truck':'kiu';
+  setMsg('c9msg', (c9mode!==crMode(c9cur))?'⚠️ เปลี่ยนแบบขายแล้ว — ยังไม่ได้บันทึก กด 💾 บันทึกราคา เพื่อใช้จริง':'', 'warn');
+  c9Render();
+  c9RenderPlates();
+  c9LoadNoPrice();
+}
+function c9ModeBar(){
+  function b(m,t,sub){
+    var on=(c9mode===m);
+    return '<label style="flex:1;min-width:170px;display:flex;gap:8px;align-items:flex-start;cursor:pointer;'
+      +'border:2px solid '+(on?'var(--ok)':'var(--border)')+';border-radius:8px;padding:9px 12px;'
+      +(on?'background:rgba(21,128,61,.06)':'')+'">'
+      +'<input type="radio" name="c9mode" '+(on?'checked':'')+' onchange="c9SetMode(\''+m+'\')" style="margin-top:3px">'
+      +'<span><b>'+t+'</b><br><span style="font-size:11px;color:var(--muted)">'+sub+'</span></span></label>';
+  }
+  return b('kiu','⚖️ ขายตามคิว','ราคา × คิวสุทธิจากตาชั่ง')
+       + b('truck','🚚 ขายตามคัน','ราคาเหมาต่อคัน · 6 ล้อ / พ่วง / 10 ล้อ');
+}
 function c9Render(){
   var box=document.getElementById('c9rows'); if(!box) return;
+  var mb=document.getElementById('c9modeBar'); if(mb) mb.innerHTML=c9ModeBar();
+  var ab=document.getElementById('c9addBtn'); if(ab) ab.style.display=(c9mode==='truck')?'none':'';
+  var hint=document.getElementById('c9hint');
+  if(c9mode==='truck'){
+    if(hint) hint.innerHTML='ใส่ราคาเป็น <b>บาท/คัน</b> ตามชนิดรถ · 1 ใบชั่ง = 1 คัน · ชนิดรถดูจากทะเบียน (ตั้งในตารางด้านล่าง) · ชนิดที่ไม่ขายเว้นว่างไว้';
+    box.innerHTML=c9RenderTruck();
+    return;
+  }
+  if(hint) hint.innerHTML='ติ๊กหัวข้อที่ใช้กับลูกค้ารายนี้ · ที่ไม่ติ๊กจะไม่ถูกนำไปคิดเงิน · ราคาทุกช่องเป็น <b>บาท/คิว</b>';
   box.innerHTML=c9draft.map(function(x,i){
     return '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;'
       +(x.on?'background:rgba(21,128,61,.06)':'')+'">'
@@ -4784,91 +4959,208 @@ function c9Render(){
       +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;padding-left:27px">'
       +'<label style="font-size:11px;color:var(--muted)">ราคา (บาท/คิว)'
       +'<input type="number" min="0" step="0.01" value="'+(x.v||'')+'" oninput="c9Set('+i+',\'v\',this.value)" class="filter-input" style="width:120px;display:block"></label>'
-      +'<label style="font-size:11px;color:var(--muted)">VAT'
-      +'<select onchange="c9Set('+i+',\'vat\',this.value)" class="filter-input" style="display:block">'
-      +'<option'+(x.vat==='ไม่มีแวต'?' selected':'')+'>ไม่มีแวต</option>'
-      +'<option'+(x.vat==='รวม VAT 7%'?' selected':'')+'>รวม VAT 7%</option>'
-      +'</select></label>'
-      +'<label style="font-size:11px;color:var(--muted)">หัก ณ ที่จ่าย'
-      +'<select onchange="c9Set('+i+',\'wht\',this.value)" class="filter-input" style="display:block">'
-      +'<option value="0"'+(!x.wht?' selected':'')+'>ไม่หัก</option>'
-      +'<option value="1"'+(x.wht===1?' selected':'')+'>หัก 1%</option>'
-      +'<option value="3"'+(x.wht===3?' selected':'')+'>หัก 3%</option>'
-      +'</select></label>'
+      +c9VatSel('c9Set('+i+',\'vat\',this.value)', x.vat)
+      +c9WhtSel('c9Set('+i+',\'wht\',this.value)', x.wht)
       +'</div></div>';
   }).join('');
 }
+function c9VatSel(onch, val){
+  return '<label style="font-size:11px;color:var(--muted)">VAT'
+    +'<select onchange="'+onch+'" class="filter-input" style="display:block">'
+    +'<option'+(val==='ไม่มีแวต'?' selected':'')+'>ไม่มีแวต</option>'
+    +'<option'+(val==='รวม VAT 7%'?' selected':'')+'>รวม VAT 7%</option>'
+    +'</select></label>';
+}
+function c9WhtSel(onch, val){
+  val=(+val)||0;
+  return '<label style="font-size:11px;color:var(--muted)">หัก ณ ที่จ่าย'
+    +'<select onchange="'+onch+'" class="filter-input" style="display:block">'
+    +'<option value="0"'+(!val?' selected':'')+'>ไม่หัก</option>'
+    +'<option value="1"'+(val===1?' selected':'')+'>หัก 1%</option>'
+    +'<option value="3"'+(val===3?' selected':'')+'>หัก 3%</option>'
+    +'</select></label>';
+}
+function c9RenderTruck(){
+  var t=c9truck||crTruckOf(c9cur);
+  return TRUCK_TYPES.map(function(k){
+    return '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:8px">'
+      +'<b style="min-width:80px">🚚 '+k+'</b>'
+      +'<label style="font-size:11px;color:var(--muted)">ราคา (บาท/คัน)'
+      +'<input type="number" min="0" step="1" value="'+(t.types[k]||'')+'" oninput="c9SetTruck(\''+k+'\',this.value)" class="filter-input" style="width:150px;display:block"></label>'
+      +'</div>';
+  }).join('')
+  +'<div style="display:flex;gap:10px;flex-wrap:wrap;padding:4px 2px">'
+  +c9VatSel('c9SetTruckOpt(\'vat\',this.value)', t.vat)
+  +c9WhtSel('c9SetTruckOpt(\'wht\',this.value)', t.wht)
+  +'</div>';
+}
+function c9SetTruck(k,v){ if(!c9truck) c9truck=crTruckOf(c9cur); c9truck.types[k]=(+v)||0; }
+function c9SetTruckOpt(k,v){ if(!c9truck) c9truck=crTruckOf(c9cur); c9truck[k]=(k==='wht')?((+v)||0):v; }
 function c9Tog(i,v){ c9draft[i].on=!!v; c9Render(); }
 function c9Set(i,k,v){ c9draft[i][k] = (k==='v'||k==='wht') ? ((+v)||0) : v; }
 function c9Del(i){ c9draft.splice(i,1); c9Render(); }
 function c9AddTopic(){ c9draft.push({label:'',on:true,v:0,vat:'ไม่มีแวต',wht:0,custom:true}); c9Render(); }
 function c9Save(){
   if(!c9cur) return;
-  var noName=c9draft.filter(function(x){ return !String(x.label||'').trim(); });
-  if(noName.length){ setMsg('c9msg','❌ มีหัวข้อที่ยังไม่ได้ตั้งชื่อ','err'); return; }
-  var bad=c9draft.filter(function(x){ return x.on && !(x.v>0); });
-  if(bad.length){ setMsg('c9msg','❌ "'+bad[0].label+'" ติ๊กไว้แต่ยังไม่ใส่ราคา','err'); return; }
+  var prices=c9draft;
+  if(c9mode==='truck'){
+    var any=TRUCK_TYPES.some(function(k){ return (c9truck.types[k]||0)>0; });
+    if(!any){ setMsg('c9msg','❌ ใส่ราคาต่อคันอย่างน้อย 1 ชนิดรถ','err'); return; }
+    /* หัวข้อต่อคิวที่ยังไม่ตั้งชื่อ ไม่ต้องเก็บ (โหมดนี้ไม่ได้ใช้) */
+    prices=c9draft.filter(function(x){ return !x.custom || String(x.label||'').trim(); });
+  } else {
+    var noName=c9draft.filter(function(x){ return !String(x.label||'').trim(); });
+    if(noName.length){ setMsg('c9msg','❌ มีหัวข้อที่ยังไม่ได้ตั้งชื่อ (กด "ลบ" ถ้าไม่ใช้)','err'); return; }
+    var bad=c9draft.filter(function(x){ return x.on && !(x.v>0); });
+    if(bad.length){ setMsg('c9msg','❌ "'+bad[0].label+'" ติ๊กไว้แต่ยังไม่ใส่ราคา','err'); return; }
+  }
   setMsg('c9msg','⏳ กำลังบันทึก…','');
-  crSave(c9cur, c9draft).then(function(){
-    var k=c9draft.filter(function(x){return x.on&&x.v>0;}).length;
-    setMsg('c9msg', k?('✅ บันทึกแล้ว — เปิดใช้ '+k+' หัวข้อราคา · ใบชั่งที่นำเข้าหลังจากนี้จะได้ราคาอัตโนมัติ')
-                    :'✅ บันทึกแล้ว — ยังไม่ได้เปิดใช้ราคาไหนเลย','ok');
+  var mode=c9mode, truck=JSON.parse(JSON.stringify(c9truck||crTruckOf(c9cur)));
+  crSave(c9cur, prices, {mode:mode, truck:truck}).then(function(){
+    if(mode==='truck'){
+      var txt=TRUCK_TYPES.filter(function(k){ return truck.types[k]>0; })
+        .map(function(k){ return k+' '+truck.types[k].toLocaleString('th-TH'); }).join(' · ');
+      setMsg('c9msg','✅ บันทึกแล้ว — ขายตามคัน: '+txt+' ฿/คัน · ใบชั่งที่นำเข้าหลังจากนี้ได้ยอดตามชนิดรถอัตโนมัติ (เฉพาะทะเบียนที่ระบุชนิดแล้ว)','ok');
+    } else {
+      var k=c9draft.filter(function(x){return x.on&&x.v>0;}).length;
+      setMsg('c9msg', k?('✅ บันทึกแล้ว — เปิดใช้ '+k+' หัวข้อราคา · ใบชั่งที่นำเข้าหลังจากนี้จะได้ราคาอัตโนมัติ')
+                      :'✅ บันทึกแล้ว — ยังไม่ได้เปิดใช้ราคาไหนเลย','ok');
+    }
     draw9();
+    c9RenderPlates();
+    c9LoadNoPrice();
   }).catch(function(e){ setMsg('c9msg','❌ '+e.message+' (ถ้าเป็น permission ต้องเพิ่ม rule ให้ os_config/customer_rates)','err'); });
 }
 
-/* ── ใบชั่งที่ยังไม่ใส่ราคา: เลือกหลายใบแล้วใส่ราคาทีเดียว ── */
+/* ── ทะเบียนของลูกค้ารายนี้ + เลือกชนิดรถ (บันทึกทันที · ใช้ร่วมทุกลูกค้า) ── */
+function c9RenderPlates(){
+  var wrap=document.getElementById('c9platesWrap'); if(!wrap) return;
+  if(!c9cur || c9mode!=='truck'){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  var m={};
+  (typeof wData!=='undefined'?wData:[]).forEach(function(w){
+    if((w.customer||'ลูกค้า (ทั่วไป)')!==c9cur) return;
+    var k=ptKey(w.plate); if(!k) return;
+    if(!m[k]) m[k]={plate:k,n:0};
+    m[k].n++;
+  });
+  c9plates=Object.keys(m).map(function(k){ return m[k]; })
+    .sort(function(a,b){ return (b.n-a.n) || a.plate.localeCompare(b.plate); });
+  var miss=c9plates.filter(function(p){ return !ptTypeOf(p.plate); }).length;
+  document.getElementById('c9platesSum').innerHTML = c9plates.length
+    ? ('ทะเบียนของลูกค้ารายนี้ <b>'+c9plates.length+'</b> คัน'
+       +(miss?(' · <b style="color:var(--warn)">ยังไม่ระบุชนิด '+miss+' คัน</b> — ใบชั่งของรถพวกนี้จะไม่ได้ราคาอัตโนมัติ'):' · ระบุชนิดครบแล้ว ✅'))
+    : 'ยังไม่มีใบชั่งของลูกค้ารายนี้';
+  document.getElementById('c9platesBody').innerHTML=c9plates.map(function(p,i){
+    var ty=ptTypeOf(p.plate);
+    return '<tr'+(ty?'':' style="background:rgba(217,119,6,.07)"')+'>'
+      +'<td><b>'+p.plate+'</b></td>'
+      +'<td class="r">'+p.n.toLocaleString('th-TH')+'</td>'
+      +'<td><select class="filter-input" onchange="c9PlateSet('+i+',this.value)" style="width:100%">'
+      +'<option value=""'+(ty?'':' selected')+'>— ยังไม่ระบุ —</option>'
+      +TRUCK_TYPES.map(function(k){ return '<option'+(ty===k?' selected':'')+'>'+k+'</option>'; }).join('')
+      +'</select></td></tr>';
+  }).join('');
+}
+function c9PlateSet(i,v){
+  var p=c9plates[i]; if(!p) return;
+  setMsg('c9ptMsg','⏳ กำลังบันทึก '+p.plate+'…','');
+  ptSave(p.plate, v).then(function(){
+    setMsg('c9ptMsg', v?('✅ '+p.plate+' = '+v):('✅ ล้างชนิดรถของ '+p.plate+' แล้ว'), 'ok');
+  }).catch(function(e){ setMsg('c9ptMsg','❌ '+e.message+' (ถ้าเป็น permission ต้องเพิ่ม rule ให้ os_config/plate_types)','err'); });
+}
+
+/* ── ใบชั่งที่ยังไม่ใส่ราคา: เลือกหลายใบแล้วใส่ราคาทีเดียว (ใช้แบบขายที่ "บันทึกแล้ว") ── */
 function c9LoadNoPrice(){
+  var wrap=document.getElementById('c9npWrap'); if(!wrap || !c9cur) return;
+  var truckMode=(crMode(c9cur)==='truck');
+  var tr=crTruckOf(c9cur);
   var list=(typeof wData!=='undefined'?wData:[]).filter(function(w){
-    return (w.customer||'ลูกค้า (ทั่วไป)')===c9cur && !c9HasPrice(w) && (w.sale_unit||'คิว')==='คิว';
+    if((w.customer||'ลูกค้า (ทั่วไป)')!==c9cur || c9HasPrice(w)) return false;
+    return truckMode ? true : ((w.sale_unit||'คิว')==='คิว');
   });
   list.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
   c9np=list.slice(0,200).map(function(w){
-    return {id:w._id, seq:w.seq||'', plate:w.plate||'', date:w.date||'', net:c9NetKiu(w), sel:true};
+    var ty=truckMode?ptTypeOf(w.plate):'', v=truckMode?(tr.types[ty]||0):0;
+    return {id:w._id, seq:w.seq||'', plate:w.plate||'', date:w.date||'', net:c9NetKiu(w),
+            type:ty, v:v, sel:truckMode?(v>0):true};
   });
-  var wrap=document.getElementById('c9npWrap');
   if(!c9np.length){ wrap.style.display='none'; return; }
   wrap.style.display='';
   document.getElementById('c9npN').textContent=c9np.length;
+  var mw=document.getElementById('c9npModeWarn'); if(mw) mw.style.display=(c9mode!==crMode(c9cur))?'':'none';
+  var pl=document.getElementById('c9npPriceLbl'); if(pl) pl.style.display=truckMode?'none':'';
+  var th=document.getElementById('c9npExtraTh'); if(th) th.style.display=truckMode?'':'none';
   var pe=document.getElementById('c9npPrice');
-  if(pe && !pe.value){ var cr=crPriceOf(c9cur); if(cr>0) pe.value=cr; }
+  if(!truckMode && pe && !pe.value){ var cr=crPriceOf(c9cur); if(cr>0) pe.value=cr; }
   document.getElementById('c9npBody').innerHTML=c9np.map(function(r,i){
+    var extra='';
+    if(truckMode){
+      extra='<td>'+(r.v>0
+        ? (r.type+' · <b>'+r.v.toLocaleString('th-TH')+'</b> ฿')
+        : ('<span style="color:var(--warn);font-weight:700">'+(r.type?('ยังไม่ตั้งราคา '+r.type):'❓ ทะเบียนยังไม่ระบุชนิดรถ')+'</span>'))+'</td>';
+    }
     return '<tr>'
-      +'<td><input type="checkbox" '+(r.sel?'checked':'')+' onchange="c9NpTog('+i+',this.checked)"></td>'
+      +'<td><input type="checkbox" '+(r.sel?'checked':'')+((truckMode&&!(r.v>0))?' disabled':'')+' onchange="c9NpTog('+i+',this.checked)"></td>'
       +'<td>'+r.seq+'</td><td><b>'+r.plate+'</b></td><td>'+r.date+'</td>'
-      +'<td class="r">'+fmt3(r.net)+'</td></tr>';
+      +'<td class="r">'+fmt3(r.net)+'</td>'+extra+'</tr>';
   }).join('');
   c9NpCalc();
 }
 function c9NpTog(i,v){ c9np[i].sel=!!v; c9NpCalc(); }
 function c9NpAll(v){
-  c9np.forEach(function(r){ r.sel=!!v; });
-  document.querySelectorAll('#c9npBody input[type=checkbox]').forEach(function(el){ el.checked=!!v; });
+  var truckMode=(crMode(c9cur)==='truck');
+  c9np.forEach(function(r){ r.sel = !!v && (!truckMode || r.v>0); });
+  var cbs=document.querySelectorAll('#c9npBody input[type=checkbox]');
+  cbs.forEach(function(el,i){ if(c9np[i]) el.checked=c9np[i].sel; });
   c9NpCalc();
 }
 function c9NpCalc(){
+  var truckMode=(crMode(c9cur)==='truck');
+  var mismatch=(c9mode!==crMode(c9cur));
+  var sel=c9np.filter(function(r){ return r.sel && (!truckMode || r.v>0); });
+  var el=document.getElementById('c9npSum'), b=document.getElementById('c9npBtn');
+  if(truckMode){
+    var tot=sel.reduce(function(a,r){ return a+r.v; },0);
+    var skip=c9np.filter(function(r){ return !(r.v>0); }).length;
+    if(el) el.innerHTML=(sel.length
+        ? ('เลือกไว้ <b>'+sel.length+' ใบ</b> · รวม <b style="color:var(--ok)">'+Math.round(tot).toLocaleString('th-TH')+' ฿</b> (ราคาต่อคันตามชนิดรถ)')
+        : 'ยังไม่ได้เลือกใบไหนเลย')
+      +(skip?(' · <span style="color:var(--warn)">ข้าม '+skip+' ใบ ที่ทะเบียนยังไม่ระบุชนิดรถ/ชนิดนั้นยังไม่ตั้งราคา</span>'):'');
+    if(b){ b.disabled=mismatch||!sel.length; b.textContent='💾 ใส่ยอดตามชนิดรถให้ '+sel.length+' ใบ'; }
+    return;
+  }
   var p=parseFloat((document.getElementById('c9npPrice')||{}).value)||0;
-  var sel=c9np.filter(function(r){return r.sel;});
   var kiu=sel.reduce(function(a,r){return a+r.net;},0);
-  var el=document.getElementById('c9npSum');
   if(el) el.innerHTML = sel.length
     ? ('เลือกไว้ <b>'+sel.length+' ใบ</b> · รวม <b>'+fmt3(kiu)+' คิว</b> × '+p.toLocaleString('th-TH')
        +' ฿ = <b style="color:var(--ok)">'+Math.round(kiu*p).toLocaleString('th-TH')+' ฿</b>')
     : 'ยังไม่ได้เลือกใบไหนเลย';
-  var b=document.getElementById('c9npBtn');
-  if(b){ b.disabled=!sel.length||!(p>0); b.textContent='💾 ใส่ราคาให้ '+sel.length+' ใบ'; }
+  if(b){ b.disabled=mismatch||!sel.length||!(p>0); b.textContent='💾 ใส่ราคาให้ '+sel.length+' ใบ'; }
 }
 function c9NpSave(){
-  var p=parseFloat((document.getElementById('c9npPrice')||{}).value)||0;
-  var sel=c9np.filter(function(r){return r.sel;});
-  if(!sel.length||!(p>0)){ setMsg('c9msg','❌ เลือกใบชั่งและใส่ราคาก่อน','err'); return; }
-  if(!confirm('ใส่ราคา '+p.toLocaleString('th-TH')+' ฿/คิว ให้ใบชั่ง '+sel.length+' ใบ ของ '+c9cur+' ?')) return;
+  if(c9mode!==crMode(c9cur)){ setMsg('c9msg','❌ เปลี่ยนแบบขายแล้วแต่ยังไม่ได้บันทึก — กด 💾 บันทึกราคา ก่อน','err'); return; }
+  var truckMode=(crMode(c9cur)==='truck');
+  var batch=db.batch(), dates={}, sel, ask;
+  if(truckMode){
+    sel=c9np.filter(function(r){ return r.sel && r.v>0; });
+    if(!sel.length){ setMsg('c9msg','❌ ยังไม่ได้เลือกใบชั่งที่มีราคาต่อคัน','err'); return; }
+    var tot=sel.reduce(function(a,r){ return a+r.v; },0);
+    ask='ใส่ยอดตามชนิดรถให้ใบชั่ง '+sel.length+' ใบ ของ '+c9cur+'\nรวม '+Math.round(tot).toLocaleString('th-TH')+' ฿ ?';
+  } else {
+    var p=parseFloat((document.getElementById('c9npPrice')||{}).value)||0;
+    sel=c9np.filter(function(r){return r.sel;});
+    if(!sel.length||!(p>0)){ setMsg('c9msg','❌ เลือกใบชั่งและใส่ราคาก่อน','err'); return; }
+    ask='ใส่ราคา '+p.toLocaleString('th-TH')+' ฿/คิว ให้ใบชั่ง '+sel.length+' ใบ ของ '+c9cur+' ?';
+  }
+  if(!confirm(ask)) return;
   setMsg('c9msg','⏳ กำลังบันทึก '+sel.length+' ใบ…','');
-  var batch=db.batch(), dates={};
   sel.forEach(function(r){
-    batch.update(db.collection('weighings').doc(r.id), {
-      price:p, sale_unit:'คิว', sale_amount:Math.round(r.net*p*100)/100, priceSource:'bulk'
-    });
+    var upd = truckMode
+      ? { sale_unit:'เหมา', scoop:0, sale_amount:r.v, price:(r.net>0?Math.round(r.v/r.net*100)/100:0),
+          truckType:r.type, priceSource:'bulk' }
+      : { price:p, sale_unit:'คิว', sale_amount:Math.round(r.net*p*100)/100, priceSource:'bulk' };
+    batch.update(db.collection('weighings').doc(r.id), upd);
     if(r.date) dates[r.date]=1;
   });
   batch.commit().then(function(){
