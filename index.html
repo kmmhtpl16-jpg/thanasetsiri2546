@@ -8979,7 +8979,7 @@ html.mb #editCustModal .modal-actions .btn-gold{background:var(--m-green);color:
 
   /* ── ปุ่มหน้าย่อยต้นทางของแต่ละแท็บ ── */
   function subBtns(n){
-    var q = n===5 ? '#tp5>.mb-src .brow>button' : n===6 ? '#tp6 .pr-subtab' : '#tp7 .pr-tab-btn';
+    var q = n===5 ? '#tp5>.mb-src .brow>button' : n===6 ? '#tp6 .pr-subtab' : '#tp7 [id^="fuelBtn"]';
     return [].slice.call(document.querySelectorAll(q)).filter(function(b){ return b.style.display!=='none'; });
   }
   function isActive(n,b){ return n===5 ? b.classList.contains('btn-gold') : b.classList.contains('active'); }
@@ -9228,10 +9228,12 @@ html.mb #editCustModal .modal-actions .btn-gold{background:var(--m-green);color:
   }
 
   /* ════════ เปิด/ปิดโหมดมือถือ ════════ */
+  var listeners=[];
   function apply(){
     var want=MQ.matches;
     if(want===on) return;
     on=want;
+    setTimeout(function(){ listeners.forEach(function(fn){ try{ fn(on); }catch(e){ console.warn('mb listener',e); } }); },0);
     if(on){
       build();
       document.documentElement.classList.add('mb');
@@ -9267,9 +9269,302 @@ html.mb #editCustModal .modal-actions .btn-gold{background:var(--m-green);color:
     var b=document.querySelector('#editCustModal .modal-box'); if(b) b.scrollTop=0;
   });
 
+  /* ให้โมดูลแท็บอื่น (เช่น น้ำมัน) ใช้ของกลางร่วมกัน */
+  window.MB={ $:$, S:S, I:I, clean:clean, el:el, on:function(){ return on; }, open:window.mbOpen, close:mbClose,
+    onChange:function(fn){ listeners.push(fn); } };
   if(MQ.addEventListener) MQ.addEventListener('change', apply); else if(MQ.addListener) MQ.addListener(apply);
   document.addEventListener('keydown', function(e){ if(on && e.key==='Escape') mbClose(); });
   apply();
+})();
+</script>
+
+<!-- ============================================================
+     MOBILE LAYER · แท็บน้ำมัน (เฟส 2 รอบ 2) — แบบ B2 · มีผลเฉพาะจอ ≤700px (html.mb)
+============================================================ -->
+<style id="mb-css-fuel">
+@media(max-width:700px){
+/* กันหน้าเลื่อนซ้ายขวาทุกแท็บ (ตารางกว้างยังปัดได้ในกล่องของมันเอง) */
+html.mb .tab-pane{overflow-x:hidden!important;}
+
+/* ── การ์ด / หัวข้อ ── */
+html.mb #tp7 [id^="fuelSub"]>.card{background:none!important;border:none!important;border-radius:0!important;padding:0!important;margin:0!important;box-shadow:none!important;}
+html.mb #tp7 [id^="fuelSub"]>.card+.card{margin-top:4px!important;}
+html.mb #tp7 .table-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:22px 0 10px;margin:0;background:none;border:none;}
+html.mb #tp7 .table-toolbar-title{font-size:15.5px!important;font-weight:800!important;color:var(--m-text)!important;text-transform:none;letter-spacing:0;}
+html.mb #tp7 .table-toolbar-title span{font-size:12px!important;color:var(--m-muted)!important;}
+html.mb #tp7 .table-toolbar .pr-tab-btn{background:none!important;border:none!important;color:var(--m-green)!important;font-size:13.5px!important;font-weight:700;padding:6px 0!important;font-family:var(--font);}
+
+/* ── ฟอร์ม ── */
+html.mb #tp7 [id^="fuelSub"] .card>div[style*="grid-template-columns"]{grid-template-columns:1fr 1fr!important;gap:14px 10px!important;padding:0!important;}
+html.mb #tp7 [id^="fuelSub"] .card>div[style*="grid-template-columns"]>div{grid-column:1/-1;min-width:0;}
+html.mb #tp7 [id^="fuelSub"] .card>div[style*="grid-template-columns"]>div.mb-half{grid-column:auto!important;}
+html.mb #tp7 .pr-label{display:block;font-size:12.5px;color:var(--m-text2);font-weight:700;margin-bottom:6px;}
+html.mb #tp7 .pr-input{display:block;width:100%;box-sizing:border-box;background:var(--m-bg2);border:1px solid var(--m-line);border-radius:11px;
+  padding:13px 14px;font-family:var(--font);color:var(--m-text);min-height:50px;-webkit-appearance:none;appearance:none;color-scheme:light;opacity:1!important;}
+html.mb #tp7 select.pr-input{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2348596a' stroke-width='2.6' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat;background-position:right 14px center;padding-right:38px;}
+html.mb #tp7 .pr-input:focus{outline:none;border-color:var(--m-green);background-color:#fff;}
+html.mb #tp7 .pr-input[readonly]{background-color:#eef2f4;color:var(--m-text2);}
+/* กล่องคำแนะนำ (เส้นประฟ้า) */
+html.mb #tp7 .card>div[style*="79,195,247"]{margin:14px 0 0!important;background:#eef6fb!important;border:1px dashed #c3ddee!important;border-radius:12px!important;
+  padding:11px 13px!important;font-size:12.5px!important;color:#31708f!important;line-height:1.5;}
+/* กล่องเตือน ค่าน้ำมันรถ (ม่วง) → ส้มแบบ B2 */
+html.mb #fuelSub2 .card>div[style*="206,147,216"]{order:-1;margin:0 0 4px!important;background:var(--m-orange-bg)!important;border:1px solid #f2e2c6!important;border-radius:12px!important;
+  padding:12px 14px!important;font-size:13.5px!important;font-weight:600;color:#a96b00!important;}
+html.mb #fuelSub2>.card:first-child{display:flex!important;flex-direction:column;}
+html.mb #fuelSub2>.card:first-child>.table-toolbar{order:0;}
+html.mb #fuelSub2>.card:first-child>div[style*="206,147,216"]{order:-1;margin-top:14px!important;}
+html.mb #fuelSub2>.card:first-child>div[style*="grid-template-columns"]{order:1;}
+html.mb #fuelSub2>.card:first-child>div[style*="79,195,247"]{order:2;}
+html.mb #fuelSub2>.card:first-child>.pr-save-btn{order:3;}
+/* ปุ่มบันทึก */
+html.mb #tp7 .pr-save-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:16px 0 0!important;background:var(--m-green)!important;border:none;border-radius:13px;
+  padding:15px;font-family:var(--font);font-size:16.5px;font-weight:800;color:#fff;cursor:pointer;min-height:52px;}
+html.mb #tp7 .pr-save-btn::before{content:'';width:20px;height:20px;flex-shrink:0;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M5 4h11l3 3v13H5z'/><path d='M8 4v5h7V4M8 20v-6h8v6'/></svg>") center/contain no-repeat;
+  mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M5 4h11l3 3v13H5z'/><path d='M8 4v5h7V4M8 20v-6h8v6'/></svg>") center/contain no-repeat;}
+/* รายงาน: PDF / Excel เป็นแถวปุ่ม */
+html.mb #fuelSub4 .card>div[style*="grid-template-columns"]>div[style*="flex"]{grid-column:1/-1;display:flex!important;gap:10px!important;}
+html.mb #fuelSub4 .pr-save-btn{margin:0!important;flex:1;font-size:15px;}
+html.mb #fuelSub4 .pr-save-btn::before{display:none;}
+html.mb #fuelSub4 .pr-save-btn+.pr-save-btn{background:var(--m-bg2)!important;border:1px solid var(--m-line)!important;color:var(--m-text2)!important;}
+html.mb #fuelReportPreview{background:#fff!important;border:1px solid var(--m-line)!important;border-radius:14px!important;padding:4px 2px!important;margin-top:14px!important;}
+html.mb #fuelReportPreview>div{color:var(--m-text)!important;font-size:14px!important;line-height:1.7;}
+html.mb #fuelReportPreview>div>div:first-child{font-size:15.5px;font-weight:800;color:var(--m-text)!important;}
+
+/* ── KPI คงเหลือในถัง / เบิกออกวันนี้ ── */
+html.mb #mbFuelKpi{display:grid!important;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 0;}
+html.mb #tp7:not(.mb-fsub-0):not(.mb-fsub-1) #mbFuelKpi{display:none!important;}
+html.mb .mb-kpi{border:1px solid var(--m-line);border-radius:14px;padding:13px 14px;background:#fff;min-width:0;}
+html.mb .mb-kpi-l{font-size:11.5px;color:var(--m-muted);font-weight:600;display:flex;align-items:center;gap:6px;}
+html.mb .mb-kpi-v{font-size:21px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums;letter-spacing:-.5px;color:var(--m-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html.mb .mb-kpi-u{font-size:12px;font-weight:600;color:var(--m-muted);margin-left:3px;letter-spacing:0;}
+html.mb .mb-kpi.hl{background:var(--m-green-bg);border-color:#cfe6d8;}
+html.mb .mb-kpi.hl .mb-kpi-v{color:var(--m-green-d);}
+
+/* ── ต้นทุนผันแปร/คิว (ผลคำนวณ) ── */
+html.mb #fuelCostResultContent>div{grid-template-columns:1fr 1fr!important;gap:10px!important;padding:0!important;}
+html.mb #fuelCostResultContent>div>div{background:#fff!important;border:1px solid var(--m-line);border-radius:14px!important;padding:13px 14px!important;}
+html.mb #fuelCostResultContent>div>div:nth-child(3){background:var(--m-green-bg)!important;border-color:#cfe6d8;}
+html.mb #fuelCostResultContent>div>div>div:first-child{font-size:11.5px!important;color:var(--m-muted)!important;font-weight:600;}
+html.mb #fuelCostResultContent>div>div>div:last-child{font-size:20px!important;color:var(--m-text)!important;font-weight:800!important;}
+html.mb #fuelCostResultContent>div>div:nth-child(3)>div:last-child{color:var(--m-green-d)!important;font-size:24px!important;}
+html.mb #fuelCostResultContent>div>div:nth-child(n+4){background:none!important;border:none!important;padding:4px 2px!important;font-size:12.5px!important;color:var(--m-muted)!important;}
+html.mb #fuelCostResultContent>div>div:nth-child(5){background:#eef6fb!important;border:1px dashed #c3ddee!important;padding:10px 12px!important;color:#31708f!important;}
+
+/* ── ตารางแบบย่อ (ใช้ร่วมทุกตารางในแท็บน้ำมัน) ── */
+html.mb .mbt{margin:0;border:1px solid var(--m-line);border-radius:14px;overflow:hidden;overflow:clip;background:#fff;}
+html.mb .mbt>div,html.mb [id="fuelInList"].mbt,html.mb .mbt{overflow-x:visible!important;}
+html.mb .mbt table{border-collapse:separate;border-spacing:0;width:100%!important;min-width:0!important;font-size:14px!important;}
+html.mb .mbt table.mb-meas{width:auto!important;}
+html.mb .mbt thead th{position:sticky;top:0;z-index:3;background:var(--m-bg2);color:var(--m-text2);font-size:12.5px;font-weight:700;text-transform:none;letter-spacing:0;
+  padding:10px 8px;white-space:nowrap;border-bottom:1px solid var(--m-line);text-align:left;}
+html.mb .mbt tbody td{padding:13px 8px;white-space:nowrap;border-bottom:1px solid #f0f4f6;font-variant-numeric:tabular-nums;background:#fff;color:var(--m-text)!important;font-size:14px!important;}
+html.mb .mbt tbody tr:nth-child(even) td{background:#fafcfc;}
+html.mb .mbt tbody tr:last-child td{border-bottom:none;}
+html.mb .mbt th:first-child,html.mb .mbt td:first-child{padding-left:12px;font-weight:700;}
+html.mb .mbt tr>:last-child{padding-right:12px;}
+html.mb .mbt .mb-r{text-align:right!important;}
+html.mb .mbt td.mb-mu{color:var(--m-muted)!important;}
+html.mb .mbt [data-c]{display:none;}
+html.mb .mbt td[colspan]{display:table-cell!important;text-align:center;color:var(--m-muted)!important;}
+html.mb .mbt td[data-c].mb-ell{max-width:8.5em;overflow:hidden;text-overflow:ellipsis;}
+html.mb .mbt tbody tr.mb-tap{cursor:pointer;}
+html.mb .mbt tbody tr.mb-tap:active td{background:var(--m-green-bg);}
+html.mb .mbt .mb-thint{border-top:1px solid var(--m-line);}
+/* sheet รายละเอียดแถว */
+html.mb .mb-dl{margin:4px 18px 0;border:1px solid var(--m-line);border-radius:14px;overflow:hidden;}
+html.mb .mb-dr{display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid #f0f4f6;font-size:14.5px;}
+html.mb .mb-dr:last-child{border-bottom:none;}
+html.mb .mb-dk{width:40%;flex-shrink:0;color:var(--m-muted);font-weight:600;font-size:13px;}
+html.mb .mb-dv{flex:1;min-width:0;font-weight:700;color:var(--m-text);word-break:break-word;}
+html.mb .mb-shbtn.red{background:#fdf3f2;border-color:#f0c9c4;color:var(--m-red);}
+}
+</style>
+<script id="mb-js-fuel">
+(function(){
+  var MB=window.MB; if(!MB) return;
+  var $=MB.$, S=MB.S, I=MB.I, clean=MB.clean;
+  var D=function(){ return (typeof fuelOutData!=='undefined')?fuelOutData:[]; };
+
+  /* ── ตัวแปลงตาราง: ย่อ + เลือกคอลัมน์เท่าที่จอพอ + แตะแถวดูรายละเอียด ── */
+  // cfg: {key, head:[ชื่อสั้นต่อคอลัมน์ (null=ตัดทิ้งบนมือถือ เช่นปุ่มลบ)], right:[idx], def:[idx ที่เปิดเริ่มต้น เรียงตามความสำคัญ], lock:0, ell:[idx]}
+  var CFG={
+    fuelInList:{head:['วันที่','แหล่งที่มา','ลิตร','บาท/ล.','ยอดรวม','ใบกำกับ',null],right:[2,3,4],def:[2,4,1],ell:[1],title:'รายการรับน้ำมันเข้า'},
+    fuelOutList:{head:['วันที่','ประเภท','เครื่อง/ทะเบียน','ลิตร','หมายเหตุ',null],right:[3],def:[1,3,2],ell:[2,4],title:'รายการเบิกน้ำมัน'},
+    fuelExpList:{head:['วันที่','ทะเบียน','ปั๊ม','ลิตร','บาท/ล.','ยอดรวม','เลขไมล์',null],right:[3,4,5,6],def:[1,5,3],ell:[2],title:'รายการค่าน้ำมันรถ'},
+    fuelMonthlyHistoryList:{head:['เดือน','น้ำมันถัง','น้ำมันรถ','ค่าแรง','ค่าเช่า','รวม',null],right:[1,2,3,4,5],def:[5,1,2],ell:[],title:'สรุปต้นทุนเดือน'}
+  };
+  function pref(key){ try{ var v=JSON.parse(localStorage.getItem('mb_cols_'+key)||'null'); if(Array.isArray(v)) return v; }catch(e){} return CFG[key].def.slice(); }
+  function savePref(key,v){ try{ localStorage.setItem('mb_cols_'+key, JSON.stringify(v)); }catch(e){} }
+  var shown={};
+  function tbl(key){ var c=$(key); return c && c.querySelector('table'); }
+  function setCols(key,list){
+    var t=tbl(key); if(!t) return;
+    var st=t.querySelector('style.mb-cs'); if(!st){ st=document.createElement('style'); st.className='mb-cs'; t.insertBefore(st,t.firstChild); }
+    st.textContent=[0].concat(list).map(function(i){ return '#'+key+' [data-c="'+i+'"]'; }).join(',')+'{display:table-cell}';
+  }
+  function fits(key){
+    var c=$(key), t=tbl(key); if(!c||!t||!c.clientWidth) return true;
+    t.classList.add('mb-meas'); var n=t.offsetWidth; t.classList.remove('mb-meas');
+    return n<=c.clientWidth;
+  }
+  function fit(key){
+    var list=pref(key).slice(); setCols(key,list);
+    while(list.length && !fits(key)){ list.pop(); setCols(key,list); }
+    shown[key]=list; label(key);
+  }
+  function label(key){
+    var b=$('mbc_'+key); if(!b) return; var cfg=CFG[key], p=pref(key), sh=shown[key]||[];
+    var hid=p.filter(function(i){ return sh.indexOf(i)<0; }).length;
+    b.innerHTML=S(I.filter,15)+'<span class="mb-th-l">แสดง: <b>'+[0].concat(sh).map(function(i){ return cfg.head[i]; }).join(' · ')+'</b>'
+      +(hid>0?' <span style="color:var(--m-orange)">(จอไม่พอ ซ่อน '+hid+')</span>':'')+'</span><span class="mb-th-a">เลือกคอลัมน์</span>';
+  }
+  function transform(key){
+    if(!MB.on()) return;
+    var c=$(key), t=tbl(key), cfg=CFG[key]; if(!c||!t) return;
+    c.classList.add('mbt');
+    t.removeAttribute('style');
+    var ths=t.querySelectorAll('thead th');
+    [].forEach.call(ths, function(th,i){ if(cfg.head[i]===undefined) return; if(cfg.head[i]===null){ th.style.display='none'; return; }
+      if(i>0) th.dataset.c=i; th.textContent=cfg.head[i]; if(cfg.right.indexOf(i)>=0) th.classList.add('mb-r'); });
+    [].forEach.call(t.querySelectorAll('tbody tr'), function(tr){
+      var tds=tr.children; if(tds.length<2) return;
+      [].forEach.call(tds, function(td,i){
+        if(cfg.head[i]===null){ td.style.display='none'; return; }
+        if(i>0) td.dataset.c=i;
+        if(cfg.right.indexOf(i)>=0) td.classList.add('mb-r');
+        if(cfg.ell.indexOf(i)>=0) td.classList.add('mb-ell');
+        td.textContent=clean(td.textContent);
+      });
+      tr.classList.add('mb-tap');
+    });
+    if(!$('mbc_'+key)){
+      var b=document.createElement('button'); b.type='button'; b.className='mbx mb-thint'; b.id='mbc_'+key;
+      b.onclick=function(){ colSheet(key); }; c.appendChild(b);
+    } else c.appendChild($('mbc_'+key));
+    if(!c.dataset.mbTap){
+      c.dataset.mbTap='1';
+      c.addEventListener('click', function(e){
+        if(!MB.on()) return;
+        var tr=e.target.closest('tbody tr'); if(!tr || !tr.classList.contains('mb-tap')) return;
+        if(e.target.closest('button,a,input')) return;
+        rowSheet(key,tr);
+      });
+    }
+    fit(key);
+  }
+  function rowSheet(key,tr){
+    var cfg=CFG[key], t=tbl(key), heads=[].map.call(t.querySelectorAll('thead th'), function(th){ return th.textContent; });
+    var sh=$('mbShSub'), btns=[].slice.call(tr.querySelectorAll('button'));
+    var rows=[].map.call(tr.children, function(td,i){ return cfg.head[i]===null ? '' : '<div class="mb-dr"><div class="mb-dk">'+(cfg.head[i]||heads[i]||'')+'</div><div class="mb-dv">'+(clean(td.textContent)||'—')+'</div></div>'; }).join('');
+    sh.innerHTML='<div class="mb-grab"></div><div class="mb-sht">'+cfg.title+'</div><div class="mb-dl">'+rows+'</div>'
+      +btns.map(function(b,i){ var tx=clean(b.textContent)||'ลบรายการนี้'; var del=/ลบ|🗑/.test(b.textContent)||b.getAttribute('onclick')&&/del/i.test(b.getAttribute('onclick'));
+          return '<button class="mb-shbtn'+(del?' red':'')+'" data-b="'+i+'">'+(del?'ลบรายการนี้':tx)+'</button>'; }).join('')
+      +'<button class="mb-shbtn" data-x="1">ปิด</button>';
+    [].forEach.call(sh.querySelectorAll('[data-b]'), function(x){ x.onclick=function(){ MB.close(); btns[+x.dataset.b].click(); }; });
+    sh.querySelector('[data-x]').onclick=MB.close;
+    MB.open('mbShSub');
+  }
+  function colSheet(key){
+    var cfg=CFG[key], sh=$('mbShSub');
+    function draw(){
+      var p=pref(key), cur=shown[key]||[];
+      var html='<div class="mb-grab"></div><div class="mb-sht">เลือกคอลัมน์ที่จะแสดง</div><div class="mb-sub">เลือกได้เท่าที่หน้าจอพอดี ไม่ต้องปัดซ้ายขวา · เครื่องนี้จะจำไว้</div>'
+        +'<div class="mb-ci on lock"><div class="mb-cbox">'+S('<path d="M5 12.5l4.5 4.5L19 7"/>',14)+'</div><div class="mb-ci-n">'+cfg.head[0]+'</div><div class="mb-ci-r">แสดงเสมอ</div></div>';
+      cfg.head.forEach(function(h,i){
+        if(i===0||h===null) return;
+        var onI=cur.indexOf(i)>=0, full=false;
+        if(!onI){ setCols(key,cur.concat([i])); full=!fits(key); setCols(key,cur); }
+        html+='<div class="mb-ci'+(onI?' on':'')+(full?' full':'')+'" data-i="'+i+'"><div class="mb-cbox">'+(onI?S('<path d="M5 12.5l4.5 4.5L19 7"/>',14):'')+'</div><div class="mb-ci-n">'+h+'</div><div class="mb-ci-r">'+(full?'จอไม่พอ':'')+'</div></div>';
+      });
+      html+='<div class="mb-shrow"><button class="mb-shbtn" data-a="def">ค่าเริ่มต้น</button><button class="mb-shbtn pri" data-a="ok">เสร็จ</button></div>';
+      sh.innerHTML=html;
+      [].forEach.call(sh.querySelectorAll('.mb-ci[data-i]'), function(r){
+        r.onclick=function(){
+          var i=+r.dataset.i, cur2=shown[key]||[];
+          if(cur2.indexOf(i)>=0){ savePref(key, pref(key).filter(function(x){ return x!==i; })); }
+          else {
+            setCols(key,cur2.concat([i])); var ok=fits(key); setCols(key,cur2);
+            if(!ok){ r.classList.remove('shake'); void r.offsetWidth; r.classList.add('shake'); r.querySelector('.mb-ci-r').textContent='จอไม่พอ · เอาอันอื่นออกก่อน'; return; }
+            savePref(key, cur2.concat([i]).concat(pref(key).filter(function(x){ return cur2.indexOf(x)<0 && x!==i; })));
+          }
+          fit(key); draw();
+        };
+      });
+      sh.querySelector('[data-a="def"]').onclick=function(){ savePref(key, cfg.def.slice()); fit(key); draw(); };
+      sh.querySelector('[data-a="ok"]').onclick=MB.close;
+    }
+    draw(); MB.open('mbShSub');
+  }
+
+  /* ── KPI + จัดฟอร์ม ── */
+  var built=false;
+  function build(){
+    if(built) return; var tp=$('tp7'); if(!tp) return; built=true;
+    var tank=tp.querySelector(':scope>.card'); if(tank) tank.classList.add('mb-src');
+    var k=document.createElement('div'); k.id='mbFuelKpi'; k.className='mbx';
+    k.innerHTML='<div class="mb-kpi hl"><div class="mb-kpi-l">'+S(I.fuel,14)+'คงเหลือในถัง</div><div class="mb-kpi-v" id="mbFkTank">–</div></div>'
+      +'<div class="mb-kpi"><div class="mb-kpi-l">'+S(I.down,14)+'เบิกออกวันนี้</div><div class="mb-kpi-v" id="mbFkOut">–</div></div>';
+    var s0=$('fuelSub0'); tp.insertBefore(k, s0);
+    // ช่องที่อยู่คู่กันแบบ B2
+    ['fInLiters','fInPricePerL','fExpDate','fExpPlate','fExpLiters','fExpPricePerL','fExpOdometer','fExpInvoiceNo'].forEach(function(id){
+      var e=$(id); if(e && e.parentNode) e.parentNode.classList.add('mb-half');
+    });
+  }
+  function kpi(){
+    if(!built) return;
+    var s=(typeof calcFuelStock==='function')?calcFuelStock():{remaining:0};
+    var today=new Date(); today=today.getFullYear()+'-'+('0'+(today.getMonth()+1)).slice(-2)+'-'+('0'+today.getDate()).slice(-2);
+    var out=D().filter(function(r){ return r.date===today; }).reduce(function(a,r){ return a+(r.liters||0); },0);
+    $('mbFkTank').innerHTML=(s.remaining||0).toLocaleString('th-TH',{maximumFractionDigits:0})+'<span class="mb-kpi-u">ลิตร</span>';
+    $('mbFkOut').innerHTML=out.toLocaleString('th-TH',{maximumFractionDigits:0})+'<span class="mb-kpi-u">ลิตร</span>';
+  }
+  function sub(n){ var tp=$('tp7'); if(!tp) return; for(var i=0;i<5;i++) tp.classList.toggle('mb-fsub-'+i, i===n); }
+  function curSub(){ for(var i=0;i<5;i++){ var p=$('fuelSub'+i); if(p && p.style.display!=='none') return i; } return 0; }
+
+  /* ── ข้อความมีอิโมจิในแท็บน้ำมัน: ล้างเฉพาะตอนมือถือ แล้วคืนของเดิม ── */
+  function textNodes(on){
+    var q='#tp7 .table-toolbar-title, #tp7 .pr-label, #tp7 option, #tp7 .pr-save-btn, #tp7 .table-toolbar .pr-tab-btn, #tp7 .card>div[style*="dashed"], #fuelReportPreview>div>div, #fuelCostResultContent>div>div';
+    [].forEach.call(document.querySelectorAll(q), function(e){
+      var n=null; for(var i=0;i<e.childNodes.length;i++){ if(e.childNodes[i].nodeType===3 && e.childNodes[i].nodeValue.trim()){ n=e.childNodes[i]; break; } }
+      if(!n) return;
+      if(on){ if(e.dataset.mbf!=null) return; e.dataset.mbf=n.nodeValue; var v=clean(n.nodeValue);
+        if(e.matches('.table-toolbar .pr-tab-btn')) v=v+' →';
+        n.nodeValue=(e.children.length?v+' ':v); }
+      else if(e.dataset.mbf!=null){ n.nodeValue=e.dataset.mbf; delete e.dataset.mbf; }
+    });
+  }
+
+  function enter(){ build(); textNodes(true); sub(curSub()); kpi(); Object.keys(CFG).forEach(transform); }
+  function leave(){
+    textNodes(false);
+    Object.keys(CFG).forEach(function(key){ var c=$(key); if(c) c.classList.remove('mbt'); var b=$('mbc_'+key); if(b) b.remove(); });
+    try{ if(typeof drawFuelInList==='function'){ drawFuelInList(); drawFuelOutList(); drawFuelExpList(); } }catch(e){}
+    try{ var tp6=$('fuelSub3'); if(tp6 && tp6.style.display!=='none' && typeof loadFuelMonthlyHistory==='function') loadFuelMonthlyHistory(); }catch(e){}
+  }
+  MB.onChange(function(on){ if(on) enter(); else leave(); });
+
+  function wrap(name, after){
+    var f=window[name]; if(typeof f!=='function') return;
+    window[name]=function(){ var r=f.apply(this, arguments); try{ if(MB.on()) after.apply(this, arguments); }catch(e){ console.warn('mbf',name,e); } return r; };
+  }
+  function wrapAsync(name, key){
+    var f=window[name]; if(typeof f!=='function') return;
+    window[name]=function(){ var r=f.apply(this, arguments); Promise.resolve(r).then(function(){ try{ if(MB.on()){ textNodes(true); transform(key); } }catch(e){} }); return r; };
+  }
+  wrap('initFuelTab', function(){ enter(); });
+  wrap('fuelSubTab', function(n){ sub(curSub()); Object.keys(CFG).forEach(function(k){ var c=$(k); if(c && c.offsetParent) fit(k); }); });
+  wrap('updateFuelStockDisplay', function(){ kpi(); });
+  wrap('drawFuelInList', function(){ transform('fuelInList'); });
+  wrap('drawFuelOutList', function(){ transform('fuelOutList'); kpi(); });
+  wrap('drawFuelExpList', function(){ transform('fuelExpList'); });
+  wrapAsync('loadFuelMonthlyHistory', 'fuelMonthlyHistoryList');
+  wrap('fuelRptPreview', function(){ textNodes(true); });
+  wrap('calcAndShowFuelCost', function(){ textNodes(true); });
+  wrapAsync('loadFuelMonthly', 'fuelMonthlyHistoryList');
+  var rs=null; window.addEventListener('resize', function(){ if(!MB.on()) return; clearTimeout(rs); rs=setTimeout(function(){ Object.keys(CFG).forEach(function(k){ var c=$(k); if(c && c.classList.contains('mbt')) fit(k); }); },150); });
+  if(MB.on()) enter();
 })();
 </script>
 
