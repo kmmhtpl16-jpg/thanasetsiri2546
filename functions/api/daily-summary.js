@@ -120,7 +120,7 @@ async function buildSummary(idToken, today) {
   const dMap = {}; deds.forEach(function (d) { dMap[docId(d)] = fval(d, 'cubic') || 0; });
 
   // ── น้ำหนัก + รายได้ขายทราย ──
-  let sandRev = 0, kgTot = 0, dedTot = 0, netQTot = 0, noPrice = 0;
+  let sandRev = 0, sandCredit = 0, kgTot = 0, dedTot = 0, netQTot = 0, noPrice = 0;
   const byProd = {};
   weigh.forEach(function (w) {
     const id = docId(w);
@@ -133,12 +133,18 @@ async function buildSummary(idToken, today) {
     byProd[prod].q += net; byProd[prod].n++;
 
     const unit = fval(w, 'sale_unit');
-    if (unit === 'เหมา') { sandRev += fval(w, 'sale_amount') || 0; return; }
-    const price = fval(w, 'price') || 0; if (price <= 0) { noPrice++; return; }
-    const qty = (unit === 'ตัก') ? (fval(w, 'scoop') || 0) : ((unit === 'ตัน') ? net * TON_PER_CUBIC : net);
-    sandRev += qty * price;
+    let amt = 0;
+    if (unit === 'เหมา') { amt = fval(w, 'sale_amount') || 0; }
+    else {
+      const price = fval(w, 'price') || 0; if (price <= 0) { noPrice++; return; }
+      const qty = (unit === 'ตัก') ? (fval(w, 'scoop') || 0) : ((unit === 'ตัน') ? net * TON_PER_CUBIC : net);
+      amt = qty * price;
+    }
+    sandRev += amt;
+    if (fval(w, 'pay_method') === 'ลงบัญชี') sandCredit += amt;   // เฟส 1.2: ขายทรายลงบัญชี = ค้างชำระ
   });
   sandRev = Math.round(sandRev * 100) / 100;
+  sandCredit = Math.round(sandCredit * 100) / 100;
 
   // ── ขายดิน/อื่น ──
   let osCash = 0, osTrans = 0, osCredit = 0;
@@ -152,7 +158,7 @@ async function buildSummary(idToken, today) {
   });
   const dirtTot = osCash + osTrans + osCredit;
   const totalRev = sandRev + dirtTot;
-  const received = sandRev + osCash + osTrans;
+  const received = sandRev - sandCredit + osCash + osTrans;
   const expTot = exTot + wdTot + feTot;
   const netCash = Math.round((received - expTot) * 100) / 100;
 
@@ -172,13 +178,14 @@ async function buildSummary(idToken, today) {
 
   L.push('💰 <b>รายได้วันนี้</b>');
   L.push('  ⛏️ ขายทราย: ' + fmt(sandRev) + ' ฿');
+  if (sandCredit > 0) L.push('     · ลงบัญชี ' + fmt(sandCredit));
   L.push('  🧱 ขายดิน/อื่น: ' + fmt(dirtTot) + ' ฿');
   if (osCash > 0) L.push('     · เงินสด ' + fmt(osCash));
   if (osTrans > 0) L.push('     · โอน ' + fmt(osTrans));
   if (osCredit > 0) L.push('     · ลงบัญชี ' + fmt(osCredit));
   L.push('  รวมรายได้: <b>' + fmt(totalRev) + ' ฿</b>');
   L.push('  💵 เงินเข้าจริง: ' + fmt(received) + ' ฿');
-  L.push('  📒 ค้างชำระ: ' + fmt(osCredit) + ' ฿');
+  L.push('  📒 ค้างชำระ: ' + fmt(osCredit + sandCredit) + ' ฿');
   if (noPrice > 0) L.push('  ⚠️ ใบชั่งยังไม่ใส่ราคา: <b>' + noPrice + '/' + weigh.length + ' ใบ</b> — ยอดขายจริงสูงกว่านี้');
   L.push('');
 
