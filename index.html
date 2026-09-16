@@ -3840,7 +3840,7 @@ function draw1() {
   fp=fp.toLowerCase().trim(); fc=fc.toLowerCase().trim();
 
   var rows=[].concat(wData);
-  if(vMode==='latest' && !fp && !fc && !fa && !fb){
+  if(vMode==='latest' && !fp && !fc && !fa && !fb && !window.MB_Q1){
     var ld=rows[0]?rows[0].date:'';
     rows=rows.filter(function(r){return r.date===ld;});
   }
@@ -3848,6 +3848,7 @@ function draw1() {
   if(fc) rows=rows.filter(function(r){return (r.customer||'').toLowerCase().includes(fc);});
   if(fa) rows=rows.filter(function(r){return r.date>=fa;});
   if(fb) rows=rows.filter(function(r){return r.date<=fb;});
+  if(window.MB_Q1){ var _mq=String(window.MB_Q1).toLowerCase(); rows=rows.filter(function(r){return (r.plate||'').toLowerCase().includes(_mq)||(r.customer||'').toLowerCase().includes(_mq);}); } // มือถือ: ช่องค้นหาเดียว (ทะเบียน หรือ ลูกค้า) — จอคอมไม่มีค่านี้
 
   var tot=rows.length;
   document.getElementById('t1cnt').textContent='\u0e23\u0e27\u0e21 '+tot+' \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23';
@@ -8542,5 +8543,673 @@ function exDraw4(){
   if(el) el.innerHTML = (rows.length||autoRev>0||manual>0||dirtRev>0||wageTot>0||fuelTot>0) ? '<table class="data-table" style="width:100%;font-size:.85rem;"><tbody>'+full+'</tbody></table>' : '<div style="text-align:center;color:var(--muted);padding:18px">— เลือกเดือนเพื่อดูสรุปรายได้-รายจ่าย —</div>';
 }
 </script>
+<!-- ============================================================
+     MOBILE LAYER (เฟส 2) — แบบ B2 · มีผลเฉพาะจอ ≤700px เท่านั้น
+     จอคอมไม่โดนอะไรเลย: CSS ทุกบรรทัดอยู่ใน @media(max-width:700px) + ต้องมีคลาส html.mb
+     ของที่ฉีดเพิ่ม (#mbTop/#mbNav/sheet/hero) ถูกซ่อนด้วย .mbx นอกมือถือ
+============================================================ -->
+<style id="mb-css">
+.mbx{display:none!important;}
+@media(max-width:700px){
+html.mb{
+  --m-green:#1a8a4a; --m-green-d:#116136; --m-green-l:#22a85c; --m-green-bg:#e9f4ed;
+  --m-bg2:#f6f8f9; --m-line:#e6ebee; --m-text:#152029; --m-text2:#48596a; --m-muted:#8fa0ae;
+  --m-orange:#d98200; --m-orange-bg:#fdf6ea; --m-red:#d93b2b; --m-navh:60px;
+}
+html.mb .mbx{display:revert!important;}
+html.mb body{background:#fff;font-size:15px;}
+html.mb #appScreen{height:100vh;height:100dvh;background:#fff;}
+html.mb #appScreen>.topbar,html.mb #appScreen>.tab-bar{display:none!important;}
+html.mb .tab-pane{background:#fff;padding:14px 16px calc(var(--m-navh) + env(safe-area-inset-bottom) + 28px)!important;}
+html.mb #tp1{padding-top:0!important;gap:0;}
+html.mb input,html.mb select,html.mb textarea{font-size:16px!important;}
+html.mb svg.mi{display:block;flex-shrink:0;}
+
+/* ── แถบบน ── */
+html.mb #mbTop{display:flex!important;align-items:center;gap:8px;flex-shrink:0;z-index:40;background:#fff;
+  border-bottom:1px solid var(--m-line);padding:calc(env(safe-area-inset-top) + 10px) 12px 10px;}
+html.mb .mb-tt{flex:1;text-align:center;font-size:16.5px;font-weight:800;color:var(--m-text);letter-spacing:-.2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html.mb .mb-ib{width:40px;height:40px;border-radius:11px;border:none;background:var(--m-bg2);color:var(--m-text2);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+
+/* ── เมนูล่าง ── */
+html.mb #mbNav{display:grid!important;position:fixed;left:0;right:0;bottom:0;z-index:50;background:#fff;
+  border-top:1px solid var(--m-line);grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom);
+  box-shadow:0 -2px 14px rgba(21,32,41,.05);}
+html.mb #mbNav button{background:none;border:none;cursor:pointer;font-family:var(--font);padding:8px 2px 6px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--m-muted);
+  min-height:var(--m-navh);-webkit-tap-highlight-color:transparent;}
+html.mb #mbNav .nl{font-size:11px;font-weight:700;letter-spacing:-.2px;}
+html.mb #mbNav button.on{color:var(--m-green);}
+
+/* ── sheet ── */
+html.mb #mbMask{display:block!important;position:fixed;inset:0;background:rgba(21,32,41,.45);z-index:9000;opacity:0;pointer-events:none;transition:opacity .25s;}
+html.mb #mbMask.open{opacity:1;pointer-events:auto;}
+html.mb .mb-sheet{display:block!important;position:fixed;left:0;right:0;bottom:0;z-index:9001;background:#fff;border-radius:18px 18px 0 0;
+  transform:translateY(105%);transition:transform .3s cubic-bezier(.32,.72,0,1);
+  padding-bottom:calc(env(safe-area-inset-bottom) + 14px);max-height:86vh;max-height:86dvh;overflow-y:auto;}
+html.mb .mb-sheet.open{transform:translateY(0);}
+html.mb .mb-grab{width:38px;height:5px;border-radius:3px;background:#d8e0e5;margin:9px auto 2px;}
+html.mb .mb-sht{font-size:17px;font-weight:800;padding:10px 18px 6px;color:var(--m-text);}
+html.mb .mb-mrow{display:flex;align-items:center;gap:13px;padding:13px 18px;border-bottom:1px solid #f0f4f6;cursor:pointer;min-height:58px;}
+html.mb .mb-mrow:last-of-type{border-bottom:none;}
+html.mb .mb-mrow.on{background:var(--m-green-bg);}
+html.mb .mb-mc{width:38px;height:38px;border-radius:12px;background:var(--m-green-bg);display:flex;align-items:center;justify-content:center;color:var(--m-green);}
+html.mb .mb-mrow.on .mb-mc{background:var(--m-green);color:#fff;}
+html.mb .mb-mrow.red .mb-mc{background:#fbe3e0;color:var(--m-red);}
+html.mb .mb-mrow.red .mb-mt{color:var(--m-red);}
+html.mb .mb-mt{flex:1;font-size:15.5px;font-weight:600;color:var(--m-text);}
+html.mb .mb-mv{font-size:14px;color:var(--m-muted);font-variant-numeric:tabular-nums;}
+html.mb .mb-shbtn{display:block;margin:14px 18px 0;width:calc(100% - 36px);background:var(--m-bg2);border:1px solid var(--m-line);
+  border-radius:13px;padding:14px;font-family:var(--font);font-size:16px;font-weight:700;color:var(--m-text2);cursor:pointer;min-height:50px;}
+html.mb .mb-shbtn.pri{background:var(--m-green);border-color:var(--m-green);color:#fff;font-weight:800;}
+html.mb .mb-shrow{display:flex;gap:10px;margin:16px 18px 0;}
+html.mb .mb-shrow .mb-shbtn{margin:0;width:auto;flex:1;}
+html.mb .mb-acct{margin:6px 18px 4px;padding:14px 15px;border:1px solid var(--m-line);border-radius:14px;background:var(--m-bg2);}
+html.mb .mb-acct-l{font-size:12px;color:var(--m-muted);font-weight:600;}
+html.mb .mb-acct-v{font-size:17px;font-weight:800;color:var(--m-text);margin-top:2px;}
+
+/* ── ช่องเลือกหน้าย่อย ── */
+html.mb .mb-picker{display:flex!important;align-items:center;gap:10px;width:100%;margin:0;flex-shrink:0;cursor:pointer;
+  background:var(--m-green-bg);border:1px solid #cfe6d8;border-radius:13px;padding:11px 15px;min-height:54px;
+  font-family:var(--font);text-align:left;color:var(--m-green-d);}
+html.mb .mb-pk-l{flex:1;font-size:15.5px;font-weight:800;line-height:1.3;}
+html.mb .mb-pk-n{display:block;font-size:11.5px;font-weight:700;color:var(--m-green);opacity:.75;}
+html.mb .mb-src{display:none!important;}
+/* ปุ่มลอยของหน้าบันทึกเวลา (เงินเดือน) ยกขึ้นเหนือเมนูล่าง */
+html.mb #attActionBar{bottom:calc(var(--m-navh) + env(safe-area-inset-bottom) + 12px)!important;right:16px!important;}
+
+/* ════════ แท็บ 1 · นำเข้า ════════ */
+/* hero */
+html.mb .mb-hero{margin:14px 0 0;border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(17,97,54,.18);}
+html.mb .mb-hseg{display:flex;background:var(--m-green-d);padding:8px;gap:4px;}
+html.mb .mb-hseg button{flex:1;border:none;background:transparent;border-radius:18px;padding:8px 4px;min-height:38px;
+  font-family:var(--font);font-size:13px;font-weight:600;color:rgba(255,255,255,.72);cursor:pointer;}
+html.mb .mb-hseg button.on{background:rgba(255,255,255,.22);color:#fff;}
+html.mb .mb-hbody{background:linear-gradient(135deg,var(--m-green) 0%,var(--m-green-l) 100%);padding:18px 20px 18px;color:#fff;}
+html.mb .mb-hdate{position:relative;display:inline-flex;align-items:center;gap:6px;font-size:13px;opacity:.9;margin-bottom:6px;cursor:pointer;}
+html.mb .mb-hdate input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer;}
+html.mb .mb-hnum{font-size:40px;font-weight:800;letter-spacing:-1.4px;font-variant-numeric:tabular-nums;line-height:1.1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html.mb .mb-hunit{font-size:15px;font-weight:600;opacity:.85;margin-left:5px;letter-spacing:0;}
+html.mb .mb-hfoot{background:#fff;display:grid;grid-template-columns:1fr 1fr;}
+html.mb .mb-hf{padding:12px 16px;min-width:0;}
+html.mb .mb-hf+.mb-hf{border-left:1px solid var(--m-line);}
+html.mb .mb-hfl{font-size:11.5px;color:var(--m-muted);display:flex;align-items:center;gap:5px;}
+html.mb .mb-hfv{font-size:17px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums;color:var(--m-text);white-space:nowrap;}
+html.mb .mb-pill{width:7px;height:7px;border-radius:50%;background:var(--m-green);display:inline-block;}
+html.mb .mb-pill.g{background:#c8d2d9;}
+html.mb .mb-pill.o{background:var(--m-orange);}
+/* หัวข้อ section */
+html.mb .mb-sec{padding:22px 0 0;}
+html.mb .mb-sech{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+html.mb .mb-sect{font-size:15.5px;font-weight:800;color:var(--m-text);}
+html.mb .mb-sect small{font-size:14px;font-weight:600;color:var(--m-muted);}
+html.mb .mb-seca{font-size:13.5px;font-weight:700;color:var(--m-green);cursor:pointer;white-space:nowrap;background:none;border:none;font-family:var(--font);padding:6px 0;}
+/* ไอคอน 8 ช่อง */
+html.mb .mb-grid{display:grid!important;grid-template-columns:repeat(4,1fr);gap:4px 4px;}
+html.mb .mb-gi{display:flex;flex-direction:column;align-items:center;gap:7px;padding:9px 2px;cursor:pointer;border-radius:12px;-webkit-tap-highlight-color:transparent;}
+html.mb .mb-gi:active{background:var(--m-bg2);}
+html.mb .mb-gc{width:48px;height:48px;border-radius:15px;background:var(--m-green-bg);display:flex;align-items:center;justify-content:center;color:var(--m-green);}
+html.mb .mb-gl{font-size:11.5px;font-weight:600;color:var(--m-text2);text-align:center;line-height:1.25;}
+/* ช่องนำเข้าไฟล์ */
+html.mb #tp1>.mb-upcard{background:none;border:none;padding:0;margin-top:14px;border-radius:0;}
+html.mb #tp1>.mb-upcard>.card-title{display:none;}
+html.mb #tp1 .drop-zone{border:1.5px dashed #c3d6ca;border-radius:14px;background:#f7fbf8;padding:16px 18px;text-align:left;}
+html.mb #tp1 .drop-zone>.dico,html.mb #tp1 .drop-zone>p{display:none;}
+html.mb #tp1 .drop-zone .mb-up{display:flex!important;align-items:center;gap:14px;}
+html.mb .mb-upc{width:44px;height:44px;border-radius:13px;background:#e0f0e6;display:flex;align-items:center;justify-content:center;color:var(--m-green);}
+html.mb .mb-upt{font-size:14.5px;font-weight:700;color:var(--m-text);}
+html.mb .mb-ups{font-size:12px;color:var(--m-muted);margin-top:2px;}
+html.mb #tp1 .smsg{margin-top:10px!important;border-radius:11px;font-size:13.5px;}
+html.mb #tp1 .smsg:empty{display:none;}
+/* รายการ */
+html.mb #tp1 .tp1-split{margin:0!important;display:block;}
+html.mb #tp1 .tp1-main,html.mb #tp1 .tp1-side{padding:0!important;}
+html.mb #tp1 .tp1-main>.card{background:none;border:none!important;border-radius:0!important;padding:0;}
+html.mb #tp1 .tp1-main>.card>.card-title{display:none;}
+html.mb .mb-search{display:flex!important;gap:8px;}
+html.mb .mb-sf{flex:1;display:flex;align-items:center;gap:8px;background:var(--m-bg2);border:1px solid var(--m-line);border-radius:11px;padding:0 12px;min-width:0;}
+html.mb .mb-sf input{flex:1;min-width:0;border:none;background:none;-webkit-appearance:none;appearance:none;border-radius:0;padding:12px 0;font-family:var(--font);color:var(--m-text);}
+html.mb .mb-sf input:focus{outline:none;}
+html.mb .mb-sfx{background:none;border:none;color:var(--m-muted);padding:6px;cursor:pointer;}
+html.mb .mb-fbtn{display:flex;align-items:center;gap:6px;background:var(--m-bg2);border:1px solid var(--m-line);border-radius:11px;
+  padding:0 14px;font-family:var(--font);font-size:14px;font-weight:700;color:var(--m-text2);cursor:pointer;min-height:48px;white-space:nowrap;position:relative;}
+html.mb .mb-fbtn.on{border-color:var(--m-green);color:var(--m-green-d);background:var(--m-green-bg);}
+html.mb .mb-fdot{position:absolute;top:8px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--m-green);}
+/* ตัวกรอง (ย้ายเข้า sheet) */
+html.mb #tp1 .t1filter{display:none;}
+html.mb #mbShFilter .t1filter{display:block;background:none;border:none;padding:4px 18px 0;margin:0;}
+html.mb #mbShFilter .t1filter label{display:block;font-size:12.5px;color:var(--m-text2);font-weight:700;text-transform:none;letter-spacing:0;margin:12px 0 0;}
+html.mb #mbShFilter .t1filter input{display:block;width:100%;margin-top:6px;background:var(--m-bg2);border:1px solid var(--m-line);border-radius:11px;
+  padding:12px 14px;min-height:50px;color:var(--m-text);-webkit-appearance:none;appearance:none;}
+html.mb #mbShFilter .t1filter input:focus{outline:none;border-color:var(--m-green);background:#fff;}
+html.mb #mbShFilter .t1filter .clr-btn{display:none;}
+html.mb #mbShFilter .mb-f2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+/* ตาราง */
+html.mb .mb-twrap{margin:12px 0 0;border:1px solid var(--m-line);border-radius:14px;overflow:hidden;overflow:clip;position:relative;background:#fff;}
+html.mb .mb-twrap .table-wrap{overflow:visible;}
+html.mb .mb-twrap table{border-collapse:separate;border-spacing:0;width:100%;font-size:14px;}
+html.mb .mb-twrap table.mb-meas{width:auto!important;}
+html.mb .mb-twrap thead tr{background:none;}
+html.mb .mb-twrap thead th{position:sticky;top:0;z-index:3;background:var(--m-bg2);color:var(--m-text2);font-size:12.5px;font-weight:700;padding:10px 8px!important;
+  letter-spacing:0;text-transform:none;padding:11px 12px;white-space:nowrap;border-bottom:1px solid var(--m-line);}
+html.mb .mb-twrap tbody tr{border:none;}
+html.mb .mb-twrap tbody td{padding:13px 8px;white-space:nowrap;border-bottom:1px solid #f0f4f6;font-variant-numeric:tabular-nums;background:#fff;color:var(--m-text);}
+html.mb .mb-twrap tbody tr:nth-child(even) td{background:#fafcfc;}
+html.mb .mb-twrap tbody tr:last-child td{border-bottom:none;}
+html.mb .mb-twrap th:first-child,html.mb .mb-twrap td:first-child{padding-left:12px!important;}
+html.mb .mb-twrap tr>:last-child{padding-right:12px!important;}
+/* เลือกคอลัมน์: ซ่อนทุกคอลัมน์ที่ไม่ได้เลือก (ทะเบียนแสดงเสมอ) */
+html.mb .mb-twrap [data-k]{display:none;}
+html.mb .mb-twrap [data-k="plate"],
+html.mb .mb-twrap table.s-seq [data-k="seq"],html.mb .mb-twrap table.s-date [data-k="date"],html.mb .mb-twrap table.s-time [data-k="time"],
+html.mb .mb-twrap table.s-kg [data-k="kg"],html.mb .mb-twrap table.s-q [data-k="q"],html.mb .mb-twrap table.s-amt [data-k="amt"],
+html.mb .mb-twrap table.s-cust [data-k="cust"],html.mb .mb-twrap table.s-prod [data-k="prod"]{display:table-cell;}
+html.mb .mb-twrap td[data-k="cust"],html.mb .mb-twrap td[data-k="prod"]{max-width:8.5em;overflow:hidden;text-overflow:ellipsis;}
+html.mb .mb-twrap td[data-k="amt"] span[style*="font-size:9px"]{display:none;}
+html.mb .mb-twrap td[data-k="cust"] .b-edited{display:none;}
+html.mb .mb-twrap th.r,html.mb .mb-twrap td.r{text-align:right;}
+html.mb .mb-twrap td.gold{color:var(--m-text);font-weight:600;}
+html.mb .mb-twrap td.mb-plate{font-size:15px;font-weight:800;letter-spacing:-.2px;}
+html.mb .mb-twrap td.mb-mu{color:var(--m-muted);}
+html.mb .mb-twrap tbody tr.mb-tap{cursor:pointer;}
+html.mb .mb-twrap tbody tr.mb-tap:active td{background:var(--m-green-bg);}
+html.mb .mb-twrap .mb-hide{display:none;}
+html.mb .mb-tag{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--m-orange-bg);color:var(--m-orange);}
+html.mb .mb-twrap .b-edited{font-size:10.5px;padding:1px 6px;margin-left:4px;}
+html.mb .mb-fade{display:none;
+  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.96));z-index:5;}
+html.mb .mb-fade.off{opacity:0;}
+html.mb .mb-thint{display:flex!important;align-items:center;gap:8px;width:100%;border:none;border-top:1px solid var(--m-line);background:var(--m-bg2);
+  padding:10px 12px;min-height:46px;font-family:var(--font);font-size:13px;color:var(--m-text2);text-align:left;cursor:pointer;}
+html.mb .mb-thint b{color:var(--m-green-d);}
+html.mb .mb-thint .mb-th-l{flex:1;min-width:0;}
+html.mb .mb-thint .mb-th-a{color:var(--m-green);font-weight:800;white-space:nowrap;}
+/* sheet เลือกคอลัมน์ */
+html.mb .mb-sub{padding:0 18px 6px;font-size:13px;color:var(--m-muted);}
+html.mb .mb-ci{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid #f0f4f6;cursor:pointer;min-height:54px;}
+html.mb .mb-cbox{width:24px;height:24px;border-radius:7px;border:2px solid #cfd8dd;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;}
+html.mb .mb-ci.on .mb-cbox{background:var(--m-green);border-color:var(--m-green);}
+html.mb .mb-ci.lock .mb-cbox{background:#b9c6ce;border-color:#b9c6ce;}
+html.mb .mb-ci-n{flex:1;font-size:15.5px;font-weight:600;color:var(--m-text);}
+html.mb .mb-ci-r{font-size:12.5px;color:var(--m-muted);}
+html.mb .mb-ci.full .mb-ci-n{color:#b3bec6;}
+html.mb .mb-ci.full .mb-ci-r{color:var(--m-orange);}
+html.mb .mb-ci.shake{animation:mbshake .35s;}
+@keyframes mbshake{0%,100%{transform:translateX(0)}25%,75%{transform:translateX(-6px)}50%{transform:translateX(6px)}}
+html.mb .mb-fitbar{margin:8px 18px 4px;height:8px;border-radius:5px;background:#eef2f4;overflow:hidden;}
+html.mb .mb-fitbar i{display:block;height:100%;background:var(--m-green);border-radius:5px;transition:width .2s;}
+html.mb .mb-fitbar.full i{background:var(--m-orange);}
+html.mb #tp1 .pager{gap:6px;margin-top:12px;}
+html.mb #tp1 .pager .pbtn{min-width:44px;min-height:44px;border-radius:11px;font-size:15px;font-weight:700;background:var(--m-bg2);border-color:var(--m-line);color:var(--m-text2);}
+html.mb #tp1 .pager .pbtn.on{background:var(--m-green);border-color:var(--m-green);color:#fff;}
+html.mb .mb-warn{margin:12px 0 0;background:var(--m-orange-bg);border:1px solid #f2e2c6;border-radius:12px;padding:12px 14px;
+  display:flex!important;gap:10px;align-items:center;font-size:13.5px;font-weight:600;color:#a96b00;}
+html.mb .mb-warn[hidden]{display:none!important;}
+/* คลังไฟล์ (เจ้าของ) */
+html.mb #tp1 .tp1-side>.card{background:#fff;border:1px solid var(--m-line)!important;border-radius:14px!important;padding:14px 14px 10px;margin-top:22px;}
+html.mb #tp1 .tp1-side .card-title{font-size:15.5px;font-weight:800;color:var(--m-text);text-transform:none;letter-spacing:0;margin-bottom:8px;}
+html.mb #tp1 .tp1-side .card-title .btn{min-height:40px;font-size:13.5px;border-radius:10px;}
+html.mb #batchList{overflow-x:auto;}
+html.mb #batchList .btn-red,html.mb #batchList .btn-eye{min-height:38px;border-radius:9px;font-size:13px;}
+/* หน้าต่างแก้ราคา/ลูกค้า → sheet จากล่าง */
+html.mb #editCustModal.modal-overlay,html.mb #del-batch-dialog{align-items:flex-end!important;padding:0!important;}
+html.mb #editCustModal .modal-box,html.mb #del-batch-dialog>div{width:100%!important;max-width:none!important;border-radius:18px 18px 0 0!important;border:none!important;
+  padding:18px 18px calc(env(safe-area-inset-bottom) + 16px)!important;max-height:90vh;max-height:90dvh;overflow-y:auto;box-shadow:0 -8px 30px rgba(0,0,0,.2);background:#fff!important;}
+html.mb #editCustModal .modal-box{display:flex;flex-direction:column;padding-top:0!important;}
+html.mb #editCustModal .modal-box::before{content:'';display:block;width:38px;height:5px;border-radius:3px;background:#d8e0e5;margin:9px auto 4px;order:-10;flex-shrink:0;}
+html.mb #editCustModal .modal-title{font-size:17px;font-weight:800;color:var(--m-text);margin:6px 0 10px;order:-9;}
+html.mb #editCustModal .modal-title .mb-no{color:var(--m-muted);font-weight:600;}
+html.mb #ecPane1,html.mb #ecPane2{display:contents!important;}
+html.mb #editCustModal .modal-conflict{order:-8;font-size:13px;}
+html.mb #editCustModal .mb-o1{order:1}html.mb #editCustModal .mb-o2{order:2}html.mb #editCustModal .mb-o3{order:3}html.mb #editCustModal .mb-o4{order:4}
+html.mb #editCustModal .mb-o5{order:5}html.mb #editCustModal .mb-o6{order:6}html.mb #editCustModal .mb-o7{order:7}html.mb #editCustModal .mb-o8{order:8}
+html.mb #editCustModal .mb-o9{order:9}html.mb #editCustModal .mb-o10{order:10}html.mb #editCustModal .mb-o11{order:11}html.mb #editCustModal .mb-o12{order:12}
+html.mb #editCustModal .mb-o9{margin-top:6px;padding-top:14px;border-top:1px solid var(--m-line);}
+html.mb #editCustModal .modal-actions{order:50;flex-direction:column-reverse;gap:10px!important;}
+html.mb #editCustModal .modal-actions .btn{width:100%;flex:none!important;}
+html.mb #editCustModal .modal-actions .btn-gold{min-height:54px!important;font-size:16.5px!important;font-weight:800;}
+html.mb #editCustModal .modal-actions .btn-ghost{background:var(--m-bg2);border:1px solid var(--m-line);color:var(--m-text2);}
+html.mb #editCustModal .modal-row{margin-bottom:12px;}
+html.mb #editCustModal .modal-row label{font-size:12.5px;font-weight:700;color:var(--m-text2);text-transform:none;letter-spacing:0;margin-bottom:6px;}
+html.mb #editCustModal .modal-row input,html.mb #editCustModal .modal-row select{min-height:50px;padding:12px 14px!important;border-radius:11px!important;background:var(--m-bg2)!important;border:1px solid var(--m-line)!important;}
+html.mb #editCustModal .modal-row input[readonly]{background:#eef2f4!important;}
+html.mb #editCustModal .modal-note{font-size:12px;}
+html.mb #editCustModal .modal-actions,html.mb #del-batch-dialog .brow{display:flex;gap:10px;margin-top:16px;}
+html.mb #editCustModal .modal-actions .btn,html.mb #del-batch-dialog .brow>button{flex:1;justify-content:center;min-height:52px;border-radius:13px;font-size:16px;}
+html.mb #editCustModal .modal-actions .btn-gold{background:var(--m-green);color:#fff;}
+}
+</style>
+<script id="mb-js">
+(function(){
+  var MQ = window.matchMedia('(max-width:700px)');
+  var on = false, built = false;
+  function $(id){ return document.getElementById(id); }
+  function S(d,sz){ return '<svg class="mi" width="'+(sz||21)+'" height="'+(sz||21)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>'; }
+  var I = {
+    imp:'<path d="M12 3v11"/><path d="M8 10l4 4 4-4"/><path d="M4 18h16"/>',
+    ded:'<path d="M12 4v16M5 8h14"/><path d="M5 8l-2.5 6h5z"/><path d="M19 8l-2.5 6h5z"/>',
+    fr:'<path d="M2 16V7h11v9"/><path d="M13 10h4l4 3.5V16"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
+    pay:'<circle cx="12" cy="7.5" r="3.2"/><path d="M4.5 20c0-3.7 3.4-6.2 7.5-6.2s7.5 2.5 7.5 6.2"/>',
+    fuel:'<path d="M12 3.4c0 0 6.2 6.4 6.2 10.3a6.2 6.2 0 1 1-12.4 0C5.8 9.8 12 3.4 12 3.4z"/>',
+    box:'<path d="M3.5 8L12 4l8.5 4v8L12 20l-8.5-4z"/><path d="M3.5 8L12 12l8.5-4M12 12v8"/>',
+    doc:'<path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h5"/>',
+    chart:'<path d="M4 19V10M9.3 19V5M14.7 19v-7M20 19v-4"/>',
+    baht:'<path d="M12 3v18M16.5 7H10a2.8 2.8 0 0 0 0 5.6h4a2.8 2.8 0 0 1 0 5.6H7"/>',
+    menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+    out:'<path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 8l-4 4 4 4M6 12h9"/>',
+    link:'<path d="M10 13a4 4 0 0 0 5.7.3l2.6-2.6a4 4 0 1 0-5.7-5.7l-1.4 1.4"/><path d="M14 11a4 4 0 0 0-5.7-.3l-2.6 2.6a4 4 0 1 0 5.7 5.7l1.4-1.4"/>',
+    cal:'<rect x="3.5" y="5" width="17" height="15" rx="2.2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    up:'<path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+    down:'<path d="M12 4v12"/><path d="M8 12l4 4 4-4"/><path d="M5 20h14"/>',
+    cust:'<path d="M16 20v-1.6c0-2.3-2.2-4.1-5-4.1s-5 1.8-5 4.1V20"/><circle cx="11" cy="8" r="3.1"/><path d="M18 13.6c1.8.5 3 1.8 3 3.4V20"/><path d="M16.5 5.2a3 3 0 0 1 0 5.6"/>',
+    user:'<circle cx="12" cy="8" r="3.4"/><path d="M4.5 20c0-3.6 3.4-6 7.5-6s7.5 2.4 7.5 6"/>',
+    search:'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+    filter:'<path d="M3 6h18M6 12h12M10 18h4"/>',
+    warn:'<path d="M12 3l9.5 17h-19z"/><path d="M12 9.5v4.5M12 17.2h.01"/>',
+    chev:'<path d="M6 9l6 6 6-6"/>',
+    x:'<path d="M6 6l12 12M18 6L6 18"/>',
+    cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2.1 1.2M17.7 15.3l2.1 1.2M4.2 16.5l2.1-1.2M17.7 8.7l2.1-1.2"/>'
+  };
+  var TITLE = {1:'ท่าทราย ธนเศรษฐ์ศิริ',2:'หักน้ำหนัก',3:'ใบแจ้งหนี้ลูกค้า',4:'สรุปผู้บริหาร',5:'ค่าเที่ยวรถร่วม',6:'เงินเดือน',7:'น้ำมัน',8:'รายจ่าย',9:'ลูกค้า'};
+  var NAV = [[1,'imp','นำเข้า'],[5,'fr','ค่าเที่ยว'],[6,'pay','เงินเดือน'],[7,'fuel','น้ำมัน']];
+  var MTH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  var curTab = 1, heroSeg = 0, heroDate = '';
+  function isAdm(){ return typeof curRole!=='undefined' && curRole==='admin'; }
+  function fmt(v,d){ return (v||0).toLocaleString('th-TH',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); }
+  function thDate(ymd,short){ if(!ymd) return '–'; var p=ymd.split('-'); var s=(+p[2])+' '+MTH[(+p[1])-1]; return short?s:s+' '+String((+p[0])+543).slice(2); }
+  function todayYmd(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+  function el(tag,cls,html){ var e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+
+  /* ── ยอดเงินของใบชั่ง (สูตรเดียวกับ draw1) ── */
+  function amt(r){
+    var net=Math.max(0,(r.kg/KPC)-((typeof dData!=='undefined'?dData[r._id]:0)||0));
+    if(r.sale_unit==='เหมา') return r.sale_amount||0;
+    if(!(r.price>0)) return 0;
+    return (r.sale_unit==='ตัก'?(r.scoop||0):(r.sale_unit==='ตัน'?net*1.5:net))*r.price;
+  }
+  function netK(r){ return Math.max(0,(r.kg/KPC)-((typeof dData!=='undefined'?dData[r._id]:0)||0)); }
+
+  /* ════════ สร้างของเพิ่มครั้งแรกที่เข้ามือถือ ════════ */
+  function build(){
+    if(built) return; built=true;
+    var app=$('appScreen'); if(!app) return;
+
+    // แถบบน
+    var top=el('header','mbx'); top.id='mbTop';
+    top.innerHTML='<button class="mb-ib" aria-label="บัญชี" onclick="mbOpen(\'mbShAcct\')">'+S(I.user,19)+'</button>'
+      +'<div class="mb-tt" id="mbTitle">ท่าทราย ธนเศรษฐ์ศิริ</div>'
+      +'<button class="mb-ib" aria-label="เมนู" onclick="mbOpen(\'mbShMore\')">'+S(I.menu,19)+'</button>';
+    var tb=app.querySelector('.topbar'); app.insertBefore(top, tb);
+
+    // เมนูล่าง
+    var nav=el('nav','mbx'); nav.id='mbNav';
+    nav.innerHTML=NAV.map(function(n){ return '<button data-t="'+n[0]+'" onclick="goTab('+n[0]+')">'+S(I[n[1]],22)+'<span class="nl">'+n[2]+'</span></button>'; }).join('')
+      +'<button data-t="more" onclick="mbOpen(\'mbShMore\')">'+S(I.menu,22)+'<span class="nl">เพิ่มเติม</span></button>';
+    app.appendChild(nav);
+
+    // mask + sheets
+    var mask=el('div','mbx'); mask.id='mbMask'; mask.onclick=mbClose; document.body.appendChild(mask);
+    ['mbShMore','mbShAcct','mbShSub','mbShFilter','mbShCols'].forEach(function(id){ var s=el('div','mbx mb-sheet'); s.id=id; document.body.appendChild(s); });
+
+    // ── แท็บ 1: hero + เมนู 8 ช่อง ──
+    var tp1=$('tp1');
+    var home=el('div','mbx'); home.id='mbHome';
+    home.innerHTML='<div class="mb-hero">'
+      +'<div class="mb-hseg" id="mbHSeg"><button class="on" onclick="mbSeg(0)">น้ำหนักรับเข้า</button><button onclick="mbSeg(1)">ยอดขาย</button><button onclick="mbSeg(2)">สรุปภาพรวม</button></div>'
+      +'<div class="mb-hbody"><label class="mb-hdate">'+S(I.chev,14)+'<span id="mbHDate">–</span><input type="date" id="mbHDateIn" onchange="mbHeroDate(this.value)"></label>'
+      +'<div class="mb-hnum" id="mbHNum">–</div></div>'
+      +'<div class="mb-hfoot"><div class="mb-hf"><div class="mb-hfl" id="mbHF1l"></div><div class="mb-hfv" id="mbHF1v">–</div></div>'
+      +'<div class="mb-hf"><div class="mb-hfl" id="mbHF2l"></div><div class="mb-hfv" id="mbHF2v">–</div></div></div></div>'
+      +'<div class="mb-sec"><div class="mb-sech"><div class="mb-sect">เมนู</div><button class="mb-seca" onclick="mbOpen(\'mbShMore\')">ดูทั้งหมด →</button></div>'
+      +'<div class="mb-grid" id="mbGrid"></div></div>';
+    tp1.insertBefore(home, tp1.firstChild);
+
+    // ช่องนำเข้าไฟล์ (ใส่หน้าตาใหม่ใน drop-zone เดิม — input ไฟล์ตัวเดิมยังคลุมทั้งกล่อง)
+    var dz=tp1.querySelector('.drop-zone');
+    if(dz){ var up=el('div','mbx mb-up','<div class="mb-upc">'+S(I.up,22)+'</div><div><div class="mb-upt">นำเข้าไฟล์ตาชั่ง</div><div class="mb-ups">แตะเพื่อเลือก .xls / .xlsx</div></div>');
+      dz.insertBefore(up, dz.querySelector('input')); }
+
+    // หัวรายการ + ค้นหา + ตาราง
+    var card=tp1.querySelector('.tp1-main>.card');
+    var tw=card && card.querySelector('.table-wrap');
+    if(card && tw){
+      var head=el('div','mbx'); head.id='mbListHead';
+      head.innerHTML='<div class="mb-sec"><div class="mb-sech"><div class="mb-sect" id="mbListT">รายการ</div></div></div>'
+        +'<div class="mbx mb-search"><div class="mb-sf">'+S(I.search,16)+'<input id="mbQ1" type="search" placeholder="ค้นหาทะเบียน หรือ ลูกค้า" oninput="mbSearch(this.value)" autocomplete="off"></div>'
+        +'<button class="mb-fbtn" id="mbFBtn" onclick="mbOpen(\'mbShFilter\')">'+S(I.filter,15)+'ตัวกรอง</button></div>';
+      card.insertBefore(head, tw);
+      var wrap=el('div','mb-twrap'); card.insertBefore(wrap, tw); wrap.appendChild(tw);
+      var th=el('button','mbx mb-thint'); th.type='button'; th.id='mbColBtn'; th.onclick=function(){ mbOpen('mbShCols'); }; wrap.appendChild(th);
+      var warn=el('div','mbx mb-warn'); warn.id='mbWarn'; warn.hidden=true;
+      var pg=$('t1pg'); card.insertBefore(warn, pg ? pg.nextSibling : null);
+    }
+    // แตะแถว = ตั้งราคา
+    var tb1=$('t1b');
+    if(tb1) tb1.addEventListener('click', function(e){
+      if(!on) return;
+      if(e.target.closest('button,a,input')) return;
+      var tr=e.target.closest('tr'); var b=tr && tr.querySelector('.btn-edit-cust'); if(b) b.click();
+    });
+
+    // ช่องเลือกหน้าย่อย (ค่าเที่ยว / เงินเดือน / น้ำมัน)
+    var t5=$('tp5'), t6=$('tp6'), t7=$('tp7');
+    if(t5 && t5.firstElementChild) t5.firstElementChild.classList.add('mb-src');
+    if(t6){ if(t6.firstElementChild) t6.firstElementChild.classList.add('mb-src'); var ps=t6.querySelector('.pr-subtabs'); if(ps) ps.classList.add('mb-src'); }
+    if(t7){ var h=t7.querySelector(':scope>h2'); if(h){ h.classList.add('mb-src'); if(h.nextElementSibling) h.nextElementSibling.classList.add('mb-src'); } }
+    var upc=tp1.querySelector(':scope>.card'); if(upc) upc.classList.add('mb-upcard');
+    // หน้าต่างแก้ใบชั่ง: ซ่อนแถบ 2 แท็บ + เรียงช่องใหม่แบบ B2 (ทะเบียน → ลูกค้า → ราคา ก่อน)
+    var tb2=$('ecTabBtn1'); if(tb2 && tb2.parentNode) tb2.parentNode.classList.add('mb-src');
+    [['ecPlate',1],['ecNew',2],['ecPriceWrap',3],['ecAmount',4],['ecUnit',5],['ecScoopWrap',6],['ecQtyWrap',7],['ecPay',8],['ecReason',9],['ecOld',10],['ecMeta',12]].forEach(function(x){
+      var e=$(x[0]); if(!e) return; var row=e.classList.contains('modal-row')?e:e.closest('.modal-row'); if(row) row.classList.add('mb-o'+x[1]);
+    });
+    var nt=document.querySelector('#editCustModal .modal-note'); if(nt) nt.classList.add('mb-o11');
+    [5,6,7].forEach(function(n){
+      var tp=$('tp'+n); if(!tp) return;
+      var pk=el('button','mbx mb-picker'); pk.type='button'; pk.id='mbPk'+n;
+      pk.innerHTML='<span class="mb-pk-l"><span class="mb-pk-n">หน้าย่อย</span><span class="mb-pk-v">–</span></span>'+S(I.chev,18);
+      pk.onclick=function(){ mbSubSheet(n); };
+      tp.insertBefore(pk, tp.firstChild);
+    });
+  }
+
+  /* ── ปุ่มหน้าย่อยต้นทางของแต่ละแท็บ ── */
+  function subBtns(n){
+    var q = n===5 ? '#tp5>.mb-src .brow>button' : n===6 ? '#tp6 .pr-subtab' : '#tp7 .pr-tab-btn';
+    return [].slice.call(document.querySelectorAll(q)).filter(function(b){ return b.style.display!=='none'; });
+  }
+  function isActive(n,b){ return n===5 ? b.classList.contains('btn-gold') : b.classList.contains('active'); }
+  function clean(t){ return (t||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu,'').replace(/\s+/g,' ').trim(); }
+  function subIcon(t){ return /ใบจ่าย|เบิกเงิน|ประวัติการจ่าย|เรต|สรุปเงินเดือน/.test(t)?I.baht : /รายงาน|สรุป|ต้นทุน/.test(t)?I.chart : /รุ่งชัย/.test(t)?I.link : /ทะเบียนรถ|ค่าน้ำมันรถ/.test(t)?I.fr : /ทะเบียนพนักงาน/.test(t)?I.cust : /เวลา/.test(t)?I.cal : /เบิกจากถัง/.test(t)?I.down : /รับเข้า/.test(t)?I.fuel : I.doc; }
+  function syncPicker(n){
+    var pk=$('mbPk'+n); if(!pk) return;
+    var a=subBtns(n).filter(function(b){ return isActive(n,b); })[0];
+    pk.querySelector('.mb-pk-v').textContent = a ? clean(a.textContent) : '–';
+  }
+  window.mbSubSheet=function(n){
+    var sh=$('mbShSub'); var bs=subBtns(n);
+    sh.innerHTML='<div class="mb-grab"></div><div class="mb-sht">'+TITLE[n]+' — เลือกหน้า</div>'
+      +bs.map(function(b,i){ var t=clean(b.textContent); return '<div class="mb-mrow'+(isActive(n,b)?' on':'')+'" data-i="'+i+'"><div class="mb-mc">'+S(subIcon(t),20)+'</div><div class="mb-mt">'+t+'</div></div>'; }).join('')
+      +'<button class="mb-shbtn" onclick="mbClose()">ปิด</button>';
+    [].forEach.call(sh.querySelectorAll('.mb-mrow'), function(r){
+      r.onclick=function(){ var b=bs[+r.dataset.i]; mbClose(); if(b) b.click(); syncPicker(n); var tp=$('tp'+n); if(tp) tp.scrollTop=0; };
+    });
+    mbOpen('mbShSub');
+  };
+
+  /* ── เมนูทั้งหมด / บัญชี ── */
+  function menuItems(){
+    var a=isAdm();
+    var L=[[1,'imp','นำเข้าใบชั่ง'],[2,'ded','หักน้ำหนัก'],[5,'fr','ค่าเที่ยวรถร่วม'],[6,'pay','เงินเดือน'],[7,'fuel','น้ำมัน']];
+    if(a) L.push([9,'cust','ลูกค้า']);
+    L.push(['so','box','ขายอื่น']);
+    if(a) L.push([3,'doc','ใบแจ้งหนี้ลูกค้า'],[4,'chart','สรุปผู้บริหาร'],[8,'baht','รายจ่าย']);
+    return L;
+  }
+  function go(k){ mbClose(); if(k==='so'){ location.href='sell-other.html'; return; } goTab(k); }
+  window.mbGo=go;
+  function renderMenus(){
+    var cnt=dayRows(heroDate).length;
+    var items=menuItems();
+    $('mbShMore').innerHTML='<div class="mb-grab"></div><div class="mb-sht">เมนูทั้งหมด</div>'
+      +items.map(function(m){ return '<div class="mb-mrow'+(m[0]===curTab?' on':'')+'" onclick="mbGo('+(typeof m[0]==='number'?m[0]:"'"+m[0]+"'")+')"><div class="mb-mc">'+S(I[m[1]],20)+'</div><div class="mb-mt">'+m[2]+'</div>'+(m[0]===1&&cnt?'<div class="mb-mv">'+cnt+' ใบ</div>':'')+'</div>'; }).join('')
+      +'<button class="mb-shbtn" onclick="mbClose()">ปิด</button>';
+    // เมนู 8 ช่องในหน้าแรก
+    var G = isAdm()
+      ? [[1,'imp','นำเข้า<br>ใบชั่ง'],[2,'ded','หัก<br>น้ำหนัก'],[5,'fr','ค่าเที่ยว<br>รถร่วม'],[6,'pay','เงินเดือน'],[7,'fuel','น้ำมัน'],[9,'cust','ลูกค้า'],[3,'doc','ใบแจ้ง<br>หนี้'],[4,'chart','สรุป<br>ผู้บริหาร']]
+      : [[1,'imp','นำเข้า<br>ใบชั่ง'],[2,'ded','หัก<br>น้ำหนัก'],[5,'fr','ค่าเที่ยว<br>รถร่วม'],[6,'pay','เงินเดือน'],[7,'fuel','น้ำมัน'],['so','box','ขายอื่น']];
+    $('mbGrid').innerHTML=G.map(function(g){ return '<div class="mb-gi" onclick="mbGo('+(typeof g[0]==='number'?g[0]:"'"+g[0]+"'")+')"><div class="mb-gc">'+S(I[g[1]],21)+'</div><div class="mb-gl">'+g[2]+'</div></div>'; }).join('');
+    var role=clean(($('topbarRole')||{}).textContent)||'–';
+    $('mbShAcct').innerHTML='<div class="mb-grab"></div><div class="mb-sht">บัญชีผู้ใช้</div>'
+      +'<div class="mb-acct"><div class="mb-acct-l">เข้าสู่ระบบในฐานะ</div><div class="mb-acct-v">'+role+'</div></div>'
+      +'<div class="mb-mrow red" onclick="mbClose();doLogout()"><div class="mb-mc">'+S(I.out,20)+'</div><div class="mb-mt">ออกจากระบบ</div></div>'
+      +'<button class="mb-shbtn" onclick="mbClose()">ปิด</button>';
+  }
+
+  window.mbOpen=function(id){
+    if(id==='mbShMore'||id==='mbShAcct') renderMenus();
+    if(id==='mbShFilter') filterSheet();
+    if(id==='mbShCols') colSheet();
+    $('mbMask').classList.add('open'); $(id).classList.add('open');
+  };
+  function mbClose(){
+    var m=$('mbMask'); if(m) m.classList.remove('open');
+    [].forEach.call(document.querySelectorAll('.mb-sheet.open'), function(s){ s.classList.remove('open'); });
+  }
+  window.mbClose=mbClose;
+
+  /* ── ตัวกรองแท็บ 1 (ย้าย .t1filter ตัวจริงเข้า sheet ตอนมือถือ) ── */
+  var fHome=null;
+  function filterSheet(){
+    var sh=$('mbShFilter'); var f=document.querySelector('.t1filter');
+    if(!sh.dataset.b){
+      sh.dataset.b='1';
+      sh.innerHTML='<div class="mb-grab"></div><div class="mb-sht">ตัวกรองรายการ</div><div id="mbFSlot"></div>'
+        +'<div class="mb-shrow"><button class="mb-shbtn" onclick="clrF1();mbFState()">ล้างตัวกรอง</button><button class="mb-shbtn pri" onclick="mbClose();mbFState()">ดูผล</button></div>';
+    }
+    if(f && f.parentNode!==$('mbFSlot')){
+      if(!fHome) fHome={p:f.parentNode,n:f.nextSibling};
+      $('mbFSlot').appendChild(f);
+      var ls=f.querySelectorAll('label');
+      if(ls.length>=4 && !f.querySelector('.mb-f2')){ var g=el('div','mb-f2'); f.insertBefore(g, ls[2]); g.appendChild(ls[2]); g.appendChild(ls[3]); }
+    }
+  }
+  window.mbFState=function(){
+    var n=['f1p','f1c','f1a','f1b'].filter(function(id){ return ($(id)||{}).value; }).length;
+    var b=$('mbFBtn'); if(!b) return;
+    b.classList.toggle('on', n>0);
+    var d=b.querySelector('.mb-fdot'); if(n>0&&!d) b.appendChild(el('span','mb-fdot')); if(!n&&d) d.remove();
+  };
+  function filterBack(){
+    var f=document.querySelector('.t1filter'); if(!f||!fHome) return;
+    var g=f.querySelector('.mb-f2'); if(g){ while(g.firstChild) f.insertBefore(g.firstChild, g); g.remove(); }
+    fHome.p.insertBefore(f, fHome.n);
+  }
+
+  var qT=null;
+  window.mbSearch=function(v){ clearTimeout(qT); qT=setTimeout(function(){ window.MB_Q1=(v||'').trim(); page1=1; draw1(); }, 180); };
+
+  /* ── hero ── */
+  function dayRows(d){ return (typeof wData!=='undefined'?wData:[]).filter(function(r){ return r.date===d; }); }
+  window.mbSeg=function(i){ heroSeg=i; [].forEach.call($('mbHSeg').children, function(b,k){ b.classList.toggle('on',k===i); }); hero(); };
+  window.mbHeroDate=function(v){ if(v){ heroDate=v; hero(); } };
+  function hero(){
+    if(!built||!$('mbHNum')) return;
+    var W=(typeof wData!=='undefined'?wData:[]);
+    if(!heroDate || !W.some(function(r){return r.date===heroDate;})){ heroDate = W.length ? W[0].date : todayYmd(); }
+    var rows=dayRows(heroDate);
+    var kg=0,qn=0,money=0,priced=0;
+    rows.forEach(function(r){ kg+=r.kg||0; var a=amt(r); money+=a; if(a>0) priced++; });
+    var dl = heroDate===todayYmd() ? 'วันนี้ ('+thDate(heroDate)+')' : thDate(heroDate);
+    $('mbHDateIn').value=heroDate;
+    var H,U,f1l,f1v,f2l,f2v;
+    if(heroSeg===0){ H=fmt(kg); U='กก.'; f1l='<span class="mb-pill"></span>คิดเป็นคิว'; f1v=fmt(kg/KPC,2); f2l='<span class="mb-pill g"></span>จำนวนเที่ยว'; f2v=fmt(rows.length); }
+    else if(heroSeg===1){ H=fmt(money); U='บาท'; f1l='<span class="mb-pill"></span>ใส่ราคาแล้ว'; f1v=fmt(priced)+' ใบ'; f2l='<span class="mb-pill o"></span>ยังไม่ใส่ราคา'; f2v=fmt(rows.length-priced)+' ใบ'; }
+    else {
+      var ym=heroDate.slice(0,7), mr=W.filter(function(r){ return (r.date||'').slice(0,7)===ym; }), mq=0, mm=0;
+      mr.forEach(function(r){ mq+=netK(r); mm+=amt(r); });
+      var p=ym.split('-'); dl='เดือน '+MTH[(+p[1])-1]+' '+String((+p[0])+543).slice(2);
+      H=fmt(mq,2); U='คิวสุทธิ'; f1l='<span class="mb-pill"></span>ยอดขายทั้งเดือน'; f1v=fmt(mm); f2l='<span class="mb-pill g"></span>เที่ยวทั้งเดือน'; f2v=fmt(mr.length);
+    }
+    $('mbHDate').textContent=dl;
+    $('mbHNum').innerHTML=H+'<span class="mb-hunit">'+U+'</span>';
+    $('mbHF1l').innerHTML=f1l; $('mbHF1v').textContent=f1v; $('mbHF2l').innerHTML=f2l; $('mbHF2v').textContent=f2v;
+    var w=$('mbWarn');
+    if(w){ var np=rows.length-priced; w.hidden=!(np>0); w.innerHTML=S(I.warn,18)+'<span>ยังไม่ใส่ราคา '+np+' ใบ จาก '+rows.length+' ใบ ('+thDate(heroDate,true)+')</span>'; }
+  }
+
+  /* ── ตาราง แท็บ 1: เรียงคอลัมน์ใหม่ + เลือกคอลัมน์เท่าที่จอพอ (ไม่ต้องปัดซ้ายขวา) ── */
+  var ORD=[1,0,2,3,6,7,8,4,5,9];                                   // ลำดับ td เดิม → ลำดับมือถือ
+  var KEYS=['plate','seq','date','time','kg','q','amt','cust','prod','btn'];
+  var HEAD=['ทะเบียน','เลขที่','วันที่','เวลา','น้ำหนัก','คิว','ยอด (บาท)','ลูกค้า','สินค้า',''];
+  var CNAME={seq:'เลขที่ใบชั่ง',date:'วันที่',time:'เวลา',kg:'น้ำหนัก (กก.)',q:'คิว',amt:'ยอดเงิน (บาท)',cust:'ลูกค้า',prod:'สินค้า'};
+  var CHOOSE=['date','kg','amt','q','cust','seq','time','prod'];
+  var COL_KEY='mb_t1_cols', DEF_COLS=['date','kg','amt'];
+  var colPref=(function(){ try{ var v=JSON.parse(localStorage.getItem(COL_KEY)||'null'); if(Array.isArray(v)) return v.filter(function(k){ return CHOOSE.indexOf(k)>=0; }); }catch(e){} return DEF_COLS.slice(); })();
+  var colShown=[];
+  var headOrig=null;
+  function tblEl(){ var t=$('t1b'); return t ? t.parentNode : null; }
+  function setCols(list){ var t=tblEl(); if(!t) return; CHOOSE.forEach(function(k){ t.classList.toggle('s-'+k, list.indexOf(k)>=0); }); }
+  function natW(){ var t=tblEl(); if(!t) return 0; t.classList.add('mb-meas'); var n=t.offsetWidth; t.classList.remove('mb-meas'); return n; }   // ความกว้างจริงของเนื้อหา
+  function wrapW(){ var t=tblEl(); var w=t && t.closest('.mb-twrap'); return w ? w.clientWidth : 0; }
+  function fits(){ var ww=wrapW(); if(!ww) return true; return natW() <= ww; }
+  function fitCols(){                       // เอาตามที่เลือกไว้ แต่ถ้าจอไม่พอ ตัดตัวท้าย ๆ ออกชั่วคราว (ไม่ลบค่าที่บันทึก)
+    var list=colPref.slice(); setCols(list);
+    while(list.length && !fits()){ list.pop(); setCols(list); }
+    colShown=list; colLabel();
+  }
+  function colLabel(){
+    var b=$('mbColBtn'); if(!b) return;
+    var hidden=colPref.length-colShown.length;
+    b.innerHTML=S(I.filter,15)+'<span class="mb-th-l">แสดง: <b>ทะเบียน'+colShown.map(function(k){ return ' · '+HEAD[KEYS.indexOf(k)]; }).join('')+'</b>'
+      +(hidden>0?' <span style="color:var(--m-orange)">(จอไม่พอ ซ่อน '+hidden+')</span>':'')+'</span><span class="mb-th-a">เลือกคอลัมน์</span>';
+  }
+  function saveCols(){ try{ localStorage.setItem(COL_KEY, JSON.stringify(colPref)); }catch(e){} }
+  function canAdd(k){ var t=colShown.concat([k]); setCols(t); var ok=fits(); setCols(colShown); return ok; }
+  function colSheet(){
+    var sh=$('mbShCols');
+    var free=0, ww=wrapW(); if(ww) free=Math.min(100,Math.round(natW()/ww*100));
+    var html='<div class="mb-grab"></div><div class="mb-sht">เลือกคอลัมน์ที่จะแสดง</div>'
+      +'<div class="mb-sub">เลือกได้เท่าที่หน้าจอพอดี ไม่ต้องปัดซ้ายขวา · เครื่องนี้จะจำไว้</div>'
+      +'<div class="mb-fitbar'+(free>=90?' full':'')+'"><i style="width:'+free+'%"></i></div>'
+      +'<div class="mb-sub" style="padding-top:2px">ใช้พื้นที่จอไป '+free+'%</div>'
+      +'<div class="mb-ci on lock"><div class="mb-cbox">'+S('<path d="M5 12.5l4.5 4.5L19 7"/>',14)+'</div><div class="mb-ci-n">ทะเบียน</div><div class="mb-ci-r">แสดงเสมอ</div></div>';
+    CHOOSE.forEach(function(k){
+      var onK=colShown.indexOf(k)>=0, full=!onK && !canAdd(k);
+      html+='<div class="mb-ci'+(onK?' on':'')+(full?' full':'')+'" data-k="'+k+'"><div class="mb-cbox">'+(onK?S('<path d="M5 12.5l4.5 4.5L19 7"/>',14):'')+'</div>'
+        +'<div class="mb-ci-n">'+CNAME[k]+'</div><div class="mb-ci-r">'+(full?'จอไม่พอ':'')+'</div></div>';
+    });
+    html+='<div class="mb-shrow"><button class="mb-shbtn" data-act="def">ค่าเริ่มต้น</button><button class="mb-shbtn pri" data-act="ok">เสร็จ</button></div>';
+    sh.innerHTML=html;
+    [].forEach.call(sh.querySelectorAll('.mb-ci[data-k]'), function(r){
+      r.onclick=function(){
+        var k=r.dataset.k, i=colPref.indexOf(k), shown=colShown.indexOf(k)>=0;
+        if(shown){ colPref=colPref.filter(function(x){ return x!==k; }); }
+        else {
+          if(!canAdd(k)){ r.classList.remove('shake'); void r.offsetWidth; r.classList.add('shake'); r.querySelector('.mb-ci-r').textContent='จอไม่พอ · เอาอันอื่นออกก่อน'; return; }
+          colPref=colShown.concat([k]).concat(colPref.filter(function(x){ return colShown.indexOf(x)<0 && x!==k; }));
+        }
+        saveCols(); fitCols(); colSheet();
+      };
+    });
+    sh.querySelector('[data-act="def"]').onclick=function(){ colPref=DEF_COLS.slice(); saveCols(); fitCols(); colSheet(); };
+    sh.querySelector('[data-act="ok"]').onclick=mbClose;
+  }
+  function mobileTable(){
+    var tb=$('t1b'); if(!tb) return;
+    var thr=tb.parentNode.querySelector('thead tr');
+    if(thr && !thr.dataset.mb){
+      if(!headOrig) headOrig=thr.innerHTML;
+      var ths=[].slice.call(thr.children);
+      if(ths.length===10){ ORD.forEach(function(i,k){ ths[i].textContent=HEAD[k]; ths[i].dataset.k=KEYS[k]; if(k>=4&&k<=6) ths[i].classList.add('r'); thr.appendChild(ths[i]); }); }
+      thr.dataset.mb='1';
+    }
+    [].forEach.call(tb.children, function(tr){
+      if(tr.dataset.mb) return; var td=[].slice.call(tr.children); if(td.length!==10) return;
+      ORD.forEach(function(i,k){ td[i].dataset.k=KEYS[k]; tr.appendChild(td[i]); });
+      td[1].className='mb-plate'; td[0].className='mb-mu'; td[2].className='mb-mu'; td[2].textContent=thDate(td[2].textContent,true); td[3].className='mb-mu';
+      td[5].classList.add('mb-mu');
+      if(!td[8].textContent.replace(/[–\s]/g,'')) td[8].innerHTML='<span class="mb-tag">ยังไม่ใส่</span>';
+      tr.classList.add('mb-tap'); tr.dataset.mb='1';
+    });
+    var n=((($('t1cnt')||{}).textContent||'').match(/\d[\d,]*/)||['0'])[0];
+    var latest = (typeof vMode!=='undefined' && vMode==='latest') && !window.MB_Q1 && !['f1p','f1c','f1a','f1b'].some(function(id){ return ($(id)||{}).value; });
+    var ld=(typeof wData!=='undefined'&&wData[0])?wData[0].date:'';
+    $('mbListT').innerHTML=(latest ? (ld===todayYmd()?'รายการวันนี้':'รายการล่าสุด '+thDate(ld,true)) : 'รายการที่ค้นเจอ')+' <small>· '+n+' ใบ</small>';
+    fitCols();
+  }
+  function desktopTable(){
+    var tb=$('t1b'); if(!tb) return;
+    var t=tb.parentNode; CHOOSE.forEach(function(k){ t.classList.remove('s-'+k); });
+    var thr=t.querySelector('thead tr');
+    if(thr && thr.dataset.mb && headOrig){ thr.innerHTML=headOrig; delete thr.dataset.mb; }
+  }
+  var rsT=null;
+  window.addEventListener('resize', function(){ if(!on) return; clearTimeout(rsT); rsT=setTimeout(fitCols,150); });
+
+  /* ── ข้อความที่มีอิโมจิ: เปลี่ยนเฉพาะตอนมือถือ แล้วคืนของเดิมตอนออก ── */
+  var TXT=[
+    ['#editCustModal .modal-title','แก้ไขรายการขาย / ตั้งราคา'],
+    ['#editCustModal .modal-actions .btn-gold','บันทึก'],
+    ['#tp1 .tp1-side .card-title','คลังไฟล์ที่นำเข้า'],
+    ['#del-batch-dialog div[style*="font-size:17px"]','ยืนยันการลบ'],
+    ['#batchList>p','กด รีเฟรช เพื่อโหลดรายการ'],
+    ['#ecPay option[value="สด"]','เงินสด'],['#ecPay option[value="โอน"]','โอน']
+  ];
+  function swapText(toMobile){
+    TXT.forEach(function(t){
+      var e=document.querySelector(t[0]); if(!e) return;
+      // card-title มีปุ่มข้างใน → เปลี่ยนเฉพาะ text node แรก
+      var node = e.firstChild && e.firstChild.nodeType===3 ? e.firstChild : null;
+      if(toMobile){
+        if(e.dataset.mbo!=null) return;
+        if(node && e.children.length){ e.dataset.mbo=node.nodeValue; e.dataset.mbm='node'; node.nodeValue=t[1]+' '; }
+        else { e.dataset.mbo=e.textContent; e.dataset.mbm='text'; e.textContent=t[1]; }
+      } else if(e.dataset.mbo!=null){
+        if(e.dataset.mbm==='node' && node) node.nodeValue=e.dataset.mbo; else e.textContent=e.dataset.mbo;
+        delete e.dataset.mbo; delete e.dataset.mbm;
+      }
+    });
+    var rb=document.querySelector('#tp1 .tp1-side .card-title .btn');
+    if(rb){ if(toMobile && rb.dataset.mbo==null){ rb.dataset.mbo=rb.textContent; rb.textContent='รีเฟรช'; } else if(!toMobile && rb.dataset.mbo!=null){ rb.textContent=rb.dataset.mbo; delete rb.dataset.mbo; } }
+  }
+
+  function syncNav(n){
+    curTab=n;
+    if($('mbTitle')) $('mbTitle').textContent=TITLE[n]||'ท่าทราย ธนเศรษฐ์ศิริ';
+    [].forEach.call(document.querySelectorAll('#mbNav button'), function(b){ b.classList.toggle('on', b.dataset.t===String(n)); });
+    if(n===5||n===6||n===7) syncPicker(n);
+    if(n===1) setTimeout(fitCols,0);
+    var tp=$('tp'+n); if(tp) tp.scrollTop=0;
+  }
+
+  /* ════════ เปิด/ปิดโหมดมือถือ ════════ */
+  function apply(){
+    var want=MQ.matches;
+    if(want===on) return;
+    on=want;
+    if(on){
+      build();
+      document.documentElement.classList.add('mb');
+      swapText(true); renderMenus(); syncNav(curTab); hero();
+      if(typeof draw1==='function' && document.getElementById('appScreen').style.display==='flex') draw1();
+    } else {
+      mbClose(); filterBack(); swapText(false);
+      document.documentElement.classList.remove('mb');
+      window.MB_Q1=''; if($('mbQ1')) $('mbQ1').value='';
+      desktopTable();
+      if(typeof draw1==='function') draw1();   // วาดตารางกลับเป็นแบบจอคอม
+    }
+  }
+
+  /* ── ครอบฟังก์ชันเดิม (ของเดิมทำงานเหมือนเดิมทุกอย่าง แค่เรียกของมือถือต่อท้าย) ── */
+  function wrap(name, after){
+    var f=window[name]; if(typeof f!=='function') return;
+    window[name]=function(){ var r=f.apply(this, arguments); try{ if(on) after.apply(this, arguments); }catch(e){ console.warn('mb',name,e); } return r; };
+  }
+  wrap('goTab', function(n){ var tp=$('tp'+n); if(tp && tp.classList.contains('active')) syncNav(n); });
+  wrap('draw1', function(){ mobileTable(); hero(); });
+  wrap('kpi', function(){ hero(); });
+  wrap('applyRole', function(){ renderMenus(); });
+  wrap('frSetType', function(){ syncPicker(5); });
+  wrap('prSwitch', function(){ syncPicker(6); });
+  wrap('fuelSubTab', function(){ syncPicker(7); });
+  wrap('clrF1', function(){ mbFState(); });
+  wrap('openEditModal', function(id){
+    var r=(typeof wData!=='undefined'?wData:[]).find(function(w){ return w._id===id; }); if(!r) return;
+    var t=document.querySelector('#editCustModal .modal-title');
+    if(t){ if(t.dataset.mbo==null){ t.dataset.mbo=t.textContent; t.dataset.mbm='text'; } t.innerHTML='แก้ไขใบชั่ง <span class="mb-no">#'+r.seq+'</span>'; }
+    setTimeout(function(){ var a=document.activeElement; if(a && a.id==='ecNew') a.blur(); }, 160);   // ไม่ให้คีย์บอร์ดเด้งทันทีตอนเปิด
+    var b=document.querySelector('#editCustModal .modal-box'); if(b) b.scrollTop=0;
+  });
+
+  if(MQ.addEventListener) MQ.addEventListener('change', apply); else if(MQ.addListener) MQ.addListener(apply);
+  document.addEventListener('keydown', function(e){ if(on && e.key==='Escape') mbClose(); });
+  apply();
+})();
+</script>
+
 </body>
 </html>
