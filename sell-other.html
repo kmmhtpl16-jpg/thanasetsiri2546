@@ -1322,5 +1322,32 @@ if(auth){
   });
 } else { showPin(); }
 </script>
+<style id="emb-css">
+/* === เปิดในกรอบหน้าหลัก (?embed=1) — ซ่อนแถบม่วง+แท็บ ใช้เมนูซ้ายของหน้าหลักแทน · โทนสีตามหน้าหลัก === */
+html.emb{--pri:#15803d;--pri-d:#0f5f2e;--pri-l:#eaf6ee;--bg:#eef1f6;--line:#d4dce6;--text:#14202e;--muted:#5b6b7d;}
+html.emb body{background:var(--bg);}
+html.emb #pin{display:none!important;}
+html.emb .topbar,html.emb .tabs{display:none!important;}
+html.emb #app{max-width:1180px;margin:0;padding:0 0 40px;}
+html.emb .pane{padding:22px;}
+html.emb .card{border-radius:10px;padding:18px 22px;}
+</style>
+<script id="emb-js">
+/* เปิดในกรอบหน้าหลัก: ?embed=1 */
+(function(){ if(!/[?&]embed=1/.test(location.search)) return;
+  document.documentElement.classList.add('emb');
+  /* แท็บเจ้าของ แยกเป็น 2 เมนู: 'debt' = ยอดค้างชำระ · 'set' = ตั้งค่า / ตรวจสอบ */
+  window.soView=function(v){
+    goTab('owner');
+    var pane=document.getElementById('pane-owner'); if(!pane) return;
+    [].forEach.call(pane.children, function(c){
+      var h=c.querySelector && c.querySelector('h2'); var isDebt=!!(h && /ยอดค้างชำระ/.test(h.textContent));
+      if(c.classList.contains('notice')) c.style.display=(v==='set')?'':'none';
+      else if(c.classList.contains('card')) c.style.display=(v==='debt')===isDebt?'':'none';
+    });
+    window.scrollTo(0,0);
+  };
+})();
+</script>
 </body>
 </html>

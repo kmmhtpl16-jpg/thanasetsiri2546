@@ -1742,13 +1742,13 @@ select{color-scheme:light;}
         <div class="xs-split">
           <div style="flex:1 1 62%;min-width:0;display:flex;flex-direction:column;gap:14px">
             <div class="card">
-              <div class="card-title">⬆️ บันทึกตัดออกจากกอง</div>
+              <div class="card-title">⬆️ บันทึกตัดออก / ปรับยอดนับจริง</div>
               <div class="frow">
-                <label>ประเภท <select id="xsRcType" class="xs-sel" onchange="xsRcTypeChanged()"><option value="rc_out">ท่าทรายขนไปส่งลูกค้า</option><option value="rc_sale">รุ่งชัยขายหน้าโรงงาน</option></select></label>
+                <label>ประเภท <select id="xsRcType" class="xs-sel" onchange="xsRcTypeChanged()"><option value="rc_out">ท่าทรายขนไปส่งลูกค้า</option><option value="rc_sale">รุ่งชัยขายหน้าโรงงาน</option><option value="rc_adj">📏 ปรับยอดนับจริง</option></select></label>
                 <label>วันที่ <input type="date" id="xsRcDate"></label>
                 <label id="xsRcProjWrap">โครงการ <select id="xsRcProj" class="xs-sel"></select></label>
-                <label>คิว <input type="number" id="xsRcKiu" step="0.01" min="0" style="width:110px;min-width:110px"></label>
-                <label>เที่ยว <input type="number" id="xsRcTrips" min="0" placeholder="ไม่บังคับ" style="width:100px;min-width:100px"></label>
+                <label id="xsRcKiuLbl">คิว <input type="number" id="xsRcKiu" step="0.01" min="0" style="width:110px;min-width:110px"></label>
+                <label id="xsRcTripsWrap">เที่ยว <input type="number" id="xsRcTrips" min="0" placeholder="ไม่บังคับ" style="width:100px;min-width:100px"></label>
                 <label>หมายเหตุ <input type="text" id="xsRcNote" placeholder="—"></label>
                 <button class="btn btn-green" onclick="xsRcSave()">💾 บันทึก</button>
               </div>
@@ -1765,7 +1765,7 @@ select{color-scheme:light;}
               <div id="xsStockNames" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"></div>
               <div class="frow" style="margin-top:8px"><label>เพิ่มชื่อ <select id="xsStockAdd" class="xs-sel"></select></label><button class="btn btn-ghost" onclick="xsStockAddName()">＋ เพิ่ม</button></div>
             </div>
-            <div class="smsg info" style="display:block">คงเหลือ = เข้า − ท่าทรายขนไปส่ง − รุ่งชัยขาย · ยอดรุ่งชัยขายกรอกเป็นก้อนไปก่อน (เช่นรายเดือน) · ยอดเข้าหักทรายเปียกแล้ว</div>
+            <div class="smsg info" style="display:block">คงเหลือ = เข้า − ท่าทรายขนไปส่ง − รุ่งชัยขาย · ยอดรุ่งชัยขายกรอกเป็นก้อนไปก่อน (เช่นรายเดือน) · ยอดเข้าหักทรายเปียกแล้ว · นับกองจริงแล้วไม่ตรง เลือก "📏 ปรับยอดนับจริง" กรอกยอดที่นับได้ ระบบตั้งคงเหลือใหม่และโชว์ส่วนต่าง</div>
           </div>
         </div>
       </div>
@@ -1790,7 +1790,7 @@ select{color-scheme:light;}
         </div>
         <div class="card">
           <div class="card-title">📋 ทรายซื้อที่บันทึกแล้ว</div>
-          <div class="table-wrap"><table><thead><tr><th>วันที่</th><th>ท่า</th><th>โครงการ</th><th class="r">เที่ยว</th><th class="r">คิว</th><th class="r">ค่าทราย</th><th class="r">ค่าเที่ยว</th><th>ใบแจ้งหนี้</th><th></th></tr></thead><tbody id="xsJrBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>วันที่</th><th>ท่า</th><th>โครงการ</th><th class="r">เที่ยว</th><th class="r">คิว</th><th class="r">ราคา/คิว</th><th class="r">ค่าทราย</th><th class="r">ค่าเที่ยว</th><th>ใบแจ้งหนี้</th><th></th></tr></thead><tbody id="xsJrBody"></tbody></table></div>
         </div>
       </div>
 
@@ -1811,6 +1811,10 @@ select{color-scheme:light;}
       </div>
     </section>
 
+    <!-- ขายสินค้าอื่น เปิดในกรอบหน้าหลัก (25 ก.ย. 69) — ลำดับ pane ต้องเป็นที่ 11 -->
+    <div class="tab-pane" id="tp11" style="padding:0">
+      <iframe id="soFrame" title="ขายสินค้าอื่น" style="flex:1;width:100%;border:0;min-height:100%;background:var(--bg)"></iframe>
+    </div>
   </main>
 </div>
 
@@ -2228,6 +2232,7 @@ function goTab(n) {
   if(n===8) initExpenseTab();
   if(n===9) draw9();
   if(n===10 && typeof xsInit==='function') xsInit();
+  if(n===11){ var _sf=document.getElementById('soFrame'); if(_sf && !_sf.getAttribute('src')) _sf.src='sell-other.html?embed=1'; }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -9746,6 +9751,24 @@ html.mb .mb-shbtn.red{background:#fdf3f2;border-color:#f0c9c4;color:var(--m-red)
     <div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById('xs-book-modal').style.display='none'">ปิด</button><button class="btn btn-gold" style="color:#fff" onclick="xsBookSave()">💾 บันทึก</button></div>
   </div>
 </div>
+
+<div id="xs-price-modal" class="xs-ov" style="display:none">
+  <div class="xs-box" style="width:min(460px,96vw)">
+    <div class="modal-title">✏️ แก้ราคาซื้อทราย / ค่าเที่ยว</div>
+    <div id="xpInfo" class="xs-billinfo" style="margin-top:0"></div>
+    <div class="xs-grid2" style="margin-top:10px">
+      <label class="xs-f">ราคาซื้อ (บาท/คิว รวม VAT)<input type="number" id="xpBuy" step="0.01" min="0"></label>
+      <label class="xs-f">ค่าเที่ยว (บาท/เที่ยว)<input type="number" id="xpFr" step="0.01" min="0"></label>
+    </div>
+    <div style="margin-top:10px;font-size:14px;display:flex;flex-direction:column;gap:6px">
+      <label><input type="radio" name="xpScope" id="xpOne"> เฉพาะวันนี้</label>
+      <label><input type="radio" name="xpScope" id="xpAll"> <span id="xpAllLbl"></span></label>
+    </div>
+    <div id="xpHist"></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">แก้ได้แม้วางบิลลูกค้าแล้ว — เปลี่ยนแค่ต้นทุน ไม่กระทบยอดในใบแจ้งหนี้ · เก็บราคาเดิมไว้ในประวัติ</div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById('xs-price-modal').style.display='none'">ปิด</button><button class="btn btn-gold" style="color:#fff" onclick="xsJrPriceSave()">💾 บันทึก</button></div>
+  </div>
+</div>
 <style id="xs-css">
 /* ── ทรายแหล่งอื่น (25 ก.ย. 69) — จอคอม ── */
 #tp10 .xs-pane{display:flex;flex-direction:column;gap:14px}
@@ -9922,7 +9945,10 @@ function xsDrawSum(){
 }
 
 /* ══════════ กองรุ่งชัย ══════════ */
-function xsRcTypeChanged(){ document.getElementById('xsRcProjWrap').style.display = document.getElementById('xsRcType').value==='rc_out'?'':'none'; }
+function xsRcTypeChanged(){ var t=document.getElementById('xsRcType').value;
+  document.getElementById('xsRcProjWrap').style.display = t==='rc_out'?'':'none';
+  document.getElementById('xsRcTripsWrap').style.display = t==='rc_adj'?'none':'';
+  document.getElementById('xsRcKiuLbl').firstChild.nodeValue = t==='rc_adj'?'นับกองได้ (คิว) ':'คิว '; }
 function xsDrawRc(){
   var stock=XS.cfg.stock||[];
   document.getElementById('xsStockNames').innerHTML = stock.map(function(s){ return '<span class="badge-canonical" style="font-size:13px;padding:4px 10px">'+xsEsc(s)+(stock.length>1?' <a href="#" onclick="xsStockDel(\''+xsEsc(s).replace(/'/g,"\\'")+'\');return false" style="color:var(--err);text-decoration:none">✕</a>':'')+'</span>'; }).join('');
@@ -9931,15 +9957,19 @@ function xsDrawRc(){
   var ev=[], mon={};
   (wData||[]).forEach(function(r){ if(stock.indexOf(r.customer)<0) return; var k=r.date.slice(0,7); var m=mon[k]||(mon[k]={date:r.date,n:0,kiu:0}); if(r.date<m.date) m.date=r.date; m.n++; m.kiu+=xsNet(r); });
   Object.keys(mon).forEach(function(k){ var m=mon[k]; ev.push({date:m.date, kind:'in', kiu:m.kiu, label:'⬇️ เข้า ใบชั่ง '+m.n+' เที่ยว ('+k.slice(5)+'/'+(parseInt(k.slice(0,4))+543)+')'}); });
-  XS.ext.forEach(function(x){ if(x.src!=='rc_out'&&x.src!=='rc_sale') return; ev.push({date:x.date, kind:x.src, kiu:+x.kiu||0, row:x,
-      label:(x.src==='rc_out'?'⬆️ ขนไปส่ง '+xsEsc(x.project||''):'🏭 รุ่งชัยขายหน้าโรงงาน')+(x.trips?' · '+x.trips+' เที่ยว':'')+(x.note?' · '+xsEsc(x.note):'') }); });
-  ev.sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:(a.kind==='in'?-1:1); });
-  var bal=0, tin=0, tout=0, tsale=0;
+  XS.ext.forEach(function(x){ if(x.src!=='rc_out'&&x.src!=='rc_sale'&&x.src!=='rc_adj') return; ev.push({date:x.date, kind:x.src, kiu:+x.kiu||0, row:x,
+      label:(x.src==='rc_out'?'⬆️ ขนไปส่ง '+xsEsc(x.project||''):x.src==='rc_adj'?'📏 นับกองจริงได้ '+xsN(x.counted)+' คิว':'🏭 รุ่งชัยขายหน้าโรงงาน')+(x.trips?' · '+x.trips+' เที่ยว':'')+(x.note?' · '+xsEsc(x.note):'') }); });
+  var ord={in:0,rc_out:1,rc_sale:1,rc_adj:2};
+  ev.sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:(ord[a.kind]-ord[b.kind]); });
+  var bal=0, tin=0, tout=0, tsale=0, tadj=0, lastCount=null;
   var rows=ev.map(function(e){
-    if(e.kind==='in'){ bal+=e.kiu; tin+=e.kiu; } else { bal-=e.kiu; if(e.kind==='rc_out') tout+=e.kiu; else tsale+=e.kiu; }
+    if(e.kind==='in'){ bal+=e.kiu; tin+=e.kiu; }
+    else if(e.kind==='rc_adj'){ var diff=(+e.row.counted||0)-bal; e.adj=diff; bal=+e.row.counted||0; tadj+=diff; lastCount=e.row; }
+    else { bal-=e.kiu; if(e.kind==='rc_out') tout+=e.kiu; else tsale+=e.kiu; }
     var act='';
     if(e.row){ act = e.row.invDoc ? '<span class="badge-billed">วางบิล '+xsEsc(e.row.invDoc)+'</span>' : '<button class="btn-red" onclick="xsRowDel(\''+e.row.id+'\')">ลบ</button>'; }
     else act='<span style="color:var(--muted);font-size:13px">แก้ที่ใบชั่ง</span>';
+    if(e.kind==='rc_adj') return '<tr style="background:rgba(52,152,219,.07)"><td>'+xsTh(e.date)+'</td><td>'+e.label+' <span style="font-size:13px;color:'+(e.adj<0?'var(--err)':'var(--gold)')+'">(ปรับ '+(e.adj>=0?'+':'')+xsN(e.adj)+')</span></td><td class="r"></td><td class="r"></td><td class="r"><b>'+xsN(bal)+'</b></td><td style="text-align:right">'+act+'</td></tr>';
     return '<tr><td>'+xsTh(e.date)+'</td><td>'+e.label+'</td><td class="r" style="color:var(--gold)">'+(e.kind==='in'?'+'+xsN(e.kiu):'')+'</td><td class="r">'+(e.kind!=='in'?xsN(e.kiu):'')+'</td><td class="r">'+xsN(bal)+'</td><td style="text-align:right">'+act+'</td></tr>';
   });
   document.getElementById('xsRcBody').innerHTML = rows.length ? rows.join('')
@@ -9949,7 +9979,7 @@ function xsDrawRc(){
      '<div class="kpi-card"><div class="kpi-label">⬇️ ขนเข้ากอง (ใบชั่ง)</div><div class="kpi-val" style="color:var(--text)">'+xsN(tin)+'</div><div class="kpi-unit">คิว</div></div>'
     +'<div class="kpi-card"><div class="kpi-label">⬆️ ท่าทรายขนไปส่ง</div><div class="kpi-val" style="color:var(--text)">'+xsN(tout)+'</div><div class="kpi-unit">คิว</div></div>'
     +'<div class="kpi-card"><div class="kpi-label">🏭 รุ่งชัยขายหน้าโรงงาน</div><div class="kpi-val" style="color:'+(tsale?'var(--text)':'var(--warn)')+'">'+(tsale?xsN(tsale):'ยังไม่กรอก')+'</div><div class="kpi-unit">คิว</div></div>'
-    +'<div class="kpi-card"><div class="kpi-label">📦 คงเหลือในกอง</div><div class="kpi-val">'+xsN(bal)+'</div><div class="kpi-unit">คิว'+(tsale?'':' · ยังไม่หักยอดรุ่งชัยขาย')+'</div></div>';
+    +'<div class="kpi-card"><div class="kpi-label">📦 คงเหลือในกอง</div><div class="kpi-val">'+xsN(bal)+'</div><div class="kpi-unit">คิว'+(lastCount?' · นับจริงล่าสุด '+xsTh(lastCount.date)+(tadj?' (ปรับรวม '+(tadj>0?'+':'')+xsN(tadj)+')':''):(tsale?'':' · ยังไม่หักยอดรุ่งชัยขาย'))+'</div></div>';
   xsRcTypeChanged();
 }
 function xsExtWrite(mut){
@@ -9966,7 +9996,14 @@ function xsRcSave(){
   var type=document.getElementById('xsRcType').value, date=document.getElementById('xsRcDate').value;
   var kiu=parseFloat(document.getElementById('xsRcKiu').value)||0, trips=parseInt(document.getElementById('xsRcTrips').value,10)||0;
   var proj=type==='rc_out'?document.getElementById('xsRcProj').value:'', note=(document.getElementById('xsRcNote').value||'').trim();
-  if(!date){ alert('เลือกวันที่'); return; } if(!(kiu>0)){ alert('กรอกจำนวนคิว'); return; } if(type==='rc_out'&&!proj){ alert('เลือกโครงการ'); return; }
+  if(!date){ alert('เลือกวันที่'); return; }
+  if(type==='rc_adj'){
+    if(!(kiu>=0) || document.getElementById('xsRcKiu').value===''){ alert('กรอกจำนวนคิวที่นับได้'); return; }
+    var arow={id:'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), src:'rc_adj', date:date, counted:xsR2(kiu), kiu:0, note:note, by:xsWho(), at:new Date().toISOString()};
+    xsExtWrite(function(rows){ rows.push(arow); return rows; }).then(function(){ document.getElementById('xsRcKiu').value=''; document.getElementById('xsRcNote').value=''; toast('✅ บันทึกยอดนับจริงแล้ว'); xsDrawRc(); }).catch(function(e){ alert('บันทึกไม่สำเร็จ: '+e.message); });
+    return;
+  }
+  if(!(kiu>0)){ alert('กรอกจำนวนคิว'); return; } if(type==='rc_out'&&!proj){ alert('เลือกโครงการ'); return; }
   var row={id:'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), src:type, date:date, project:proj, kiu:xsR2(kiu), trips:trips, note:note, by:xsWho(), at:new Date().toISOString()};
   xsExtWrite(function(rows){ rows.push(row); return rows; }).then(function(){
     document.getElementById('xsRcKiu').value=''; document.getElementById('xsRcTrips').value=''; document.getElementById('xsRcNote').value='';
@@ -10113,10 +10150,10 @@ function xsJrCommit(){
 function xsDrawJr(){
   var rows=xsExt('jr').slice().sort(function(a,b){ return a.date<b.date?1:-1; });
   document.getElementById('xsJrBody').innerHTML = rows.length ? rows.map(function(x){
-    return '<tr><td>'+xsTh(x.date)+'</td><td>'+xsEsc(x.sup||'')+'</td><td>'+xsEsc(x.project||'')+'</td><td class="r">'+(x.trips||0)+'</td><td class="r">'+xsN(x.kiu)+'</td><td class="r">'+xsN((x.kiu||0)*(x.buy||0))+'</td><td class="r">'+xsN((x.trips||0)*(x.freight||0),0)+'</td>'
+    return '<tr><td>'+xsTh(x.date)+'</td><td>'+xsEsc(x.sup||'')+'</td><td>'+xsEsc(x.project||'')+'</td><td class="r">'+(x.trips||0)+'</td><td class="r">'+xsN(x.kiu)+'</td><td class="r">'+(x.buy?xsN(x.buy):'<span class="badge-warn">ยังไม่ใส่</span>')+'</td><td class="r">'+xsN((x.kiu||0)*(x.buy||0))+'</td><td class="r">'+xsN((x.trips||0)*(x.freight||0),0)+'</td>'
       +'<td>'+(x.invDoc?'<span class="badge-billed">'+xsEsc(x.invDoc)+'</span>':'<span class="badge-pending">ยังไม่วางบิล</span>')+'</td>'
-      +'<td style="text-align:right">'+(x.invDoc?'':'<button class="btn-red" onclick="xsRowDel(\''+x.id+'\')">ลบ</button>')+'</td></tr>'; }).join('')
-    : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มี — นำเข้าไฟล์ PDF ด้านบน</td></tr>';
+      +'<td style="text-align:right;white-space:nowrap"><button class="btn-edit-cust" onclick="xsJrPriceEdit(\''+x.id+'\')">แก้ราคา</button> '+(x.invDoc?'':'<button class="btn-red" onclick="xsRowDel(\''+x.id+'\')">ลบ</button>')+'</td></tr>'; }).join('')
+    : '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มี — นำเข้าไฟล์ PDF ด้านบน</td></tr>';
 }
 
 /* ══════════ สมุดรายชื่อลูกค้า ══════════ */
@@ -10227,13 +10264,14 @@ function xsRdSearch(){
     if(!j.rows||!j.rows.length){ el.innerHTML='<div class="smsg warn">ไม่พบ — ค้นเจอเฉพาะผู้จดทะเบียน VAT'+fb+'</div>'; return; }
     XS.rd=j.rows;
     el.innerHTML='<div class="table-wrap" style="max-height:220px;overflow:auto"><table><thead><tr><th>เลขผู้เสียภาษี</th><th>ชื่อ</th><th>สาขา</th><th>ที่อยู่</th><th></th></tr></thead><tbody>'
-      +j.rows.map(function(r,i){ return '<tr><td>'+xsEsc(r.tin)+'</td><td style="white-space:normal">'+xsEsc(r.name)+'</td><td>'+xsEsc(r.branchName)+'</td><td style="white-space:normal;font-size:12px">'+xsEsc(r.address)+'</td><td><button class="btn-eye" onclick="xsRdUse('+i+')">ใช้ข้อมูลนี้</button></td></tr>'; }).join('')
+      +j.rows.map(function(r,i){ return '<tr><td>'+xsEsc(r.tin)+'</td><td style="white-space:normal">'+xsEsc(r.name)+'</td><td>'+xsEsc(r.branchName)+'</td><td style="white-space:normal;font-size:12px">'+xsEsc(xsAddrClean(r.address))+'</td><td><button class="btn-eye" onclick="xsRdUse('+i+')">ใช้ข้อมูลนี้</button></td></tr>'; }).join('')
       +'</tbody></table></div>';
   }).catch(function(e){ el.innerHTML='<div class="smsg warn">⚠️ ติดต่อไม่ได้: '+xsEsc(e.message)+'</div>'; });
 }
+function xsAddrClean(a){ return String(a||'').replace(/(^|\s)อาคาร-(?=\s|$)/g,' ').replace(/\s+/g,' ').trim(); }
 function xsRdUse(i){
   var r=(XS.rd||[])[i]; if(!r) return;
-  document.getElementById('xbName').value=r.name; document.getElementById('xbAddr').value=String(r.address||'').replace(/(^|\s)อาคาร-(?=\s|$)/g,' ').replace(/\s+/g,' ').trim();
+  document.getElementById('xbName').value=r.name; document.getElementById('xbAddr').value=xsAddrClean(r.address);
   document.getElementById('xbTax').value=r.tin; document.getElementById('xbBranch').value=r.branchName;
   toast('เติมข้อมูลจากกรมสรรพากรแล้ว — ตรวจแล้วกดบันทึก');
 }
@@ -10351,6 +10389,36 @@ function xsReleaseInv(docNo){
     return hit?next:null;
   }).catch(function(e){ if(e && e.message!=='ยกเลิก') console.warn('xsReleaseInv', e); });
 }
+
+/* ── แก้ราคาซื้อ / ค่าเที่ยว หลังนำเข้า (25 ก.ย. 69) — แก้ได้แม้วางบิลลูกค้าแล้ว (ต้นทุนไม่กระทบยอดในใบแจ้งหนี้) ── */
+function xsJrPriceEdit(id){
+  var x=XS.ext.filter(function(r){return r.id===id;})[0]; if(!x) return;
+  XS.jrEdit=id;
+  var same=xsExt('jr').filter(function(r){ return (r.sup||'')===(x.sup||'') && (r.file||'')===(x.file||'') && (+r.buy||0)===(+x.buy||0) && (+r.freight||0)===(+x.freight||0); });
+  document.getElementById('xpInfo').innerHTML='<b>'+xsEsc(x.sup||'')+'</b> · '+xsTh(x.date)+' · '+(x.trips||0)+' เที่ยว · '+xsN(x.kiu)+' คิว'+(x.file?'<br><span style="color:var(--muted);font-size:12px">ไฟล์ '+xsEsc(x.file)+'</span>':'');
+  document.getElementById('xpBuy').value=x.buy||''; document.getElementById('xpFr').value=x.freight||'';
+  document.getElementById('xpAllLbl').textContent='ทุกวันจากไฟล์เดียวกันที่ราคาเดิมเท่ากัน ('+same.length+' วัน)';
+  document.getElementById('xpOne').checked=same.length<=1; document.getElementById('xpAll').checked=same.length>1;
+  var h=(x.priceHist||[]).slice().reverse();
+  document.getElementById('xpHist').innerHTML=h.length?('<div class="xs-srch" style="margin-top:10px">ประวัติราคา</div>'+h.map(function(p){ return '<div style="font-size:13px">'+xsTh((p.at||'').slice(0,10))+' · '+xsEsc(p.by||'')+' — เดิม '+xsN(p.buy)+' ฿/คิว · ค่าเที่ยว '+xsN(p.freight,0)+'</div>'; }).join('')):'';
+  document.getElementById('xs-price-modal').style.display='flex';
+}
+function xsJrPriceSave(){
+  var id=XS.jrEdit, x=XS.ext.filter(function(r){return r.id===id;})[0]; if(!x) return;
+  var buy=parseFloat(document.getElementById('xpBuy').value), fr=parseFloat(document.getElementById('xpFr').value);
+  if(!(buy>=0) || !(fr>=0)){ alert('กรอกราคาให้ครบ'); return; }
+  var all=document.getElementById('xpAll').checked, key=[x.sup||'',x.file||'',+x.buy||0,+x.freight||0].join('|');
+  var who=xsWho(), at=new Date().toISOString(), n=0;
+  xsExtWrite(function(rows){
+    return rows.map(function(r){
+      var hit = r.id===id || (all && r.src==='jr' && [r.sup||'',r.file||'',+r.buy||0,+r.freight||0].join('|')===key);
+      if(!hit) return r;
+      if((+r.buy||0)===buy && (+r.freight||0)===fr) return r;
+      n++; r=Object.assign({},r); r.priceHist=(r.priceHist||[]).concat([{at:at,by:who,buy:+r.buy||0,freight:+r.freight||0}]); r.buy=buy; r.freight=fr; return r;
+    });
+  }).then(function(){ document.getElementById('xs-price-modal').style.display='none'; toast(n?('✅ แก้ราคาแล้ว '+n+' วัน'):'ราคาเท่าเดิม ไม่มีอะไรเปลี่ยน'); xsDrawJr(); })
+    .catch(function(e){ alert('บันทึกไม่สำเร็จ: '+e.message); });
+}
 </script>
 <style id="sb-css">
 /* ── เมนูซ้าย (25 ก.ย. 69) — เฉพาะจอกว้างกว่า 700px · มือถือไม่แตะ ── */
@@ -10440,7 +10508,13 @@ function xsReleaseInv(docNo){
         ['หักน้ำหนัก',{t:2},0],
         ['กองรุ่งชัย น้ำโสม',{t:10,s:'rc'},ADM]
       ]},
-      ['ขายอื่น',{href:'sell-other.html'},0,'ดิน / หิน'],
+      {g:'ขายอื่น', lv:2, open:1, hint:'ดิน / หิน', kids:[
+        ['ออกบิล',{t:11,so:'sell'},0],
+        ['รายได้ / ประวัติ',{t:11,so:'day'},0],
+        ['สินค้า',{t:11,so:'prod'},0],
+        ['ยอดค้างชำระ',{t:11,so:'owner',sv:'debt'},ADM,'ลูกค้าลงบัญชี'],
+        ['ตั้งค่า / ตรวจสอบ',{t:11,so:'owner',sv:'set'},ADM,'บัญชีรับเงิน · สิทธิ์ · ประวัติแก้บิล']
+      ]},
       {g:'ลูกค้า', lv:2, open:1, kids:[
         ['ใบแจ้งหนี้ลูกค้า',{t:3},ADM],
         ['สมุดรายชื่อลูกค้า',{t:10,s:'book'},ADM,'ชื่อบนใบแจ้งหนี้ + ประวัติ'],
@@ -10497,9 +10571,20 @@ function xsReleaseInv(docNo){
     if(g.p && typeof prSwitch==='function') prSwitch(g.p);
     if(g.f && typeof frSetType==='function') frSetType(g.f);
     if(g.s && typeof xsSub==='function') xsSub(g.s);
+    if(g.so) soGo(g);
     mark(it);
     if(window.innerWidth<1100 || document.documentElement.classList.contains('sb-off')) close();
     var pane=document.querySelector('.tab-pane.active'); if(pane) pane.scrollTop=0;
+  }
+  /* ขายอื่น: สั่งหน้าในกรอบเปลี่ยนแท็บ — ถ้ายังโหลดไม่เสร็จ รอ load ก่อน */
+  var soWant=null;
+  function soGo(g){
+    var fr=document.getElementById('soFrame'); if(!fr) return;
+    var go=function(){ try{ var w=fr.contentWindow; if(g.sv && w.soView) w.soView(g.sv); else w.goTab(g.so); }catch(e){} };
+    var ready=false; try{ ready=!!(fr.contentWindow && fr.contentWindow.goTab && fr.contentDocument.readyState==='complete'); }catch(e){}
+    if(ready){ go(); return; }
+    if(!soWant) fr.addEventListener('load', function(){ setTimeout(function(){ if(soWant){ soWant(); soWant=null; } },300); }, {once:true});
+    soWant=go;
   }
   function mark(it){
     cur=it;
