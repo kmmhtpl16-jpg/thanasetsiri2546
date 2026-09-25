@@ -607,6 +607,7 @@ select{color-scheme:light;}
     <button class="tab-btn ta" data-tab="4" onclick="goTab(4)" style="display:none">👑 สรุปผู้บริหาร</button>
     <button class="tab-btn ta" data-tab="8" onclick="goTab(8)" style="display:none">💸 รายจ่าย</button>
     <button class="tab-btn ta" data-tab="9" onclick="goTab(9)" style="display:none">🧑‍💼 ลูกค้า</button>
+    <button class="tab-btn ta" data-tab="10" onclick="goTab(10)" style="display:none">🏗️ ทรายแหล่งอื่น</button>
   </nav>
 
   <main class="main-content">
@@ -772,6 +773,7 @@ select{color-scheme:light;}
           <button class="btn btn-gold"  onclick="doFilter()">🔍 กรอง</button>
           <button class="btn btn-green" onclick="doExport()">📥 CSV</button>
           <button class="btn btn-ghost" onclick="openInvoiceModal()">🧾 ใบแจ้งหนี้</button>
+          <button class="btn btn-gold" onclick="xsOpenInv()" title="รวมท่าเรา + กองรุ่งชัย + ซื้อท่าอื่น เป็นบรรทัดเดียว">🏗️ ใบแจ้งหนี้ตามโครงการ</button>
           <button class="btn btn-ghost" id="invhist-toggle-btn" onclick="toggleInvHistory()">📋 ประวัติใบแจ้งหนี้</button>
         </div>
       </div>
@@ -1702,6 +1704,113 @@ select{color-scheme:light;}
     </section>
 
 
+
+    <!-- TAB 10 — ทรายแหล่งอื่น (25 ก.ย. 69) : สรุปรวม / กองรุ่งชัย / ซื้อทรายท่าอื่น / สมุดรายชื่อลูกค้า -->
+    <section class="tab-pane" id="tp10" style="padding:16px;">
+      <div class="xs-subtabs">
+        <button class="xs-subtab active" data-xs="sum" onclick="xsSub('sum')">📊 สรุปรวมทุกแหล่ง</button>
+        <button class="xs-subtab" data-xs="rc" onclick="xsSub('rc')">🏭 กองรุ่งชัย (น้ำโสม)</button>
+        <button class="xs-subtab" data-xs="jr" onclick="xsSub('jr')">📄 ซื้อทรายท่าอื่น</button>
+        <button class="xs-subtab" data-xs="book" onclick="xsSub('book')">📒 สมุดรายชื่อลูกค้า</button>
+      </div>
+      <div id="xsMsg" class="smsg" style="display:none"></div>
+
+      <!-- ── สรุปรวมทุกแหล่ง ── -->
+      <div class="xs-pane" id="xs-sum">
+        <div class="t1filter" style="margin:0">
+          <label>โครงการ (ชื่อในตาชั่ง) <select id="xsSumProj" class="xs-sel" onchange="xsDrawSum()"></select></label>
+          <label>ตั้งแต่ <input type="date" id="xsSumA" onchange="xsDrawSum()"></label>
+          <label>ถึง <input type="date" id="xsSumB" onchange="xsDrawSum()"></label>
+          <button class="btn btn-gold" style="margin-left:auto" onclick="xsOpenInv(document.getElementById('xsSumProj').value)">🧾 ออกใบแจ้งหนี้โครงการนี้</button>
+        </div>
+        <div class="kpi-row" id="xsSumKpi" style="margin-top:14px"></div>
+        <div class="xs-split">
+          <div class="card" style="flex:1 1 62%;min-width:0">
+            <div class="card-title">📋 แยกตามแหล่ง รายวัน</div>
+            <div class="table-wrap"><table><thead><tr><th>วันที่</th><th class="r">ท่าเรา (ใบชั่ง)</th><th class="r">กองรุ่งชัย</th><th class="r">ซื้อท่าอื่น (เที่ยว)</th><th class="r">ซื้อท่าอื่น (คิว)</th><th class="r">รวมส่ง</th></tr></thead><tbody id="xsSumBody"></tbody></table></div>
+          </div>
+          <div class="card" style="flex:1 1 38%;min-width:0">
+            <div class="card-title">💰 ต้นทุนทรายซื้อ vs ราคาขาย</div>
+            <div id="xsSumCost"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── กองรุ่งชัย ── -->
+      <div class="xs-pane" id="xs-rc" style="display:none">
+        <div class="kpi-row" id="xsRcKpi"></div>
+        <div class="xs-split">
+          <div style="flex:1 1 62%;min-width:0;display:flex;flex-direction:column;gap:14px">
+            <div class="card">
+              <div class="card-title">⬆️ บันทึกตัดออกจากกอง</div>
+              <div class="frow">
+                <label>ประเภท <select id="xsRcType" class="xs-sel" onchange="xsRcTypeChanged()"><option value="rc_out">ท่าทรายขนไปส่งลูกค้า</option><option value="rc_sale">รุ่งชัยขายหน้าโรงงาน</option></select></label>
+                <label>วันที่ <input type="date" id="xsRcDate"></label>
+                <label id="xsRcProjWrap">โครงการ <select id="xsRcProj" class="xs-sel"></select></label>
+                <label>คิว <input type="number" id="xsRcKiu" step="0.01" min="0" style="width:110px;min-width:110px"></label>
+                <label>เที่ยว <input type="number" id="xsRcTrips" min="0" placeholder="ไม่บังคับ" style="width:100px;min-width:100px"></label>
+                <label>หมายเหตุ <input type="text" id="xsRcNote" placeholder="—"></label>
+                <button class="btn btn-green" onclick="xsRcSave()">💾 บันทึก</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">📒 ความเคลื่อนไหวกอง</div>
+              <div class="table-wrap"><table><thead><tr><th>วันที่</th><th>รายการ</th><th class="r">เข้า</th><th class="r">ออก</th><th class="r">คงเหลือ</th><th></th></tr></thead><tbody id="xsRcBody"></tbody></table></div>
+            </div>
+          </div>
+          <div style="flex:1 1 38%;min-width:0;display:flex;flex-direction:column;gap:14px">
+            <div class="card">
+              <div class="card-title">⚖️ ขาเข้ากอง = ดึงจากใบชั่งเอง</div>
+              <div style="font-size:14px;line-height:1.7">ใบชั่งที่ชื่อโครงการตรงกับรายการนี้ นับเป็น "เข้ากอง" และไม่ออกใบแจ้งหนี้ · ไม่คิดต้นทุนระหว่างท่าทรายกับรุ่งชัย</div>
+              <div id="xsStockNames" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"></div>
+              <div class="frow" style="margin-top:8px"><label>เพิ่มชื่อ <select id="xsStockAdd" class="xs-sel"></select></label><button class="btn btn-ghost" onclick="xsStockAddName()">＋ เพิ่ม</button></div>
+            </div>
+            <div class="smsg info" style="display:block">คงเหลือ = เข้า − ท่าทรายขนไปส่ง − รุ่งชัยขาย · ยอดรุ่งชัยขายกรอกเป็นก้อนไปก่อน (เช่นรายเดือน) · ยอดเข้าหักทรายเปียกแล้ว</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ซื้อทรายท่าอื่น ── -->
+      <div class="xs-pane" id="xs-jr" style="display:none">
+        <div class="card">
+          <div class="card-title">📄 นำเข้าไฟล์สรุปเที่ยว (PDF)</div>
+          <div class="frow">
+            <label>ท่าที่ซื้อ <input type="text" id="xsJrSup" value="จิราวัฒน์"></label>
+            <label>ส่งให้โครงการ <select id="xsJrProj" class="xs-sel"></select></label>
+            <label>ราคาซื้อ (บาท/คิว รวม VAT) <input type="number" id="xsJrPrice" value="170" step="0.01" style="width:120px;min-width:120px"></label>
+            <label>ค่าเที่ยว (บาท/เที่ยว) <input type="number" id="xsJrFreight" value="250" step="0.01" style="width:110px;min-width:110px"></label>
+          </div>
+          <div class="drop-zone" style="margin-top:12px">
+            <input type="file" accept="application/pdf,.pdf" onchange="xsJrFile(event)">
+            <div class="dico">📂</div>
+            <p><strong>แตะหรือลากไฟล์ PDF สรุปเที่ยวมาวางที่นี่</strong></p>
+            <p>ระบบอ่านตารางให้เอง · ตรวจเลขบิลซ้ำ · เทียบยอดกับตารางสรุปท้ายไฟล์</p>
+          </div>
+          <div id="xsJrPreview" style="margin-top:12px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 ทรายซื้อที่บันทึกแล้ว</div>
+          <div class="table-wrap"><table><thead><tr><th>วันที่</th><th>ท่า</th><th>โครงการ</th><th class="r">เที่ยว</th><th class="r">คิว</th><th class="r">ค่าทราย</th><th class="r">ค่าเที่ยว</th><th>ใบแจ้งหนี้</th><th></th></tr></thead><tbody id="xsJrBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- ── สมุดรายชื่อลูกค้า ── -->
+      <div class="xs-pane" id="xs-book" style="display:none">
+        <div class="smsg info" style="display:block">ชื่อที่ใช้ออกใบแจ้งหนี้จริง + ที่อยู่ / เลขผู้เสียภาษี · <b>ไม่ลบชื่อ</b> เลิกใช้ได้อย่างเดียว · แก้แล้วเก็บของเดิมไว้ในประวัติ · ใบเก่าพิมพ์ซ้ำยังเป็นชื่อตอนออกใบ</div>
+        <div class="xs-split">
+          <div class="card" style="flex:1 1 60%;min-width:0">
+            <div class="card-title">📒 สมุดรายชื่อ <button class="btn btn-gold" style="margin-left:auto;color:#fff" onclick="xsBookEdit('')">＋ เพิ่มชื่อ</button></div>
+            <div class="table-wrap"><table><thead><tr><th>ชื่อบนใบแจ้งหนี้</th><th>โครงการที่ผูก</th><th class="r">ใบที่ออก</th><th class="r">ยอด (ไม่นับยกเลิก)</th><th></th></tr></thead><tbody id="xsBookBody"></tbody></table></div>
+          </div>
+          <div class="card" style="flex:1 1 40%;min-width:0;border-color:#f2d7a8">
+            <div class="card-title" style="color:var(--warn)">⚠️ โครงการที่ยังไม่ผูกชื่อลูกค้า</div>
+            <div style="font-size:13px;color:var(--muted);margin:-4px 0 8px">ยังไม่ผูก = ใช้ชื่อโครงการเป็นชื่อบนใบแจ้งหนี้ไปก่อน</div>
+            <div id="xsUnlinked"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -2106,7 +2215,7 @@ function listenFS() {
    TAB SWITCHING
 ================================================================ */
 function goTab(n) {
-  if((n===3||n===4||n===8||n===9) && curRole!=='admin') return;
+  if((n===3||n===4||n===8||n===9||n===10) && curRole!=='admin') return;
   document.querySelectorAll('.tab-btn').forEach(function(b){
     b.classList.toggle('active', parseInt(b.dataset.tab)===n);
   });
@@ -2118,6 +2227,7 @@ function goTab(n) {
   if(n===7) initFuelTab();
   if(n===8) initExpenseTab();
   if(n===9) draw9();
+  if(n===10 && typeof xsInit==='function') xsInit();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -7102,7 +7212,8 @@ function openInvHistory(){
             +'</div>';
         }
         var style=cancelled?' style="opacity:.5;text-decoration:line-through;font-size:14px"':'style="font-size:14px"';
-        var scopeTag=(v.scope==='other')?' <span style="font-size:10px;background:#f2e6d0;color:#8a5a10;padding:1px 6px;border-radius:8px">🧱 ขายอื่น</span>'
+        var scopeTag=(v.scope==='project')?(' <span style="font-size:10px;background:#e3f3e8;color:#116136;padding:1px 6px;border-radius:8px">🏗️ ตามโครงการ</span>'+(v.billName&&v.billName!==v.customer?'<br><span style="font-size:12px">ออกในนาม '+v.billName+'</span>':''))
+                    :(v.scope==='other')?' <span style="font-size:10px;background:#f2e6d0;color:#8a5a10;padding:1px 6px;border-radius:8px">🧱 ขายอื่น</span>'
                     :(v.scope==='both')?' <span style="font-size:10px;background:#e3ecf7;color:#2c5aa0;padding:1px 6px;border-radius:8px">🧾 รวม</span>':'';
         var netCell=(v.scope==='other')?'-':fmt3(v.totalNetKiu);
         return '<tr '+style+'><td style="padding:10px 12px"><b>'+v.docNo+'</b></td>'
@@ -7128,7 +7239,7 @@ function setInvStatus(docNo, status){
 function cancelInvoice(docNo){
   if(!confirm('ยืนยันยกเลิกใบแจ้งหนี้ '+docNo+'?\n\nใบที่ยกเลิกจะยังแสดงในประวัติ (ขีดฆ่า)\nและจะออกใบใหม่สำหรับยอดเดิมได้อีกครั้ง')) return;
   prDb().collection('invoices').doc(docNo).update({status:'cancelled'})
-    .then(function(){ openInvHistory(); })
+    .then(function(){ if(typeof xsReleaseInv==='function') xsReleaseInv(docNo); openInvHistory(); })
     .catch(function(e){ alert('ยกเลิกไม่สำเร็จ: '+e.message); });
 }
 
@@ -7141,6 +7252,11 @@ function printSavedInvoice(docNo){
     .then(function(d){
       if(!d.exists){ if(pw)pw.close(); alert('ไม่พบใบแจ้งหนี้'); return; }
       var v=d.data();
+      if(v.scope==='project' && typeof xsProjOpt==='function'){
+        _invRows=[];
+        printInvoice(v.sandType, v.price, v.vatType, v.balFwd||0, v.remark, v.docNo, pw, 'sand', [], v.billName||v.customer, v.totalNetKiu||0, xsProjOpt(v));
+        return;
+      }
       var scope=v.scope||'sand';
       var incSand=(scope==='sand'||scope==='both');
       // สร้าง _invRows จำลองจากช่วงวันที่ + ลูกค้า เพื่อ reuse printInvoice (เฉพาะส่วนทราย)
@@ -7168,7 +7284,7 @@ function printSavedInvoice(docNo){
     .catch(function(e){ if(pw)pw.close(); alert('ดึงข้อมูลไม่สำเร็จ: '+e.message); });
 }
 
-function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo, preWin, scope, otherLines, custNameArg, sandNetKiuArg) {
+function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo, preWin, scope, otherLines, custNameArg, sandNetKiuArg, projOpt) {
   scope=scope||'sand'; otherLines=otherLines||[];
   var incSand=(scope==='sand'||scope==='both');
   var incOther=(scope==='other'||scope==='both');
@@ -7270,6 +7386,14 @@ function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo, preW
       }
     });
   }
+  /* ใบแจ้งหนี้ตามโครงการ (ทรายแหล่งอื่น 25 ก.ย. 69) — บรรทัดเดียว ไม่บอกแหล่ง */
+  if(projOpt){
+    var _pf=projOpt.dateFrom?isoToBE(projOpt.dateFrom):'', _pt=projOpt.dateTo?isoToBE(projOpt.dateTo):'';
+    rowsArr=['<tr><td>1</td><td><b>'+productName+'</b><br><span style="font-size:7.5pt;color:#888">โครงการ '+_esc(projOpt.project||'')+(_pf?' · '+_pf+(_pt&&_pt!==_pf?' – '+_pt:''):'')+'</span></td>'
+      +'<td class="r">'+totalNetKiu.toFixed(2)+'</td><td class="c">คิว</td>'
+      +'<td class="r">'+price.toLocaleString('th-TH',{minimumFractionDigits:2})+'</td>'
+      +'<td class="r">'+(totalNetKiu*price).toLocaleString('th-TH',{minimumFractionDigits:2})+'</td></tr>'];
+  }
   var tableRows=rowsArr.join('');
 
   var remarkHtml='';
@@ -7344,7 +7468,11 @@ function printInvoice(sandType, price, vatType, balFwd, remark, fixedDocNo, preW
             +'<tr><td>วันที่</td><td>'+thDate+'</td></tr>'
             +'<tr><td>ครบกำหนด</td><td>'+thDate+'</td></tr>'
           +'</tbody></table></div></div>'
-        +'<div class="cust"><b>ลูกค้า</b>&nbsp;&nbsp;'+custName+'</div>'
+        +(projOpt
+          ? ('<div class="cust"><b>ลูกค้า</b>&nbsp;&nbsp;'+_esc(custName)+(projOpt.branch?' ('+_esc(projOpt.branch)+')':'')
+              +((projOpt.addr||projOpt.tax)?'<br><span style="font-size:8.5pt;color:#555">'+_esc(projOpt.addr||'')+(projOpt.tax?' &nbsp;|&nbsp; เลขผู้เสียภาษี '+_esc(projOpt.tax):'')+'</span>':'')
+              +'<br><span style="font-size:8.5pt;color:#555"><b style="color:#6c63b6">โครงการ</b>&nbsp; '+_esc(projOpt.project||'')+'</span></div>')
+          : ('<div class="cust"><b>ลูกค้า</b>&nbsp;&nbsp;'+custName+'</div>'))
       +'</div>';
 
   var itemsHeadHtml='<thead><tr>'
@@ -9568,5 +9696,858 @@ html.mb .mb-shbtn.red{background:#fdf3f2;border-color:#f0c9c4;color:var(--m-red)
 })();
 </script>
 
+
+
+<!-- ═══ ทรายแหล่งอื่น: หน้าต่างใบแจ้งหนี้ต่อโครงการ + แก้สมุดรายชื่อ (25 ก.ย. 69) ═══ -->
+<div id="xs-inv-modal" class="xs-ov" style="display:none">
+  <div class="xs-box" style="width:min(620px,96vw)">
+    <div class="modal-title">🧾 ใบแจ้งหนี้ตามโครงการ (รวมทุกแหล่ง บรรทัดเดียว)</div>
+    <div class="xs-grid2">
+      <label class="xs-f">โครงการ (ชื่อในตาชั่ง)<select id="xiProj" class="xs-sel" onchange="xsInvProjChanged()"></select></label>
+      <label class="xs-f">ชื่อลูกค้า ที่ต้องการแสดงบนใบแจ้งหนี้<select id="xiBill" class="xs-sel" onchange="xsInvCalc()"></select></label>
+      <label class="xs-f">ตั้งแต่<input type="date" id="xiA" onchange="xsInvCalc()"></label>
+      <label class="xs-f">ถึง<input type="date" id="xiB" onchange="xsInvCalc()"></label>
+      <label class="xs-f">ประเภทสินค้า<select id="xiType" class="xs-sel"><option value="delivery">ทราย (รวมจัดส่ง)</option><option value="self">ทราย (รับเอง)</option></select></label>
+      <label class="xs-f">ราคาต่อคิว (บาท)<input type="number" id="xiPrice" step="0.01" min="0" oninput="xsInvCalc()"></label>
+      <label class="xs-f">VAT<select id="xiVat" class="xs-sel" onchange="xsInvCalc()"><option value="inclusive">รวม VAT 7% แล้ว</option><option value="exclusive">ยังไม่รวม VAT 7%</option><option value="zero">VAT 0%</option></select></label>
+      <label class="xs-f">หมายเหตุ<input type="text" id="xiRemark" placeholder="เช่น ชำระภายใน 30 วัน"></label>
+    </div>
+    <div id="xiBillInfo" class="xs-billinfo"></div>
+    <div class="xs-srcbox">
+      <div class="xs-srch">ทรายของโครงการนี้ (ลูกค้าเห็นเป็นบรรทัดเดียว)</div>
+      <div id="xiSrc"></div>
+    </div>
+    <div id="xiWarn"></div>
+    <div id="xiTotal" class="xs-total"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="xsCloseInv()">ยกเลิก</button><button class="btn btn-gold" style="color:#fff" onclick="xsInvSave()">💾 บันทึก + พิมพ์</button></div>
+  </div>
+</div>
+
+<div id="xs-book-modal" class="xs-ov" style="display:none">
+  <div class="xs-box" style="width:min(640px,96vw)">
+    <div class="modal-title" id="xbTitle">📒 ชื่อลูกค้าบนใบแจ้งหนี้</div>
+    <div class="xs-rd">
+      <input type="text" id="xbQ" placeholder="ค้นจากกรมสรรพากร: พิมพ์เลขผู้เสียภาษี 13 หลัก" onkeydown="if(event.key==='Enter')xsRdSearch()">
+      <button class="btn btn-gold" style="color:#fff" onclick="xsRdSearch()">🔍 ค้นหา</button>
+    </div>
+    <div id="xbRd"></div>
+    <div class="xs-grid2" style="margin-top:10px">
+      <label class="xs-f" style="grid-column:1/-1">ชื่อบนใบแจ้งหนี้ *<input type="text" id="xbName"></label>
+      <label class="xs-f" style="grid-column:1/-1">ที่อยู่<textarea id="xbAddr" rows="2"></textarea></label>
+      <label class="xs-f">เลขผู้เสียภาษี<input type="text" id="xbTax" maxlength="13" inputmode="numeric"></label>
+      <label class="xs-f">สาขา<input type="text" id="xbBranch" placeholder="สำนักงานใหญ่"></label>
+      <label class="xs-f">โทร<input type="text" id="xbPhone"></label>
+      <label class="xs-f">สถานะ<select id="xbActive" class="xs-sel"><option value="1">ใช้งาน</option><option value="0">เลิกใช้</option></select></label>
+    </div>
+    <div class="xs-f" style="margin-top:8px">โครงการที่ใช้ชื่อนี้ (ติ๊กได้หลายโครงการ)</div>
+    <div id="xbProj" class="xs-projchk"></div>
+    <div id="xbHist"></div>
+    <div id="xbMsg" class="smsg" style="display:none"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById('xs-book-modal').style.display='none'">ปิด</button><button class="btn btn-gold" style="color:#fff" onclick="xsBookSave()">💾 บันทึก</button></div>
+  </div>
+</div>
+<style id="xs-css">
+/* ── ทรายแหล่งอื่น (25 ก.ย. 69) — จอคอม ── */
+#tp10 .xs-pane{display:flex;flex-direction:column;gap:14px}
+#tp10 .xs-pane[style*="display:none"]{display:none!important}
+.xs-split{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.xs-sel{padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);min-width:160px;max-width:320px}
+tr.xs-tot td{background:rgba(21,128,61,.08);font-weight:800}
+.xs-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9990;align-items:center;justify-content:center;padding:16px}
+.xs-box{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px 20px 16px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+.xs-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.xs-f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.xs-f input,.xs-f select,.xs-f textarea{width:100%;max-width:none;padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-family:var(--font)}
+.xs-billinfo{margin-top:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;line-height:1.6}
+.xs-srcbox{margin-top:10px;border:2px solid var(--gold);border-radius:10px;padding:10px 12px;background:rgba(21,128,61,.04)}
+.xs-srch{font-size:13px;font-weight:800;color:var(--gold);margin-bottom:6px}
+.xs-ck{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;cursor:pointer;flex-wrap:wrap}
+.xs-ck span:last-child{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.xs-ck input{width:16px;height:16px;accent-color:var(--gold)}
+.xs-total{margin-top:10px;font-size:14px;text-align:right}
+.xs-rd{display:flex;gap:8px}
+.xs-rd input{flex:1;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;font-family:var(--font);font-size:13px;color:var(--text)}
+.xs-projchk{display:flex;flex-direction:column;gap:4px;max-height:160px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:4px}
+.xs-un{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bg3);font-size:14px}
+.xs-un>div{flex:1;min-width:0}
+@media(min-width:1024px){
+  .xs-sel{font-size:16px;padding:9px 12px}
+  .xs-f{font-size:13px}.xs-f input,.xs-f select,.xs-f textarea{font-size:16px;padding:9px 12px}
+  .xs-ck,.xs-billinfo,.xs-srch{font-size:15px}.xs-total{font-size:16px}
+  .xs-rd input{font-size:16px}.xs-projchk{font-size:15px}
+}
+#tp10 th.r,.xs-box th.r{text-align:right}
+.xs-subtabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px}
+.xs-subtab{padding:8px 18px;border:1px solid var(--border);border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);background:var(--bg2);font-family:var(--font)}
+.xs-subtab.active{background:rgba(21,128,61,.12);border-color:rgba(21,128,61,.5);color:var(--gold)}
+@media(min-width:1024px){.xs-subtab{font-size:16px;padding:10px 20px}}
+</style>
+<script id="xs-js">
+/* ══════════════════════════════════════════════════════════════════
+   ทรายแหล่งอื่น + โครงการ + สมุดรายชื่อลูกค้า  (25 ก.ย. 2569)
+   - โครงการ = ชื่อในช่องลูกค้าของไฟล์ตาชั่ง (weighings.customer) — ไม่แก้ของเดิม
+   - ทรายส่งลูกค้ามี 3 แหล่ง: ท่าเรา (ใบชั่ง) · กองรุ่งชัย (กรอก rc_out) · ซื้อท่าอื่น (PDF → jr)
+   - กองรุ่งชัย: เข้า = ใบชั่งชื่อโครงการในรายการ stock · ออก = rc_out (ท่าทรายขนไปส่ง) + rc_sale (รุ่งชัยขายเอง)
+   - ไม่คิดต้นทุนระหว่างท่าทรายกับรุ่งชัย
+   ที่เก็บ (อยู่ใต้ os_config ทั้งหมด → ไม่ต้องเพิ่ม Firestore rule):
+     os_config/ext_sand  {rows:[{id,src:'jr'|'rc_out'|'rc_sale',date,project,kiu,trips,tons,bills,sup,buy,freight,note,invDoc,by,at}]}
+     os_config/addrbook  {map:{id:{name,addr,tax,branch,phone,active,projects:[],hist:[],by,at}}}
+     os_config/ext_cfg   {stock:['รุ่งชัย']}
+   ใบแจ้งหนี้ตามโครงการ = invoices เดิม + scope:'project' (1 บรรทัด) · แถว ext ที่วางบิลแล้วจะมี invDoc กันวางซ้ำ
+══════════════════════════════════════════════════════════════════ */
+var XS = { ext:[], book:{}, cfg:{stock:['รุ่งชัย']}, invs:[], loaded:false, sub:'sum', chk:{port:true,rc:true,jr:true}, jr:null, bookId:'' };
+
+function xsRef(id){ return db.collection('os_config').doc(id); }
+function xsEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function xsN(n,d){ d=(d==null?2:d); return (+n||0).toLocaleString('th-TH',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function xsR2(n){ return Math.round((+n||0)*100)/100; }
+function xsNet(r){ return Math.max(0, r.kg/KPC - ((typeof dData!=='undefined'&&dData[r._id])||0)); }
+function xsTh(d){ return d ? isoToBE(d) : '-'; }
+function xsWho(){ return (auth.currentUser&&auth.currentUser.email)||'-'; }
+function xsIsStock(p){ return (XS.cfg.stock||[]).indexOf(p)>=0; }
+function xsMsg(t,type){ var el=document.getElementById('xsMsg'); if(!el) return; if(!t){ el.style.display='none'; return; } el.style.display='block'; el.textContent=t; el.className='smsg '+(type||'info'); }
+
+function xsLoad(){
+  return Promise.all([
+    xsRef('ext_sand').get(), xsRef('addrbook').get(), xsRef('ext_cfg').get(),
+    db.collection('invoices').orderBy('createdAt','desc').limit(500).get()
+  ]).then(function(r){
+    XS.ext = (r[0].exists && Array.isArray(r[0].data().rows)) ? r[0].data().rows : [];
+    XS.book = (r[1].exists && r[1].data().map) ? r[1].data().map : {};
+    var c = r[2].exists ? r[2].data() : {};
+    XS.cfg = { stock: (Array.isArray(c.stock)&&c.stock.length) ? c.stock : ['รุ่งชัย'] };
+    XS.invs = []; r[3].forEach(function(d){ var v=d.data(); if(v && v.docNo) XS.invs.push(v); });
+    XS.loaded = true;
+  });
+}
+
+/* โครงการทั้งหมด (จากใบชั่ง + แถวแหล่งอื่น + ที่ผูกในสมุด) เรียงตามจำนวนใบชั่งมากไปน้อย */
+function xsProjects(opt){
+  opt=opt||{}; var cnt={};
+  (wData||[]).forEach(function(r){ var c=(r.customer||'').trim(); if(c) cnt[c]=(cnt[c]||0)+1; });
+  XS.ext.forEach(function(x){ if(x.project && cnt[x.project]==null) cnt[x.project]=0; });
+  Object.keys(XS.book).forEach(function(k){ (XS.book[k].projects||[]).forEach(function(p){ if(cnt[p]==null) cnt[p]=0; }); });
+  return Object.keys(cnt).filter(function(p){ return !opt.noStock || !xsIsStock(p); })
+    .sort(function(a,b){ return (cnt[b]-cnt[a]) || a.localeCompare(b,'th'); })
+    .map(function(p){ return {name:p, n:cnt[p]}; });
+}
+function xsProjOptions(sel, cur, opt){
+  var el=document.getElementById(sel); if(!el) return;
+  var ps=xsProjects(opt);
+  el.innerHTML = ps.map(function(p){ return '<option value="'+xsEsc(p.name)+'">'+xsEsc(p.name)+(p.n?' ('+p.n+' ใบ)':'')+'</option>'; }).join('');
+  if(cur && ps.some(function(p){return p.name===cur;})) el.value=cur;
+}
+function xsDefaultProj(){
+  var ps=xsProjects({noStock:true});
+  var hit=ps.filter(function(p){ return /บุรินทร์/.test(p.name); })[0];
+  return hit ? hit.name : (ps[0]?ps[0].name:'');
+}
+function xsBookOf(proj){
+  var ids=Object.keys(XS.book);
+  for(var i=0;i<ids.length;i++){ var b=XS.book[ids[i]]; if((b.projects||[]).indexOf(proj)>=0) return ids[i]; }
+  return '';
+}
+function xsPortRows(proj,a,b){
+  return (wData||[]).filter(function(r){ return r.customer===proj && (!a||r.date>=a) && (!b||r.date<=b); });
+}
+function xsExt(src,proj){ return XS.ext.filter(function(x){ return x.src===src && (!proj || x.project===proj); }); }
+function xsMonthStart(){ var t=todayYMD(); return t.slice(0,8)+'01'; }
+
+/* ── เปิดแท็บ ── */
+function xsInit(){
+  if(curRole!=='admin') return;
+  xsMsg('⏳ กำลังโหลด…','info');
+  xsLoad().then(function(){
+    xsMsg('');
+    var p=xsDefaultProj();
+    xsProjOptions('xsSumProj', document.getElementById('xsSumProj').value||p, {noStock:true});
+    xsProjOptions('xsRcProj', document.getElementById('xsRcProj').value||p, {noStock:true});
+    xsProjOptions('xsJrProj', document.getElementById('xsJrProj').value||p, {noStock:true});
+    var a=document.getElementById('xsSumA'), b=document.getElementById('xsSumB');
+    if(!a.value) a.value=xsMonthStart(); if(!b.value) b.value=todayYMD();
+    var rd=document.getElementById('xsRcDate'); if(!rd.value) rd.value=todayYMD();
+    xsSub(XS.sub);
+  }).catch(function(e){ xsMsg('❌ โหลดไม่สำเร็จ: '+e.message+(e.code==='permission-denied'?' (ต้องเพิ่ม rule ให้ os_config)':''),'err'); });
+}
+function xsSub(k){
+  XS.sub=k;
+  document.querySelectorAll('#tp10 .xs-subtab').forEach(function(b){ b.classList.toggle('active', b.dataset.xs===k); });
+  document.querySelectorAll('#tp10 .xs-pane').forEach(function(p){ p.style.display = (p.id==='xs-'+k)?'':'none'; });
+  if(!XS.loaded) return;
+  if(k==='sum') xsDrawSum(); if(k==='rc') xsDrawRc(); if(k==='jr') xsDrawJr(); if(k==='book') xsDrawBook();
+}
+
+/* ══════════ สรุปรวมทุกแหล่ง ══════════ */
+function xsDrawSum(){
+  var proj=document.getElementById('xsSumProj').value, a=document.getElementById('xsSumA').value, b=document.getElementById('xsSumB').value;
+  var day={};
+  function D(d){ return day[d]||(day[d]={port:0,rc:0,jrT:0,jr:0}); }
+  xsPortRows(proj,a,b).forEach(function(r){ D(r.date).port+=xsNet(r); });
+  xsExt('rc_out',proj).forEach(function(x){ if((!a||x.date>=a)&&(!b||x.date<=b)) D(x.date).rc+=(+x.kiu||0); });
+  var jrIn=xsExt('jr',proj).filter(function(x){ return (!a||x.date>=a)&&(!b||x.date<=b); });
+  jrIn.forEach(function(x){ var o=D(x.date); o.jr+=(+x.kiu||0); o.jrT+=(+x.trips||0); });
+  var T={port:0,rc:0,jr:0,jrT:0};
+  var dash='<span style="color:var(--muted)">—</span>';
+  var rows=Object.keys(day).sort().map(function(d){ var o=day[d]; T.port+=o.port; T.rc+=o.rc; T.jr+=o.jr; T.jrT+=o.jrT;
+    return '<tr><td>'+xsTh(d)+'</td><td class="r">'+(o.port?xsN(o.port):dash)+'</td><td class="r">'+(o.rc?xsN(o.rc):dash)+'</td><td class="r">'+(o.jrT||dash)+'</td><td class="r">'+(o.jr?xsN(o.jr):dash)+'</td><td class="r gold">'+xsN(o.port+o.rc+o.jr)+'</td></tr>'; });
+  var all=T.port+T.rc+T.jr;
+  document.getElementById('xsSumBody').innerHTML = rows.length
+    ? rows.join('')+'<tr class="xs-tot"><td>รวม</td><td class="r">'+xsN(T.port)+'</td><td class="r">'+xsN(T.rc)+'</td><td class="r">'+T.jrT+'</td><td class="r">'+xsN(T.jr)+'</td><td class="r gold">'+xsN(all)+'</td></tr>'
+    : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">ไม่มีข้อมูลในช่วงนี้</td></tr>';
+  function pct(v){ return all>0?Math.round(v/all*100)+'%':''; }
+  document.getElementById('xsSumKpi').innerHTML=
+     '<div class="kpi-card"><div class="kpi-label">รวมส่งโครงการนี้</div><div class="kpi-val">'+xsN(all)+'</div><div class="kpi-unit">คิว</div></div>'
+    +'<div class="kpi-card"><div class="kpi-label">ท่าเรา (ใบชั่ง)</div><div class="kpi-val" style="color:var(--text)">'+xsN(T.port)+'</div><div class="kpi-unit">คิว '+pct(T.port)+'</div></div>'
+    +'<div class="kpi-card"><div class="kpi-label">กองรุ่งชัย</div><div class="kpi-val" style="color:var(--text)">'+xsN(T.rc)+'</div><div class="kpi-unit">คิว '+pct(T.rc)+'</div></div>'
+    +'<div class="kpi-card"><div class="kpi-label">ซื้อท่าอื่น</div><div class="kpi-val" style="color:var(--warn)">'+xsN(T.jr)+'</div><div class="kpi-unit">คิว '+pct(T.jr)+' · '+T.jrT+' เที่ยว</div></div>';
+  /* ต้นทุนทรายซื้อ (ราคาซื้อรวม VAT → ถอด VAT · ค่าเที่ยวไม่มี VAT) เทียบราคาขายของโครงการ */
+  var sand=0, fr=0; jrIn.forEach(function(x){ sand+=(+x.kiu||0)*(+x.buy||0); fr+=(+x.trips||0)*(+x.freight||0); });
+  var h='';
+  if(T.jr>0){
+    var costEx=(sand/1.07+fr)/T.jr;
+    var act=(typeof crActive==='function')?crActive(proj):[]; var sp=act[0];
+    var sell=sp?(+sp.v):0, sellEx=sp?((/รวม/.test(sp.vat||'')?sell/1.07:sell)):0;
+    h='<table><tbody>'
+      +'<tr><td>ค่าทราย '+xsN(T.jr)+' คิว (รวม VAT)</td><td class="r">'+xsN(sand)+'</td></tr>'
+      +'<tr><td>ค่าเที่ยว '+T.jrT+' เที่ยว</td><td class="r">'+xsN(fr)+'</td></tr>'
+      +'<tr class="xs-tot"><td>จ่ายรวม</td><td class="r gold">'+xsN(sand+fr)+'</td></tr>'
+      +'<tr><td style="color:var(--muted)">ต้นทุนต่อคิว ก่อน VAT</td><td class="r"><b>'+xsN(costEx)+'</b></td></tr>'
+      +(sell>0?('<tr><td style="color:var(--muted)">ราคาขาย ก่อน VAT <span style="font-size:12px">('+xsN(sell)+' '+xsEsc(sp.vat||'')+')</span></td><td class="r"><b>'+xsN(sellEx)+'</b></td></tr>'
+        +'<tr class="xs-tot"><td>กำไรต่อคิว ก่อน VAT</td><td class="r gold">'+xsN(sellEx-costEx)+'</td></tr>'
+        +'<tr class="xs-tot"><td>กำไรทรายซื้อช่วงนี้</td><td class="r gold">'+xsN((sellEx-costEx)*T.jr)+'</td></tr>')
+        :'<tr><td colspan="2" style="color:var(--warn)">โครงการนี้ยังไม่ตั้งราคาขาย (แท็บลูกค้า)</td></tr>')
+      +'</tbody></table>';
+  } else h='<div style="color:var(--muted);font-size:14px">ช่วงนี้ไม่มีทรายซื้อจากท่าอื่น</div>';
+  document.getElementById('xsSumCost').innerHTML=h;
+}
+
+/* ══════════ กองรุ่งชัย ══════════ */
+function xsRcTypeChanged(){ document.getElementById('xsRcProjWrap').style.display = document.getElementById('xsRcType').value==='rc_out'?'':'none'; }
+function xsDrawRc(){
+  var stock=XS.cfg.stock||[];
+  document.getElementById('xsStockNames').innerHTML = stock.map(function(s){ return '<span class="badge-canonical" style="font-size:13px;padding:4px 10px">'+xsEsc(s)+(stock.length>1?' <a href="#" onclick="xsStockDel(\''+xsEsc(s).replace(/'/g,"\\'")+'\');return false" style="color:var(--err);text-decoration:none">✕</a>':'')+'</span>'; }).join('');
+  var addSel=document.getElementById('xsStockAdd');
+  addSel.innerHTML = xsProjects().filter(function(p){ return stock.indexOf(p.name)<0; }).map(function(p){ return '<option value="'+xsEsc(p.name)+'">'+xsEsc(p.name)+'</option>'; }).join('');
+  var ev=[], mon={};
+  (wData||[]).forEach(function(r){ if(stock.indexOf(r.customer)<0) return; var k=r.date.slice(0,7); var m=mon[k]||(mon[k]={date:r.date,n:0,kiu:0}); if(r.date<m.date) m.date=r.date; m.n++; m.kiu+=xsNet(r); });
+  Object.keys(mon).forEach(function(k){ var m=mon[k]; ev.push({date:m.date, kind:'in', kiu:m.kiu, label:'⬇️ เข้า ใบชั่ง '+m.n+' เที่ยว ('+k.slice(5)+'/'+(parseInt(k.slice(0,4))+543)+')'}); });
+  XS.ext.forEach(function(x){ if(x.src!=='rc_out'&&x.src!=='rc_sale') return; ev.push({date:x.date, kind:x.src, kiu:+x.kiu||0, row:x,
+      label:(x.src==='rc_out'?'⬆️ ขนไปส่ง '+xsEsc(x.project||''):'🏭 รุ่งชัยขายหน้าโรงงาน')+(x.trips?' · '+x.trips+' เที่ยว':'')+(x.note?' · '+xsEsc(x.note):'') }); });
+  ev.sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:(a.kind==='in'?-1:1); });
+  var bal=0, tin=0, tout=0, tsale=0;
+  var rows=ev.map(function(e){
+    if(e.kind==='in'){ bal+=e.kiu; tin+=e.kiu; } else { bal-=e.kiu; if(e.kind==='rc_out') tout+=e.kiu; else tsale+=e.kiu; }
+    var act='';
+    if(e.row){ act = e.row.invDoc ? '<span class="badge-billed">วางบิล '+xsEsc(e.row.invDoc)+'</span>' : '<button class="btn-red" onclick="xsRowDel(\''+e.row.id+'\')">ลบ</button>'; }
+    else act='<span style="color:var(--muted);font-size:13px">แก้ที่ใบชั่ง</span>';
+    return '<tr><td>'+xsTh(e.date)+'</td><td>'+e.label+'</td><td class="r" style="color:var(--gold)">'+(e.kind==='in'?'+'+xsN(e.kiu):'')+'</td><td class="r">'+(e.kind!=='in'?xsN(e.kiu):'')+'</td><td class="r">'+xsN(bal)+'</td><td style="text-align:right">'+act+'</td></tr>';
+  });
+  document.getElementById('xsRcBody').innerHTML = rows.length ? rows.join('')
+    +'<tr class="xs-tot"><td>รวม</td><td></td><td class="r">'+xsN(tin)+'</td><td class="r">'+xsN(tout+tsale)+'</td><td class="r">'+xsN(bal)+'</td><td></td></tr>'
+    : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มีข้อมูล</td></tr>';
+  document.getElementById('xsRcKpi').innerHTML=
+     '<div class="kpi-card"><div class="kpi-label">⬇️ ขนเข้ากอง (ใบชั่ง)</div><div class="kpi-val" style="color:var(--text)">'+xsN(tin)+'</div><div class="kpi-unit">คิว</div></div>'
+    +'<div class="kpi-card"><div class="kpi-label">⬆️ ท่าทรายขนไปส่ง</div><div class="kpi-val" style="color:var(--text)">'+xsN(tout)+'</div><div class="kpi-unit">คิว</div></div>'
+    +'<div class="kpi-card"><div class="kpi-label">🏭 รุ่งชัยขายหน้าโรงงาน</div><div class="kpi-val" style="color:'+(tsale?'var(--text)':'var(--warn)')+'">'+(tsale?xsN(tsale):'ยังไม่กรอก')+'</div><div class="kpi-unit">คิว</div></div>'
+    +'<div class="kpi-card"><div class="kpi-label">📦 คงเหลือในกอง</div><div class="kpi-val">'+xsN(bal)+'</div><div class="kpi-unit">คิว'+(tsale?'':' · ยังไม่หักยอดรุ่งชัยขาย')+'</div></div>';
+  xsRcTypeChanged();
+}
+function xsExtWrite(mut){
+  return db.runTransaction(function(tx){
+    return tx.get(xsRef('ext_sand')).then(function(d){
+      var rows=(d.exists && Array.isArray(d.data().rows)) ? d.data().rows.slice() : [];
+      var next=mut(rows); if(!next) throw new Error('ยกเลิก');
+      tx.set(xsRef('ext_sand'), {rows:next, updatedAt:new Date().toISOString(), updatedBy:xsWho()});
+      return next;
+    });
+  }).then(function(next){ XS.ext=next; return next; });
+}
+function xsRcSave(){
+  var type=document.getElementById('xsRcType').value, date=document.getElementById('xsRcDate').value;
+  var kiu=parseFloat(document.getElementById('xsRcKiu').value)||0, trips=parseInt(document.getElementById('xsRcTrips').value,10)||0;
+  var proj=type==='rc_out'?document.getElementById('xsRcProj').value:'', note=(document.getElementById('xsRcNote').value||'').trim();
+  if(!date){ alert('เลือกวันที่'); return; } if(!(kiu>0)){ alert('กรอกจำนวนคิว'); return; } if(type==='rc_out'&&!proj){ alert('เลือกโครงการ'); return; }
+  var row={id:'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), src:type, date:date, project:proj, kiu:xsR2(kiu), trips:trips, note:note, by:xsWho(), at:new Date().toISOString()};
+  xsExtWrite(function(rows){ rows.push(row); return rows; }).then(function(){
+    document.getElementById('xsRcKiu').value=''; document.getElementById('xsRcTrips').value=''; document.getElementById('xsRcNote').value='';
+    toast('✅ บันทึกแล้ว '+xsN(kiu)+' คิว'); xsDrawRc();
+  }).catch(function(e){ alert('บันทึกไม่สำเร็จ: '+e.message); });
+}
+function xsRowDel(id){
+  var r=XS.ext.filter(function(x){return x.id===id;})[0]; if(!r) return;
+  if(r.invDoc){ alert('แถวนี้อยู่ในใบแจ้งหนี้ '+r.invDoc+' แล้ว — ยกเลิกใบนั้นก่อนถึงจะลบได้'); return; }
+  if(!confirm('ลบรายการ '+xsTh(r.date)+' · '+xsN(r.kiu)+' คิว ?')) return;
+  xsExtWrite(function(rows){
+    var t=rows.filter(function(x){return x.id===id;})[0];
+    if(t && t.invDoc) throw new Error('แถวนี้เพิ่งถูกวางบิล ('+t.invDoc+')');
+    return rows.filter(function(x){ return x.id!==id; });
+  }).then(function(){ toast('ลบแล้ว'); xsSub(XS.sub); }).catch(function(e){ alert('ลบไม่สำเร็จ: '+e.message); });
+}
+function xsStockSave(list){
+  return xsRef('ext_cfg').set({stock:list, updatedAt:new Date().toISOString(), updatedBy:xsWho()},{merge:true}).then(function(){ XS.cfg.stock=list; xsDrawRc(); });
+}
+function xsStockAddName(){ var v=document.getElementById('xsStockAdd').value; if(!v) return; if(!confirm('นับใบชั่งชื่อ "'+v+'" เป็นทรายเข้ากองรุ่งชัย?')) return; xsStockSave((XS.cfg.stock||[]).concat([v])).catch(function(e){ alert(e.message); }); }
+function xsStockDel(v){ if(!confirm('เลิกนับ "'+v+'" เป็นทรายเข้ากอง?')) return; xsStockSave((XS.cfg.stock||[]).filter(function(s){return s!==v;})).catch(function(e){ alert(e.message); }); }
+
+/* ══════════ ซื้อทรายท่าอื่น (PDF) ══════════ */
+/* ── ตัวอ่านไฟล์สรุปเที่ยวจิราวัฒน์ (ใช้ทั้งในเบราว์เซอร์และทดสอบใน node) ── */
+var XS_MONTH={'มค':1,'กพ':2,'มีค':3,'เมย':4,'พค':5,'มิย':6,'กค':7,'สค':8,'กย':9,'ตค':10,'พย':11,'ธค':12};
+function xsMonthKey(s){ return String(s||'').replace(/[.\s่-๋]/g,''); }
+/* items ของหน้าเดียว [{str,x,y}] → บรรทัดข้อความ (เรียงบนลงล่าง ซ้ายไปขวา) */
+function xsLines(items){
+  var rows=[];
+  items.forEach(function(it){
+    if(!it.str || !String(it.str).trim()) return;
+    var r=null;
+    for(var i=0;i<rows.length;i++){ if(Math.abs(rows[i].y-it.y)<3){ r=rows[i]; break; } }
+    if(!r){ r={y:it.y, items:[]}; rows.push(r); }
+    r.items.push(it);
+  });
+  rows.sort(function(a,b){ return b.y-a.y; });
+  return rows.map(function(r){
+    r.items.sort(function(a,b){ return a.x-b.x; });
+    return r.items.map(function(i){ return String(i.str).trim(); }).join('  ');
+  });
+}
+function xsNum(s){ return parseFloat(String(s).replace(/,/g,'')); }
+/* lines (ทุกหน้าต่อกัน) → {rows:[{date,bill,plate,tons,kiu}], summary:{date:{trips,kiu}}, sumKiu, sumTons} */
+function xsParseJr(lines){
+  var reRow=/^(\d{1,2})\s+([ก-๙.]+?)\s*(\d{2})\s+.*?\s(\d{3,}(?:-\d{3,})?)\s+(\d{2,3}-\d{3,4})\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s*$/;
+  var reSum=/^(\d{1,2})\s+([ก-๙.]+?)\s*(\d{2})\s+(\d+)\s+เท.*?\s([\d,]+\.\d+)\s+ค/;
+  var reTot=/^รวม\S*\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s*$/;
+  var rows=[], summary={}, bad=[], tot=null;
+  lines.forEach(function(l){
+    var t=l.replace(/\s+/g,' ').replace(/\s*\.\s*(?=[ก-๙])/g,'.').replace(/([ก-๙])\s*\.\s*/g,'$1.').trim(); var m;
+    if((m=reRow.exec(t))){
+      var mo=XS_MONTH[xsMonthKey(m[2])]; if(!mo){ bad.push(t); return; }
+      var date=(2500+parseInt(m[3],10)-543)+'-'+String(mo).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+      rows.push({date:date, bill:m[4], plate:m[5], tons:xsNum(m[6]), kiu:xsNum(m[7])});
+    } else if((m=reSum.exec(t))){
+      var mo2=XS_MONTH[xsMonthKey(m[2])];
+      if(mo2){ var d2=(2500+parseInt(m[3],10)-543)+'-'+String(mo2).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+        summary[d2]={trips:parseInt(m[4],10), kiu:xsNum(m[5])}; }
+    } else if((m=reTot.exec(t))){ tot={tons:xsNum(m[1]), kiu:xsNum(m[2])}; }
+    else if(/^\d{1,2}\s+[ก-๙.]+\s*\d{2}\s/.test(t)){ bad.push(t); }
+  });
+  return {rows:rows, summary:summary, total:tot, bad:bad};
+}
+/* รวมเป็นรายวัน · คิว = ตันรวมของวัน ÷ 1.5 (ตรงกับตารางสรุปท้ายไฟล์) */
+function xsDaily(rows){
+  var d={};
+  rows.forEach(function(r){ var x=d[r.date]||(d[r.date]={date:r.date,trips:0,tons:0,bills:[]}); x.trips++; x.tons+=r.tons; x.bills.push(r.bill); });
+  return Object.keys(d).sort().map(function(k){ var x=d[k]; x.tons=Math.round(x.tons*100)/100; x.kiu=Math.round(x.tons/1.5*100)/100; return x; });
+}
+
+var _xsPdfLib=null;
+function xsPdfLib(){
+  if(_xsPdfLib) return _xsPdfLib;
+  _xsPdfLib=new Promise(function(res,rej){
+    if(window.pdfjsLib){ res(window.pdfjsLib); return; }
+    var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=function(){ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; res(window.pdfjsLib); };
+    s.onerror=function(){ _xsPdfLib=null; rej(new Error('โหลดตัวอ่าน PDF ไม่ได้ (เช็กอินเทอร์เน็ต)')); };
+    document.head.appendChild(s);
+  });
+  return _xsPdfLib;
+}
+function xsJrFile(evt){
+  var f=evt.target.files[0]; evt.target.value=''; if(!f) return;
+  var pv=document.getElementById('xsJrPreview'); pv.innerHTML='<div class="smsg info">⏳ กำลังอ่าน '+xsEsc(f.name)+'…</div>';
+  var fr=new FileReader();
+  fr.onload=function(){
+    xsPdfLib().then(function(lib){ return lib.getDocument({data:new Uint8Array(fr.result)}).promise; })
+    .then(function(doc){
+      var ps=[]; for(var i=1;i<=doc.numPages;i++) ps.push(doc.getPage(i).then(function(pg){ return pg.getTextContent(); }));
+      return Promise.all(ps);
+    }).then(function(tcs){
+      var lines=[]; tcs.forEach(function(tc){ lines=lines.concat(xsLines(tc.items.map(function(it){ return {str:it.str,x:it.transform[4],y:it.transform[5]}; }))); });
+      var p=xsParseJr(lines); p.file=f.name; XS.jr=p; xsJrPreview();
+    }).catch(function(e){ pv.innerHTML='<div class="smsg err">❌ อ่านไฟล์ไม่ได้: '+xsEsc(e.message)+'</div>'; });
+  };
+  fr.readAsArrayBuffer(f);
+}
+function xsJrKnownBills(sup){ var s={}; xsExt('jr').forEach(function(x){ if((x.sup||'')===sup) (x.bills||[]).forEach(function(b){ s[b]=x.date; }); }); return s; }
+function xsJrPreview(){
+  var p=XS.jr, pv=document.getElementById('xsJrPreview'); if(!p) { pv.innerHTML=''; return; }
+  if(!p.rows.length){ pv.innerHTML='<div class="smsg err">❌ ไม่เจอตารางเที่ยวในไฟล์นี้ — ไฟล์ต้องเป็นแบบ "สรุปเที่ยว" (วันที่ · เลขที่บิล · ทะเบียน · ตัน · คิว)</div>'; return; }
+  var sup=(document.getElementById('xsJrSup').value||'').trim();
+  var known=xsJrKnownBills(sup), seen={}, dupIn=0;
+  var fresh=p.rows.filter(function(r){ if(seen[r.bill]){ dupIn++; return false; } seen[r.bill]=1; return !known[r.bill]; });
+  var daily=xsDaily(p.rows), dNew=xsDaily(fresh);
+  var ok=true, chk=[];
+  var mism=daily.filter(function(d){ var s=p.summary[d.date]; return s && (s.trips!==d.trips || Math.abs(s.kiu-d.kiu)>0.011); });
+  var sumK=daily.reduce(function(a,d){return a+d.kiu;},0);
+  chk.push((mism.length?'❌':'✅')+' ยอดรายวันเทียบตารางสรุปท้ายไฟล์'+(Object.keys(p.summary).length?'':' (ไฟล์นี้ไม่มีตารางสรุป)')+(mism.length?' — ไม่ตรง '+mism.length+' วัน':''));
+  if(p.total) chk.push((Math.abs(p.total.kiu-sumK)<0.02?'✅':'❌')+' ยอดรวมท้ายไฟล์ '+xsN(p.total.kiu)+' คิว · อ่านได้ '+xsN(sumK)+' คิว');
+  chk.push((dupIn?'⚠️':'✅')+' เลขบิลซ้ำในไฟล์ '+dupIn+' ใบ');
+  chk.push((fresh.length<p.rows.length?'⚠️':'✅')+' เคยนำเข้าแล้ว '+(p.rows.length-fresh.length-dupIn)+' เที่ยว (ข้าม)');
+  if(p.bad.length) chk.push('⚠️ อ่านไม่ออก '+p.bad.length+' บรรทัด');
+  if(mism.length) ok=false;
+  var price=parseFloat(document.getElementById('xsJrPrice').value)||0, frt=parseFloat(document.getElementById('xsJrFreight').value)||0;
+  var body=dNew.map(function(d){ return '<tr><td>'+xsTh(d.date)+'</td><td class="r">'+d.trips+'</td><td class="r">'+xsN(d.tons)+'</td><td class="r">'+xsN(d.kiu)+'</td><td class="r">'+xsN(d.kiu*price)+'</td><td class="r">'+xsN(d.trips*frt,0)+'</td></tr>'; }).join('');
+  var tT=dNew.reduce(function(a,d){return a+d.trips;},0), tK=dNew.reduce(function(a,d){return a+d.kiu;},0);
+  pv.innerHTML='<div class="smsg '+(ok?'ok':'err')+'" style="line-height:1.8">'+xsEsc(p.file)+' · '+p.rows.length+' เที่ยว<br>'+chk.join('<br>')+'</div>'
+    +(dNew.length?('<div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>วันที่ (ใหม่)</th><th class="r">เที่ยว</th><th class="r">ตัน</th><th class="r">คิว</th><th class="r">ค่าทราย</th><th class="r">ค่าเที่ยว</th></tr></thead><tbody>'+body
+      +'<tr class="xs-tot"><td>รวม</td><td class="r">'+tT+'</td><td></td><td class="r">'+xsN(tK)+'</td><td class="r">'+xsN(tK*price)+'</td><td class="r">'+xsN(tT*frt,0)+'</td></tr></tbody></table></div>'
+      +'<div class="brow" style="margin-top:12px"><button class="btn btn-green" '+(ok?'':'disabled style="opacity:.5"')+' onclick="xsJrCommit()">💾 บันทึก '+tT+' เที่ยว เข้าโครงการที่เลือก</button><button class="btn btn-ghost" onclick="XS.jr=null;xsJrPreview()">ยกเลิก</button></div>')
+      :'<div class="smsg warn" style="margin-top:10px">ทุกเที่ยวในไฟล์นี้นำเข้าไปแล้ว ไม่มีอะไรใหม่</div>');
+  XS.jrFresh=fresh;
+}
+function xsJrCommit(){
+  var fresh=XS.jrFresh||[]; if(!fresh.length) return;
+  var sup=(document.getElementById('xsJrSup').value||'').trim(), proj=document.getElementById('xsJrProj').value;
+  var price=parseFloat(document.getElementById('xsJrPrice').value)||0, frt=parseFloat(document.getElementById('xsJrFreight').value)||0;
+  if(!sup){ alert('กรอกชื่อท่าที่ซื้อ'); return; } if(!proj){ alert('เลือกโครงการ'); return; }
+  if(!(price>0) && !confirm('ยังไม่ใส่ราคาซื้อ — บันทึกไปก่อนแล้วมาแก้ราคาทีหลัง?')) return;
+  var days=xsDaily(fresh), now=new Date().toISOString(), who=xsWho(), file=(XS.jr&&XS.jr.file)||'';
+  xsExtWrite(function(rows){
+    var known={}; rows.forEach(function(x){ if(x.src==='jr'&&(x.sup||'')===sup) (x.bills||[]).forEach(function(b){ known[b]=1; }); });
+    var add=days.map(function(d){ return {id:'j'+d.date.replace(/-/g,'')+Math.random().toString(36).slice(2,7), src:'jr', sup:sup, date:d.date, project:proj,
+      trips:d.trips, tons:d.tons, kiu:d.kiu, bills:d.bills, buy:price, freight:frt, file:file, by:who, at:now}; })
+      .filter(function(r){ return !r.bills.some(function(b){ return known[b]; }); });
+    if(!add.length) throw new Error('ไม่มีเที่ยวใหม่ (มีคนนำเข้าไปแล้ว)');
+    return rows.concat(add);
+  }).then(function(){ toast('✅ บันทึกทรายซื้อแล้ว'); XS.jr=null; xsJrPreview(); xsDrawJr(); })
+    .catch(function(e){ alert('บันทึกไม่สำเร็จ: '+e.message); });
+}
+function xsDrawJr(){
+  var rows=xsExt('jr').slice().sort(function(a,b){ return a.date<b.date?1:-1; });
+  document.getElementById('xsJrBody').innerHTML = rows.length ? rows.map(function(x){
+    return '<tr><td>'+xsTh(x.date)+'</td><td>'+xsEsc(x.sup||'')+'</td><td>'+xsEsc(x.project||'')+'</td><td class="r">'+(x.trips||0)+'</td><td class="r">'+xsN(x.kiu)+'</td><td class="r">'+xsN((x.kiu||0)*(x.buy||0))+'</td><td class="r">'+xsN((x.trips||0)*(x.freight||0),0)+'</td>'
+      +'<td>'+(x.invDoc?'<span class="badge-billed">'+xsEsc(x.invDoc)+'</span>':'<span class="badge-pending">ยังไม่วางบิล</span>')+'</td>'
+      +'<td style="text-align:right">'+(x.invDoc?'':'<button class="btn-red" onclick="xsRowDel(\''+x.id+'\')">ลบ</button>')+'</td></tr>'; }).join('')
+    : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มี — นำเข้าไฟล์ PDF ด้านบน</td></tr>';
+}
+
+/* ══════════ สมุดรายชื่อลูกค้า ══════════ */
+function xsInvsOfBook(id){
+  var b=XS.book[id]; if(!b) return [];
+  return XS.invs.filter(function(v){ return v.billId ? v.billId===id : ((v.billName||v.customer)===b.name || (!v.billName && (b.projects||[]).indexOf(v.customer)>=0)); });
+}
+function xsDrawBook(){
+  var ids=Object.keys(XS.book).sort(function(a,b){ return (XS.book[a].name||'').localeCompare(XS.book[b].name||'','th'); });
+  var covered={};
+  ids.forEach(function(id){ var b=XS.book[id]; covered[b.name]=1; (b.projects||[]).forEach(function(p){ covered[p]=1; }); });
+  var rows=ids.map(function(id){
+    var b=XS.book[id], iv=xsInvsOfBook(id), live=iv.filter(function(v){return v.status!=='cancelled';});
+    var tot=live.reduce(function(a,v){return a+(+v.grandTotal||0);},0);
+    return '<tr'+(b.active===false?' style="opacity:.5"':'')+'><td><b>'+xsEsc(b.name)+'</b>'+(b.active===false?' <span class="badge-warn">เลิกใช้</span>':'')
+      +'<div style="font-size:12px;color:var(--muted)">'+(b.tax?'เลขภาษี '+xsEsc(b.tax):'<span style="color:var(--warn)">ยังไม่มีเลขภาษี/ที่อยู่</span>')+'</div></td>'
+      +'<td style="white-space:normal;font-size:13px">'+((b.projects||[]).map(xsEsc).join('<br>')||'<span style="color:var(--muted)">—</span>')+'</td>'
+      +'<td class="r">'+live.length+(iv.length>live.length?' <span style="color:var(--muted);font-size:12px">(+ยกเลิก '+(iv.length-live.length)+')</span>':'')+'</td><td class="r">'+xsN(tot)+'</td>'
+      +'<td style="text-align:right"><button class="btn-edit-cust" onclick="xsBookEdit(\''+id+'\')">เปิด / แก้</button></td></tr>';
+  });
+  /* ชื่อที่เคยออกใบแจ้งหนี้แต่ยังไม่อยู่ในสมุด */
+  var old={}; XS.invs.forEach(function(v){ var n=v.billName||v.customer; if(!n||covered[n]) return; var o=old[n]||(old[n]={n:0,c:0,t:0}); if(v.status==='cancelled') o.c++; else { o.n++; o.t+=(+v.grandTotal||0); } });
+  Object.keys(old).forEach(function(n){ var o=old[n];
+    rows.push('<tr style="background:rgba(243,156,18,.06)"><td><b>'+xsEsc(n)+'</b><div style="font-size:12px;color:var(--warn)">เคยออกใบแจ้งหนี้ · ยังไม่ได้บันทึกเข้าสมุด</div></td><td style="font-size:13px">'+xsEsc(n)+'</td>'
+      +'<td class="r">'+o.n+(o.c?' <span style="color:var(--muted);font-size:12px">(+ยกเลิก '+o.c+')</span>':'')+'</td><td class="r">'+xsN(o.t)+'</td>'
+      +'<td style="text-align:right"><button class="btn-edit-cust" onclick="xsBookEdit(\'\','+JSON.stringify(n).replace(/"/g,'&quot;')+')">＋ บันทึกเข้าสมุด</button></td></tr>'); });
+  document.getElementById('xsBookBody').innerHTML = rows.join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มีรายชื่อ</td></tr>';
+  var un=xsProjects({noStock:true}).filter(function(p){ return !xsBookOf(p.name); });
+  var opts='<option value="">— เลือกชื่อลูกค้า —</option><option value="__new">＋ สร้างชื่อใหม่จากโครงการนี้</option>'+ids.filter(function(id){return XS.book[id].active!==false;}).map(function(id){ return '<option value="'+id+'">'+xsEsc(XS.book[id].name)+'</option>'; }).join('');
+  document.getElementById('xsUnlinked').innerHTML = un.length ? un.map(function(p,i){
+    return '<div class="xs-un"><div><b>'+xsEsc(p.name)+'</b><div style="font-size:12px;color:var(--muted)">'+p.n+' ใบชั่ง</div></div><select class="xs-sel" id="xsUn'+i+'" data-p="'+xsEsc(p.name)+'" onchange="xsLinkProj(this)">'+opts+'</select></div>'; }).join('')
+    : '<div style="color:var(--muted);font-size:14px">ผูกครบทุกโครงการแล้ว</div>';
+}
+function xsLinkProj(sel){
+  var p=sel.getAttribute('data-p'), id=sel.value; if(!id) return;
+  if(id==='__new'){ xsBookEdit('', p, [p]); sel.value=''; return; }
+  var b=XS.book[id]; if(!confirm('ผูกโครงการ "'+p+'" กับ "'+b.name+'"?')){ sel.value=''; return; }
+  xsBookWrite(id, function(e){ e.projects=(e.projects||[]).concat([p]); return e; }, true).then(function(){ toast('ผูกแล้ว'); xsDrawBook(); }).catch(function(er){ alert(er.message); sel.value=''; });
+}
+/* แก้รายการเดียวในสมุด (transaction) — keepHist=false จะบันทึกของเดิมลงประวัติเมื่อชื่อ/ที่อยู่/เลขภาษี/สาขา/โทร/สถานะเปลี่ยน */
+function xsBookWrite(id, mut, noHist){
+  return db.runTransaction(function(tx){
+    return tx.get(xsRef('addrbook')).then(function(d){
+      var map=(d.exists && d.data().map) ? JSON.parse(JSON.stringify(d.data().map)) : {};
+      var old=map[id]||null, cur=old?JSON.parse(JSON.stringify(old)):{projects:[],hist:[],active:true,createdAt:new Date().toISOString(),createdBy:xsWho()};
+      var next=mut(cur);
+      /* โครงการหนึ่งผูกได้ชื่อเดียว → ถอดออกจากชื่ออื่น */
+      (next.projects||[]).forEach(function(p){ Object.keys(map).forEach(function(k){ if(k!==id && map[k].projects) map[k].projects=map[k].projects.filter(function(x){return x!==p;}); }); });
+      if(old && !noHist){
+        var keys=['name','addr','tax','branch','phone','active'], ch=keys.some(function(k){ return (old[k]==null?'':String(old[k]))!==(next[k]==null?'':String(next[k])); });
+        if(ch){ var prev={}; keys.forEach(function(k){ prev[k]=old[k]==null?'':old[k]; }); next.hist=(next.hist||[]).concat([{at:new Date().toISOString(), by:xsWho(), prev:prev}]); }
+      }
+      next.updatedAt=new Date().toISOString(); next.updatedBy=xsWho();
+      map[id]=next;
+      tx.set(xsRef('addrbook'), {map:map});
+      return map;
+    });
+  }).then(function(map){ XS.book=map; return map; });
+}
+function xsBookEdit(id, presetName, presetProj){
+  XS.bookId=id||'';
+  var b=id?XS.book[id]:{name:presetName||'',addr:'',tax:'',branch:'',phone:'',active:true,projects:presetProj||(presetName&&xsProjects().some(function(p){return p.name===presetName;})?[presetName]:[])};
+  document.getElementById('xbTitle').textContent = id?'📒 '+b.name:'📒 เพิ่มชื่อลูกค้าบนใบแจ้งหนี้';
+  document.getElementById('xbName').value=b.name||''; document.getElementById('xbAddr').value=b.addr||''; document.getElementById('xbTax').value=b.tax||'';
+  document.getElementById('xbBranch').value=b.branch||''; document.getElementById('xbPhone').value=b.phone||''; document.getElementById('xbActive').value=(b.active===false)?'0':'1';
+  document.getElementById('xbQ').value=b.tax||(b.name||'').replace(/^(หจก\.?|บริษัท|บจก\.?|ห้างหุ้นส่วนจำกัด)\s*/,'').replace(/\s*จำกัด.*$/,'');
+  document.getElementById('xbRd').innerHTML=''; var m=document.getElementById('xbMsg'); m.style.display='none';
+  var mine=b.projects||[];
+  document.getElementById('xbProj').innerHTML = xsProjects({noStock:true}).map(function(p){
+    var other=xsBookOf(p.name), oth=(other&&other!==id)?XS.book[other].name:'';
+    return '<label><input type="checkbox" value="'+xsEsc(p.name)+'"'+(mine.indexOf(p.name)>=0?' checked':'')+'> '+xsEsc(p.name)+(oth?' <span style="color:var(--muted);font-size:12px">(ตอนนี้ผูกกับ '+xsEsc(oth)+')</span>':'')+'</label>'; }).join('');
+  var h='';
+  if(id){
+    var iv=xsInvsOfBook(id);
+    h+='<div class="xs-srch" style="margin-top:12px">🕘 ประวัติใบแจ้งหนี้</div>'+(iv.length?'<div class="table-wrap"><table><thead><tr><th>เลขที่</th><th>ช่วง</th><th class="r">ยอด</th><th>สถานะ</th></tr></thead><tbody>'
+      +iv.map(function(v){ var c=v.status==='cancelled'; return '<tr'+(c?' style="opacity:.55;text-decoration:line-through"':'')+'><td>'+xsEsc(v.docNo)+'</td><td>'+xsTh(v.dateFrom)+(v.dateTo!==v.dateFrom?' – '+xsTh(v.dateTo):'')+'</td><td class="r">'+xsN(v.grandTotal)+'</td><td>'+(typeof statusLabel==='function'?statusLabel(v.status):v.status)+'</td></tr>'; }).join('')
+      +'</tbody></table></div>':'<div style="color:var(--muted);font-size:13px">ยังไม่มี</div>');
+    var hs=(b.hist||[]).slice().reverse();
+    h+='<div class="xs-srch" style="margin-top:12px">✏️ ประวัติแก้ข้อมูล</div>'+(hs.length?hs.map(function(x){ return '<div style="font-size:13px;border-bottom:1px solid var(--bg3);padding:4px 0">'+xsTh((x.at||'').slice(0,10))+' · '+xsEsc(x.by||'')+' — ของเดิม: <b>'+xsEsc(x.prev.name)+'</b> '+xsEsc(x.prev.addr||'')+(x.prev.tax?' · '+xsEsc(x.prev.tax):'')+(x.prev.branch?' · '+xsEsc(x.prev.branch):'')+(String(x.prev.active)==='false'?' · (เลิกใช้)':'')+'</div>'; }).join(''):'<div style="color:var(--muted);font-size:13px">ยังไม่เคยแก้</div>');
+  }
+  document.getElementById('xbHist').innerHTML=h;
+  document.getElementById('xs-book-modal').style.display='flex';
+}
+function xsBookSave(){
+  var name=(document.getElementById('xbName').value||'').trim(); if(!name){ alert('กรอกชื่อบนใบแจ้งหนี้'); return; }
+  var tax=(document.getElementById('xbTax').value||'').replace(/\D/g,'');
+  if(tax && tax.length!==13){ alert('เลขผู้เสียภาษีต้องมี 13 หลัก'); return; }
+  var projs=[].slice.call(document.querySelectorAll('#xbProj input:checked')).map(function(i){ return i.value; });
+  var id=XS.bookId||('b'+Date.now().toString(36));
+  var dupName=Object.keys(XS.book).filter(function(k){ return k!==id && XS.book[k].name===name; })[0];
+  if(dupName){ alert('มีชื่อนี้ในสมุดแล้ว — เปิดรายการเดิมแทน'); return; }
+  xsBookWrite(id, function(e){
+    e.name=name; e.addr=(document.getElementById('xbAddr').value||'').trim(); e.tax=tax;
+    e.branch=(document.getElementById('xbBranch').value||'').trim(); e.phone=(document.getElementById('xbPhone').value||'').trim();
+    e.active=document.getElementById('xbActive').value!=='0'; e.projects=projs; return e;
+  }).then(function(){ document.getElementById('xs-book-modal').style.display='none'; toast('✅ บันทึกสมุดรายชื่อแล้ว'); if(XS.sub==='book') xsDrawBook(); var im=document.getElementById('xs-inv-modal'); if(im && im.style.display!=='none') xsInvProjChanged(); })
+    .catch(function(e){ var m=document.getElementById('xbMsg'); m.style.display='block'; m.className='smsg err'; m.textContent='❌ '+e.message; });
+}
+function xsRdSearch(){
+  var q=(document.getElementById('xbQ').value||'').trim(), el=document.getElementById('xbRd');
+  if(!q){ return; }
+  var tin=q.replace(/[\s-]/g,''); var qs=/^\d{13}$/.test(tin)?('tin='+tin):('name='+encodeURIComponent(q));
+  el.innerHTML='<div class="smsg info">⏳ กำลังค้นที่กรมสรรพากร…</div>';
+  fetch('/api/rd-lookup?'+qs).then(function(r){ return r.json().catch(function(){ return {ok:false,error:'ตอบกลับไม่ถูกรูปแบบ ('+r.status+')'}; }); })
+  .then(function(j){
+    var fb=' · หรือ <a href="https://www.rd.go.th/63834.html" target="_blank" rel="noopener">เปิดหน้าค้นของกรมสรรพากร</a> แล้วพิมพ์เอง';
+    if(!j.ok){ el.innerHTML='<div class="smsg warn">⚠️ '+(/^name=/.test(qs)?'ค้นด้วยชื่อที่กรมสรรพากรยังไม่ได้ — ใช้เลขผู้เสียภาษี 13 หลักแทน':xsEsc(j.error||'ค้นไม่ได้'))+fb+'</div>'; return; }
+    if(!j.rows||!j.rows.length){ el.innerHTML='<div class="smsg warn">ไม่พบ — ค้นเจอเฉพาะผู้จดทะเบียน VAT'+fb+'</div>'; return; }
+    XS.rd=j.rows;
+    el.innerHTML='<div class="table-wrap" style="max-height:220px;overflow:auto"><table><thead><tr><th>เลขผู้เสียภาษี</th><th>ชื่อ</th><th>สาขา</th><th>ที่อยู่</th><th></th></tr></thead><tbody>'
+      +j.rows.map(function(r,i){ return '<tr><td>'+xsEsc(r.tin)+'</td><td style="white-space:normal">'+xsEsc(r.name)+'</td><td>'+xsEsc(r.branchName)+'</td><td style="white-space:normal;font-size:12px">'+xsEsc(r.address)+'</td><td><button class="btn-eye" onclick="xsRdUse('+i+')">ใช้ข้อมูลนี้</button></td></tr>'; }).join('')
+      +'</tbody></table></div>';
+  }).catch(function(e){ el.innerHTML='<div class="smsg warn">⚠️ ติดต่อไม่ได้: '+xsEsc(e.message)+'</div>'; });
+}
+function xsRdUse(i){
+  var r=(XS.rd||[])[i]; if(!r) return;
+  document.getElementById('xbName').value=r.name; document.getElementById('xbAddr').value=String(r.address||'').replace(/(^|\s)อาคาร-(?=\s|$)/g,' ').replace(/\s+/g,' ').trim();
+  document.getElementById('xbTax').value=r.tin; document.getElementById('xbBranch').value=r.branchName;
+  toast('เติมข้อมูลจากกรมสรรพากรแล้ว — ตรวจแล้วกดบันทึก');
+}
+
+/* ══════════ ใบแจ้งหนี้ตามโครงการ ══════════ */
+function xsOpenInv(proj){
+  if(curRole!=='admin') return;
+  var go=function(){
+    xsProjOptions('xiProj', proj||xsDefaultProj(), {noStock:true});
+    xsInvProjChanged(true);
+    document.getElementById('xs-inv-modal').style.display='flex';
+  };
+  if(XS.loaded) xsLoad().then(go).catch(function(e){ alert(e.message); }); else xsLoad().then(go).catch(function(e){ alert('โหลดข้อมูลไม่สำเร็จ: '+e.message); });
+}
+function xsCloseInv(){ document.getElementById('xs-inv-modal').style.display='none'; }
+function xsInvProjChanged(first){
+  var proj=document.getElementById('xiProj').value;
+  var bid=xsBookOf(proj), ids=Object.keys(XS.book).filter(function(id){ return XS.book[id].active!==false || id===bid; });
+  var bs=document.getElementById('xiBill');
+  bs.innerHTML='<option value="">'+xsEsc(proj)+' (ชื่อโครงการ · ยังไม่อยู่ในสมุด)</option>'+ids.map(function(id){ return '<option value="'+id+'">'+xsEsc(XS.book[id].name)+'</option>'; }).join('');
+  bs.value=bid||'';
+  /* ช่วงวันที่: ต่อจากใบล่าสุดของโครงการนี้ */
+  var last=XS.invs.filter(function(v){ return v.customer===proj && v.status!=='cancelled'; }).map(function(v){ return v.dateTo; }).sort().pop();
+  var a=last?(function(){ var d=new Date(last+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+1); return d.toISOString().slice(0,10); })():xsMonthStart();
+  document.getElementById('xiA').value=a; document.getElementById('xiB').value=todayYMD();
+  var act=(typeof crActive==='function')?crActive(proj):[], sp=act[0];
+  document.getElementById('xiPrice').value = sp ? (+sp.v) : '';
+  document.getElementById('xiVat').value = sp ? (/รวม/.test(sp.vat||'')?'inclusive':(/แยก|ไม่รวม|บวก/.test(sp.vat||'')?'exclusive':'zero')) : 'inclusive';
+  document.getElementById('xiType').value = (sp && /รับเอง/.test(sp.label||'')) ? 'self' : 'delivery';
+  XS.chk={port:true,rc:true,jr:true};
+  xsInvCalc();
+}
+function xsInvState(){
+  var proj=document.getElementById('xiProj').value, a=document.getElementById('xiA').value, b=document.getElementById('xiB').value;
+  var port=xsPortRows(proj,a,b), portK=port.reduce(function(s,r){ return s+xsNet(r); },0);
+  var pend=function(src){ return xsExt(src,proj).filter(function(x){ return !x.invDoc && (!b||x.date<=b); }).sort(function(x,y){ return x.date<y.date?-1:1; }); };
+  var rc=pend('rc_out'), jr=pend('jr');
+  var rcK=rc.reduce(function(s,x){return s+(+x.kiu||0);},0), jrK=jr.reduce(function(s,x){return s+(+x.kiu||0);},0), jrT=jr.reduce(function(s,x){return s+(+x.trips||0);},0);
+  portK=xsR2(portK); rcK=xsR2(rcK); jrK=xsR2(jrK);
+  var kiu=xsR2((XS.chk.port?portK:0)+(XS.chk.rc?rcK:0)+(XS.chk.jr?jrK:0));   /* ปัด 2 ตำแหน่งก่อนคูณราคา → ยอดในใบบันทึก = ยอดที่พิมพ์ */
+  var price=parseFloat(document.getElementById('xiPrice').value)||0, vat=document.getElementById('xiVat').value;
+  var sub=Math.round(kiu*price*100)/100, grand=sub, vatAmt=0, ex=sub;
+  if(vat==='exclusive'){ vatAmt=Math.round(sub*0.07*100)/100; grand=sub+vatAmt; }
+  else if(vat==='inclusive'){ ex=Math.round(sub/1.07*100)/100; vatAmt=Math.round((sub-ex)*100)/100; }
+  var dates=[]; if(XS.chk.port) port.forEach(function(r){ dates.push(r.date); }); if(XS.chk.rc) rc.forEach(function(x){ dates.push(x.date); }); if(XS.chk.jr) jr.forEach(function(x){ dates.push(x.date); });
+  dates.sort();
+  return {proj:proj,a:a,b:b,port:port,portK:portK,rc:rc,rcK:rcK,jr:jr,jrK:jrK,jrT:jrT,kiu:kiu,price:price,vat:vat,grand:Math.round(grand*100)/100,vatAmt:vatAmt,ex:ex,
+          from:dates[0]||a, to:b};
+}
+function xsInvToggle(k,el){ XS.chk[k]=el.checked; xsInvCalc(); }
+function xsInvCalc(){
+  var s=xsInvState();
+  var early=function(rows){ var e=rows.filter(function(x){ return x.date<s.a; }); return e.length?' <span class="badge-warn">ค้างจากก่อนช่วง '+e.length+' วัน ('+xsTh(e[0].date)+'…)</span>':''; };
+  document.getElementById('xiSrc').innerHTML=
+     '<label class="xs-ck"><input type="checkbox" '+(XS.chk.port?'checked':'')+' onchange="xsInvToggle(\'port\',this)"> ท่าเรา (ใบชั่ง '+s.port.length+' ใบ ในช่วงวันที่)<span>'+xsN(s.portK)+' คิว</span></label>'
+    +'<label class="xs-ck"><input type="checkbox" '+(XS.chk.rc?'checked':'')+' onchange="xsInvToggle(\'rc\',this)"> กองรุ่งชัย (ยังไม่วางบิล '+s.rc.length+' รายการ)'+early(s.rc)+'<span>'+xsN(s.rcK)+' คิว</span></label>'
+    +'<label class="xs-ck"><input type="checkbox" '+(XS.chk.jr?'checked':'')+' onchange="xsInvToggle(\'jr\',this)"> ซื้อท่าอื่น (ยังไม่วางบิล '+s.jr.length+' วัน · '+s.jrT+' เที่ยว)'+early(s.jr)+'<span>'+xsN(s.jrK)+' คิว</span></label>'
+    +'<div class="xs-ck" style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px"><b>รวมในใบนี้</b><span style="color:var(--text);font-weight:800">'+xsN(s.kiu)+' คิว</span></div>';
+  /* เตือนใบชั่งท่าเราที่อาจวางบิลซ้ำ (ใบเดิมช่วงวันที่ทับกัน) */
+  var ov=XS.invs.filter(function(v){ return v.customer===s.proj && v.status!=='cancelled' && (v.scope||'sand')!=='other' && !(v.dateTo<s.a || v.dateFrom>s.b); });
+  document.getElementById('xiWarn').innerHTML = (ov.length && XS.chk.port) ? '<div class="smsg warn" style="display:block;margin-top:8px">⚠️ ช่วงวันที่ทับกับใบเดิม: '+ov.map(function(v){ return xsEsc(v.docNo)+' ('+xsTh(v.dateFrom)+'–'+xsTh(v.dateTo)+')'; }).join(', ')+' — ใบชั่งท่าเราช่วงที่ทับอาจถูกวางบิลซ้ำ</div>' : '';
+  var bid=document.getElementById('xiBill').value, b=bid?XS.book[bid]:null;
+  document.getElementById('xiBillInfo').innerHTML = b ? ('<b>'+xsEsc(b.name)+'</b>'+(b.branch?' · '+xsEsc(b.branch):'')+'<br>'+(b.addr?xsEsc(b.addr):'<span style="color:var(--warn)">ยังไม่มีที่อยู่</span>')+(b.tax?' · เลขผู้เสียภาษี '+xsEsc(b.tax):'')+' · <a href="#" onclick="xsBookEdit(\''+bid+'\');return false">แก้</a>')
+    : '<span style="color:var(--warn)">ใช้ชื่อโครงการเป็นชื่อลูกค้า (ไม่มีที่อยู่/เลขภาษี)</span> · <a href="#" onclick="xsBookEdit(\'\','+JSON.stringify(s.proj).replace(/"/g,'&quot;')+',['+JSON.stringify(s.proj).replace(/"/g,'&quot;')+']);return false">＋ บันทึกเข้าสมุดรายชื่อ</a>';
+  document.getElementById('xiTotal').innerHTML = s.price>0
+    ? ('ช่วง '+xsTh(s.from)+' – '+xsTh(s.to)+' · '+xsN(s.kiu)+' คิว × '+xsN(s.price)+' = <b>'+xsN(s.grand)+' บาท</b>'+(s.vat!=='zero'?' <span style="color:var(--muted)">(VAT '+xsN(s.vatAmt)+')</span>':''))
+    : '<span style="color:var(--warn)">กรอกราคาต่อคิว</span>';
+}
+function xsInvSave(){
+  var s=xsInvState();
+  if(!(s.kiu>0)){ alert('ไม่มีทรายที่จะวางบิล'); return; }
+  if(!(s.price>0)){ alert('กรอกราคาต่อคิวก่อน'); return; }
+  var bid=document.getElementById('xiBill').value, b=bid?XS.book[bid]:null;
+  var extIds=[].concat(XS.chk.rc?s.rc.map(function(x){return x.id;}):[], XS.chk.jr?s.jr.map(function(x){return x.id;}):[]);
+  var dup=XS.invs.filter(function(v){ return v.scope==='project' && v.customer===s.proj && v.status!=='cancelled' && v.dateFrom===s.from && v.dateTo===s.to; })[0];
+  if(dup){ alert('⚠️ ช่วงนี้เคยออกใบแล้ว ('+dup.docNo+') — ยกเลิกใบเดิมก่อน'); return; }
+  var pw=window.open('','_blank');
+  if(pw){ try{ pw.document.write('<!doctype html><html><head><meta charset="utf-8"><title>กำลังบันทึก…</title></head><body style="font-family:Sarabun,sans-serif;padding:24px;color:#555">กำลังบันทึกใบแจ้งหนี้…</body></html>'); }catch(e){} }
+  var t=new Date(), docNo='BL'+t.getFullYear()+String(t.getMonth()+1).padStart(2,'0')+String(t.getDate()).padStart(2,'0')+String(Math.floor(Math.random()*900+100));
+  var rec={ docNo:docNo, customer:s.proj, project:s.proj, scope:'project',
+    billId:bid||'', billName:b?b.name:s.proj, billAddr:b?(b.addr||''):'', billTax:b?(b.tax||''):'', billBranch:b?(b.branch||''):'',
+    dateFrom:s.from, dateTo:s.to, sandType:document.getElementById('xiType').value, price:s.price, vatType:s.vat, balFwd:0,
+    remark:(document.getElementById('xiRemark').value||'').trim(),
+    totalNetKiu:s.kiu, srcKiu:{port:XS.chk.port?xsR2(s.portK):0, rc:XS.chk.rc?xsR2(s.rcK):0, jr:XS.chk.jr?xsR2(s.jrK):0},
+    portRange:XS.chk.port?[s.a,s.b]:null, extIds:extIds, otherTotal:0, otherLines:[],
+    grandTotal:s.grand, status:'pending', createdAt:new Date().toISOString(), createdBy:xsWho() };
+  db.runTransaction(function(tx){
+    return tx.get(xsRef('ext_sand')).then(function(d){
+      var rows=(d.exists && Array.isArray(d.data().rows)) ? d.data().rows.slice() : [];
+      var taken=rows.filter(function(x){ return extIds.indexOf(x.id)>=0 && x.invDoc; });
+      if(taken.length) throw new Error('บางรายการเพิ่งถูกวางบิลในใบ '+taken[0].invDoc+' — ปิดแล้วเปิดหน้าต่างใหม่');
+      rows=rows.map(function(x){ if(extIds.indexOf(x.id)>=0){ x=Object.assign({},x); x.invDoc=docNo; } return x; });
+      tx.set(db.collection('invoices').doc(docNo), rec);
+      if(extIds.length) tx.set(xsRef('ext_sand'), {rows:rows, updatedAt:new Date().toISOString(), updatedBy:xsWho()});
+      return rows;
+    });
+  }).then(function(rows){
+    XS.ext=rows; XS.invs.unshift(rec);
+    if(typeof tgNotify==='function') tgNotify('🧾 <b>ใบแจ้งหนี้ใหม่ (ตามโครงการ)</b>\nเลขที่ '+docNo+'\nโครงการ: '+s.proj+'\nลูกค้า: '+rec.billName+'\n'+xsN(s.kiu)+' คิว · ยอด '+xsN(s.grand)+' ฿');
+    xsCloseInv();
+    _invRows=[];
+    printInvoice(rec.sandType, rec.price, rec.vatType, 0, rec.remark, docNo, pw, 'sand', [], rec.billName, rec.totalNetKiu, xsProjOpt(rec));
+    var card=document.getElementById('invhist-inline'); if(card && card.style.display!=='none' && typeof openInvHistory==='function') openInvHistory();
+    if(XS.sub && document.getElementById('tp10').classList.contains('active')) xsSub(XS.sub);
+  }).catch(function(e){ if(pw) pw.close(); alert('บันทึกไม่สำเร็จ: '+e.message); });
+}
+function xsProjOpt(v){
+  return { project:v.project||v.customer, billName:v.billName||v.customer, addr:v.billAddr||'', tax:v.billTax||'', branch:v.billBranch||'',
+           kiu:+v.totalNetKiu||0, dateFrom:v.dateFrom, dateTo:v.dateTo };
+}
+/* ยกเลิกใบ → ปล่อยแถวแหล่งอื่นให้วางบิลใหม่ได้ */
+function xsReleaseInv(docNo){
+  return xsExtWrite(function(rows){
+    var hit=false; var next=rows.map(function(x){ if(x.invDoc===docNo){ hit=true; x=Object.assign({},x); delete x.invDoc; } return x; });
+    return hit?next:null;
+  }).catch(function(e){ if(e && e.message!=='ยกเลิก') console.warn('xsReleaseInv', e); });
+}
+</script>
+<style id="sb-css">
+/* ── เมนูซ้าย (25 ก.ย. 69) — เฉพาะจอกว้างกว่า 700px · มือถือไม่แตะ ── */
+#sbMenu,#sbBurger,#sbMask,#sbCrumb{display:none}
+@media(min-width:701px){
+  html.sb .tab-bar{display:none!important}
+  html.sb #appScreen .main-content{flex-direction:row}
+  html.sb .main-content>.tab-pane{flex:1 1 auto;min-width:0}
+  html.sb #sbMenu{display:block;width:290px;flex:0 0 290px;background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;padding:8px 0 24px}
+  html.sb.sb-off #sbMenu{display:none}
+  html.sb.sb-off #sbBurger{display:flex}
+  #sbBurger{align-items:center;justify-content:center;width:40px;height:40px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--gold);font-size:20px;cursor:pointer;flex-shrink:0}
+  html.sb #sbCrumb{display:inline;font-size:.8em;color:var(--muted);font-weight:600;margin-left:12px}
+  html.sb #sbCrumb:before{content:'› '}
+  .sb-head{display:flex;align-items:center;gap:8px;padding:4px 14px 10px;font-size:16px;font-weight:800;color:var(--gold);border-bottom:1px solid var(--border);margin-bottom:6px}
+  .sb-x{margin-left:auto;border:1px solid var(--border);background:var(--bg3);border-radius:6px;width:32px;height:32px;cursor:pointer;color:var(--muted);font-size:16px;font-family:var(--font)}
+  .sb-gh{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+  .sb-gh:hover,.sb-it:hover{background:var(--bg3)}
+  .sb-pm{width:16px;height:16px;border:1px solid #9fb0c0;border-radius:3px;position:relative;flex-shrink:0;background:#fff}
+  .sb-pm:before{content:'';position:absolute;left:3px;right:3px;top:6.5px;height:1.5px;background:var(--muted)}
+  .sb-pm:after{content:'';position:absolute;top:3px;bottom:3px;left:6.5px;width:1.5px;background:var(--muted)}
+  .sb-g.open>.sb-gh .sb-pm:after{display:none}
+  .sb-gb{display:none}
+  .sb-g.open>.sb-gb{display:block}
+  .sb-lv1{margin:2px 0 8px}
+  .sb-lv1>.sb-gh{padding:10px 14px;font-size:16px;font-weight:800;color:var(--gold2);background:var(--bg3);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .sb-lv1>.sb-gb{margin-left:21px;border-left:1px dotted #9fb0c0;padding:2px 0 4px}
+  .sb-lv2>.sb-gh{padding:8px 12px 8px 6px;font-size:15px;font-weight:700;color:var(--text)}
+  .sb-lv2>.sb-gb{margin-left:13px;border-left:1px dotted #9fb0c0}
+  .sb-lv3>.sb-gh{padding:8px 12px 8px 22px;font-size:15px;font-weight:600;position:relative}
+  .sb-lv3>.sb-gh:before{content:'';position:absolute;left:0;top:50%;width:18px;border-top:1px dotted #9fb0c0}
+  .sb-lv3>.sb-gh .sb-pm{width:14px;height:14px}
+  .sb-lv3>.sb-gb{margin-left:29px;border-left:1px dotted #9fb0c0}
+  .sb-it{position:relative;padding:8px 10px 8px 22px;margin-right:10px;font-size:15px;color:var(--text);cursor:pointer;border-radius:0 8px 8px 0}
+  .sb-it:before{content:'';position:absolute;left:0;top:50%;width:14px;border-top:1px dotted #9fb0c0}
+  .sb-lv1>.sb-gb>.sb-it{font-weight:700}
+  .sb-tx small{display:block;font-size:12px;color:var(--muted);font-weight:400}
+  .sb-tx small.sb-hint{display:inline;margin-left:4px}
+  .sb-it.on,.sb-gh.sb-page.on{background:rgba(21,128,61,.12);color:var(--gold2);font-weight:800;box-shadow:inset 3px 0 0 var(--gold)}
+  .sb-gh.sb-page.on{border-radius:0 8px 8px 0;margin-right:10px}
+  .sb-it.on small{color:var(--gold)}
+}
+/* จอ 1100px ขึ้นไป: ตัวใหญ่สำหรับผู้สูงอายุ */
+@media(min-width:1024px){
+  .sb-lv1>.sb-gh{font-size:18px}.sb-lv2>.sb-gh,.sb-lv3>.sb-gh{font-size:17px}.sb-it{font-size:17px;padding:9px 10px 9px 22px}.sb-tx small{font-size:13.5px}
+  html.sb #sbMenu{width:310px;flex-basis:310px}
+}
+/* แท็บเล็ต / จอแคบ 701–1099px: เมนูหุบ แตะ ☰ แล้วเลื่อนออกมาทับ */
+@media(min-width:701px) and (max-width:1099px){
+  html.sb #sbBurger{display:flex}
+  html.sb #sbMenu{position:fixed;left:0;top:0;bottom:0;z-index:9000;transform:translateX(-105%);transition:transform .25s;box-shadow:4px 0 24px rgba(0,0,0,.2);display:block}
+  html.sb.sb-show #sbMenu{transform:none}
+  html.sb.sb-off #sbMenu{display:block}
+  html.sb.sb-show #sbMask{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:8999}
+}
+@media(min-width:1100px){
+  html.sb.sb-off.sb-show #sbMenu{display:block;position:fixed;left:0;top:0;bottom:0;z-index:9000;box-shadow:4px 0 24px rgba(0,0,0,.2)}
+  html.sb.sb-off.sb-show #sbMask{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:8999}
+}
+/* แท็บเล็ตแนวตั้ง 701–1023px: ตัวหนังสือ/ปุ่มใหญ่พอกดด้วยนิ้ว */
+@media(min-width:701px) and (max-width:1023px){
+  html,body{font-size:17px}
+  table{font-size:15px} thead th{font-size:12px;padding:10px 12px} tbody td{padding:10px 12px}
+  .btn{font-size:15px;padding:10px 16px;min-height:42px}
+  input,select,textarea{font-size:16px}
+  .frow input,.t1filter input,.filter-input,.modal-row input,.form-input{font-size:16px;padding:9px 12px}
+  .frow label,.t1filter label,.modal-row label{font-size:13px}
+  .card-title{font-size:14px} .kpi-val{font-size:24px} .kpi-label{font-size:12px}
+  .pr-subtab,.xs-subtab{font-size:15px;padding:10px 16px}
+  .sb-it{padding:11px 10px 11px 22px}
+}
+</style>
+<script id="sb-js">
+/* ══════════════════════════════════════════════════════════════════
+   เมนูซ้ายแบบต้นไม้ (แบบ ACC-BILLING) — จอคอม/แท็บเล็ตเท่านั้น (กว้างกว่า 700px)
+   25 ก.ย. 2569 · มือถือยังใช้เมนูล่างแบบ B2 เหมือนเดิม (ไม่แตะ)
+   - แท็บเดิมทุกแท็บยังอยู่ครบ แค่เปลี่ยนทางเข้า → เมนูเรียกฟังก์ชันเดิม (goTab/prSwitch/frSetType/xsSub)
+   - จอ ≥1100px เมนูกางค้าง (ซ่อนได้ด้วย «) · จอ 701–1099px เมนูหุบ แตะ ☰ แล้วเลื่อนออกมา
+══════════════════════════════════════════════════════════════════ */
+(function(){
+  var ADM=1;
+  /* [ชื่อ, ทำอะไร, เฉพาะเจ้าของ?, คำอธิบายเล็ก] · กลุ่ม = {g:ชื่อ, lv, open, kids:[...], go?:กดหัวข้อแล้วไปไหน} */
+  var T=[
+    {g:'💰 รายได้จากขาย', lv:1, open:1, kids:[
+      {g:'ทราย', lv:2, open:1, go:{t:10,s:'sum'}, goAdm:ADM, hint:'สรุปรวมทุกแหล่ง', kids:[
+        ['ใบชั่ง ท่าทรายสังคม',{t:1},0,'นำเข้าไฟล์ตาชั่ง'],
+        ['หักน้ำหนัก',{t:2},0],
+        ['กองรุ่งชัย น้ำโสม',{t:10,s:'rc'},ADM]
+      ]},
+      ['ขายอื่น',{href:'sell-other.html'},0,'ดิน / หิน'],
+      {g:'ลูกค้า', lv:2, open:1, kids:[
+        ['ใบแจ้งหนี้ลูกค้า',{t:3},ADM],
+        ['สมุดรายชื่อลูกค้า',{t:10,s:'book'},ADM,'ชื่อบนใบแจ้งหนี้ + ประวัติ'],
+        ['ลูกค้า / ราคา',{t:9},ADM]
+      ]}
+    ]},
+    {g:'💸 รายจ่าย', lv:1, open:1, kids:[
+      {g:'ต้นทุนทราย', lv:2, open:1, kids:[
+        ['ซื้อทรายท่าอื่น',{t:10,s:'jr'},ADM,'อัปไฟล์สรุปเที่ยว'],
+        ['น้ำมัน',{t:7},0,'เรือ / แม็กโคร / รถ'],
+        {g:'เงินเดือน', lv:3, open:0, kids:[
+          ['บันทึกเวลาทำงาน',{t:6,p:'att'},0],
+          ['บันทึกเบิกเงิน',{t:6,p:'wd'},0],
+          ['จ่ายเงินเดือน / ปิดงวด',{t:6,p:'cyc'},0,'รอบ 1–15 · รอบ 16–สิ้นเดือน'],
+          ['ประวัติการจ่าย',{t:6,p:'pay'},0],
+          ['ทะเบียนพนักงาน',{t:6,p:'reg'},0]
+        ]}
+      ]},
+      {g:'ค่าเที่ยวรถร่วม', lv:2, open:0, kids:[
+        ['ใบแจ้งหนี้ค่าเที่ยว',{t:5,f:'invoice'},0],
+        ['ใบจ่ายรถร่วม',{t:5,f:'payment'},0],
+        ['รายงานตามทะเบียน',{t:5,f:'report'},0],
+        ['เรตค่าเที่ยว',{t:5,f:'rates'},0],
+        ['ส่งไปโปรแกรมรุ่งชัย',{t:5,f:'rclink'},ADM],
+        ['จัดการทะเบียนรถ',{t:5,f:'vehicles'},0]
+      ]},
+      ['รายจ่ายอื่น',{t:8},ADM]
+    ]},
+    {g:'📒 บัญชี 👑', lv:1, open:1, adm:ADM, kids:[
+      ['สรุปผู้บริหาร',{t:4},ADM,'กำไร / ขาดทุน'],
+      ['ค่าแรงรวมรายเดือน',{t:6,p:'sum'},ADM]
+    ]}
+  ];
+  var ITEMS=[], cur=null;
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+  function isAdm(){ return typeof curRole!=='undefined' && curRole==='admin'; }
+  function build(nodes){
+    return nodes.map(function(n){
+      if(Array.isArray(n)){
+        var i=ITEMS.length; ITEMS.push({label:n[0], go:n[1], adm:!!n[2]});
+        return '<div class="sb-it'+(n[2]?' sb-adm':'')+'" data-i="'+i+'"><span class="sb-tx">'+esc(n[0])+(n[3]?'<small>'+esc(n[3])+'</small>':'')+'</span></div>';
+      }
+      var gi=-1; if(n.go){ gi=ITEMS.length; ITEMS.push({label:n.g, go:n.go, adm:!!(n.adm||n.goAdm), toggle:true}); }
+      return '<div class="sb-g sb-lv'+n.lv+(n.open?' open':'')+(n.adm?' sb-adm':'')+'">'
+        +'<div class="sb-gh'+(gi>=0?' sb-page':'')+'"'+(gi>=0?' data-i="'+gi+'"':'')+'><span class="sb-pm"></span><span class="sb-tx">'+esc(n.g)+(n.hint?' <small class="sb-hint">'+esc(n.hint)+'</small>':'')+'</span></div>'
+        +'<div class="sb-gb">'+build(n.kids)+'</div></div>';
+    }).join('');
+  }
+  function run(it){
+    var g=it.go;
+    if(g.href){ location.href=g.href; return; }
+    if(it.adm && !isAdm()){ if(it.toggle){ var el=document.querySelector('#sbMenu [data-i="'+ITEMS.indexOf(it)+'"]'); if(el) el.parentNode.classList.toggle('open'); } return; }
+    goTab(g.t);
+    if(g.p && typeof prSwitch==='function') prSwitch(g.p);
+    if(g.f && typeof frSetType==='function') frSetType(g.f);
+    if(g.s && typeof xsSub==='function') xsSub(g.s);
+    mark(it);
+    if(window.innerWidth<1100 || document.documentElement.classList.contains('sb-off')) close();
+    var pane=document.querySelector('.tab-pane.active'); if(pane) pane.scrollTop=0;
+  }
+  function mark(it){
+    cur=it;
+    document.querySelectorAll('#sbMenu .on').forEach(function(e){ e.classList.remove('on'); });
+    var i=ITEMS.indexOf(it), el=document.querySelector('#sbMenu [data-i="'+i+'"]');
+    if(el){ el.classList.add('on'); var g=el.parentNode; while(g && g.id!=='sbMenu'){ if(g.classList&&g.classList.contains('sb-g')) g.classList.add('open'); g=g.parentNode; } }
+    var cr=document.getElementById('sbCrumb'); if(cr) cr.textContent=it.label;
+  }
+  function open(){ document.documentElement.classList.add('sb-show'); }
+  function close(){ document.documentElement.classList.remove('sb-show'); }
+  window.sbToggle=function(){
+    var h=document.documentElement;
+    if(window.innerWidth>=1100 && !h.classList.contains('sb-off')){ h.classList.add('sb-off'); try{ localStorage.setItem('sbOff','1'); }catch(e){} return; }
+    if(window.innerWidth>=1100 && h.classList.contains('sb-off') && !h.classList.contains('sb-show')){ h.classList.remove('sb-off'); try{ localStorage.removeItem('sbOff'); }catch(e){} return; }
+    h.classList.toggle('sb-show');
+  };
+  window.sbApplyRole=function(){
+    var a=isAdm();
+    document.querySelectorAll('#sbMenu .sb-adm').forEach(function(e){ e.style.display=a?'':'none'; });
+    /* กลุ่มที่ไม่เหลือเมนูให้กด → ซ่อนหัวข้อด้วย */
+    [].slice.call(document.querySelectorAll('#sbMenu .sb-g')).reverse().forEach(function(g){ if(g.classList.contains('sb-adm')) return; var any=[].some.call(g.querySelectorAll('.sb-gb .sb-it'), function(e){ var x=e; while(x && x!==g){ if(x.style && x.style.display==='none') return false; x=x.parentNode; } return true; }); g.style.display=any?'':'none'; });
+  };
+  function init(){
+    var main=document.querySelector('#appScreen .main-content'); if(!main || document.getElementById('sbMenu')) return;
+    var aside=document.createElement('aside'); aside.id='sbMenu';
+    aside.innerHTML='<div class="sb-head">☰ เมนูหลัก<button type="button" class="sb-x" title="ซ่อนเมนู" onclick="sbToggle()">«</button></div><div class="sb-tree">'+build(T)+'</div>';
+    main.insertBefore(aside, main.firstChild);
+    var mask=document.createElement('div'); mask.id='sbMask'; mask.onclick=close; document.body.appendChild(mask);
+    var tb=document.querySelector('#appScreen .topbar');
+    if(tb){ var b=document.createElement('button'); b.type='button'; b.id='sbBurger'; b.title='เมนู'; b.innerHTML='☰'; b.onclick=sbToggle; tb.insertBefore(b, tb.firstChild);
+      var c=document.createElement('span'); c.id='sbCrumb'; var t=tb.querySelector('.topbar-title'); if(t) t.appendChild(c); }
+    aside.addEventListener('click', function(e){
+      var pm=e.target.closest('.sb-pm'); var gh=e.target.closest('.sb-gh'); var it=e.target.closest('[data-i]');
+      if(pm && gh){ gh.parentNode.classList.toggle('open'); return; }
+      if(it){ run(ITEMS[+it.getAttribute('data-i')]); return; }
+      if(gh){ gh.parentNode.classList.toggle('open'); }
+    });
+    document.documentElement.classList.add('sb');
+    try{ if(localStorage.getItem('sbOff')==='1') document.documentElement.classList.add('sb-off'); }catch(e){}
+    sbApplyRole();
+    /* เปิดแท็บจากที่อื่น (ปุ่มเดิม/โค้ดเดิม) → ไฮไลต์เมนูให้ตรง */
+    var _goTab=window.goTab;
+    window.goTab=function(n){ _goTab(n); if(!cur || cur.go.t!==n){ var f=ITEMS.filter(function(x){ return x.go.t===n && (!x.adm||isAdm()); })[0]; if(f) mark(f); } };
+    var _ar=window.applyRole; if(typeof _ar==='function') window.applyRole=function(){ _ar(); sbApplyRole(); };
+    mark(ITEMS.filter(function(x){return x.go.t===1;})[0]);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
 </body>
 </html>
