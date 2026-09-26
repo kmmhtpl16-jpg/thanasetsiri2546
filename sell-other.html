@@ -1349,5 +1349,164 @@ html.emb .card{border-radius:10px;padding:18px 22px;}
   };
 })();
 </script>
+<style id="smb-css">
+/* === ขายอื่นบนมือถือแบบ B2 (26 ก.ย.69) — เฉพาะเปิดในกรอบหน้าหลัก (?embed=1) + จอ ≤700px (html.smb) · จอคอมไม่เปลี่ยน === */
+html.smb{--pri:#0f7b3f;--pri-l:#e8f5ee;--bg:#f6f7f8;--line:#e6e9ec;}
+html.smb body{background:#fff;font-size:15px;}
+html.smb #app{padding:0 0 20px;}
+html.smb .pane{padding:12px 14px 16px;}
+html.smb .card{border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:none;border:1px solid var(--line);}
+html.smb .card h2{font-size:15px;margin:0 0 10px;}
+html.smb .inp,html.smb select.inp{font-size:16px;min-height:46px;border-radius:12px;}
+html.smb .mini{font-size:12px;}
+html.smb #smbSeg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#eef1f3;border-radius:12px;padding:4px;margin:12px 14px 0;}
+html.smb #smbSeg button{height:40px;border:0;border-radius:9px;background:none;font-size:14.5px;color:#5f6b76;font-family:inherit;}
+html.smb #smbSeg button.on{background:var(--pri);color:#fff;font-weight:700;}
+/* ออกบิล: เรียงใหม่ ข้อมูลบิล → สินค้า → ชำระ → (พับ) รถ/VAT/หมายเหตุ → สรุป */
+html.smb #pane-sell.on{display:flex;flex-direction:column;}
+html.smb #pane-sell>.smb-c-bill{order:1}
+html.smb #pane-sell>.smb-c-items{order:2}
+html.smb #pane-sell>.smb-c-pay{order:3}
+html.smb #pane-sell>#smbMore{order:4}
+html.smb #pane-sell>.smb-c-veh{order:5}
+html.smb #pane-sell>.smb-c-sum{order:6}
+html.smb #pane-sell>#editBanner{order:0}
+html.smb #pane-sell>#saveBtn{order:9}
+html.smb #pane-sell:not(.smb-open)>.smb-c-veh{display:none;}
+html.smb #pane-sell:not(.smb-open)>.smb-c-sum .row{display:none;}
+html.smb .smb-c-bill .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:10px;}
+html.smb .smb-c-bill #fDate{min-width:0;width:100%;padding:0 8px;font-size:15px;}
+html.smb .smb-c-bill #fCust{min-width:0;}
+html.smb .smb-c-bill .grid2 .mini{display:none;}
+html.smb .smb-c-bill .grid2 .row{margin:0;}
+html.smb .smb-c-bill .grid2 .row>div[style*="flex"]{gap:6px!important;}
+html.smb .smb-c-bill .grid2 .row>div[style*="flex"] .ghost{padding:0 10px!important;font-size:13px;flex:none;}
+html.smb .smb-c-bill h2,html.smb .smb-c-items>h2{display:none;}
+html.smb #smbChips{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 6px;}
+html.smb #smbChips .smb-lb{width:100%;font-size:12px;color:#5f6b76;}
+html.smb .smb-chip{border:1px dashed #9fcfb2;color:var(--pri);background:#f6fbf8;border-radius:10px;padding:8px 12px;font-size:14px;font-weight:700;font-family:inherit;}
+html.smb .item{background:#fff;border:0;border-bottom:1px solid #f0f2f4;border-radius:0;padding:10px 0;margin:0;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"sel stp" "pr amt" "msg msg";gap:6px 10px;align-items:center;}
+html.smb .item .top{grid-area:sel;margin:0;}
+html.smb .item .top{min-width:0;}
+html.smb .item .top select{min-height:42px;font-weight:700;border-radius:10px;min-width:0;width:100%;font-size:15px;}
+html.smb .item .top .del{flex:none;}
+html.smb .item .top .del{padding:6px 10px;}
+html.smb .item .nums{display:contents;}
+html.smb .item .nums>div:nth-child(1){grid-area:stp;}
+html.smb .item .nums>div:nth-child(2){display:none;}
+html.smb .item .nums>div:nth-child(3){grid-area:pr;display:flex;align-items:center;gap:6px;}
+html.smb .item .nums>div:nth-child(1) .mini{display:none;}
+html.smb .item .nums>div:nth-child(3) .mini{margin:0;white-space:nowrap;}
+html.smb .item .nums>div:nth-child(3) .inp{max-width:110px;min-height:38px;padding:6px 10px!important;}
+html.smb .item .amt{grid-area:amt;padding:0;font-size:15px;}
+html.smb .item .belowmsg{grid-area:msg;}
+html.smb .smb-stp{display:flex;align-items:center;border:1px solid #dde2e6;border-radius:11px;overflow:hidden;height:42px;background:#fff;}
+html.smb .smb-stp button{width:40px;height:42px;border:0;background:none;font-size:22px;color:var(--pri);font-weight:700;font-family:inherit;}
+html.smb .smb-stp .q{width:58px!important;min-height:42px!important;border:0!important;border-left:1px solid #eef1f3!important;border-right:1px solid #eef1f3!important;border-radius:0!important;text-align:center;padding:0!important;font-size:16px;}
+html.smb .smb-c-items .addbtn{min-height:42px;font-size:13.5px;}
+html.smb .smb-c-pay h2{display:none;}
+html.smb .paybtns button{padding:10px 4px;font-size:14.5px;border-width:1.5px;}
+html.smb #smbMore{display:flex;align-items:center;justify-content:space-between;padding:12px 4px;border:0;border-top:1px solid #eef1f3;background:none;font-size:14px;color:#3d4852;font-family:inherit;width:100%;margin-bottom:8px;}
+html.smb #smbMore b{color:var(--pri);}
+html.smb .smb-c-sum h2{display:none;}
+html.smb .smb-c-sum{padding:10px 14px;}
+html.smb #totBox{margin:0;}
+html.smb #saveBtn{position:sticky;bottom:10px;z-index:5;min-height:52px;border-radius:14px;font-size:16.5px;margin:4px 0 0;box-shadow:0 6px 16px rgba(15,123,63,.25);}
+/* บิลวันนี้ */
+html.smb .daytot{border-radius:16px;margin:0 0 12px;}
+html.smb #monthCard{display:none;}
+html.smb .billrow{border-radius:13px;padding:10px 12px;}
+html.smb .billrow .acts{flex-wrap:wrap;gap:6px;}
+html.smb .billrow .acts button{padding:7px 10px;font-size:13px;}
+</style>
+<script id="smb-js">
+(function(){
+  if(!document.documentElement.classList.contains('emb')) return;
+  var MQ=window.matchMedia('(max-width:700px)'), on=false, built=false;
+  function $(id){ return document.getElementById(id); }
+  function strip(t){ return String(t).replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu,'').replace(/^\s+/,''); }
+  function mark(){
+    var p=$('pane-sell'); if(!p) return;
+    [].forEach.call(p.children,function(c){
+      if(!c.classList.contains('card')) return; var h=c.querySelector('h2'); var t=h?h.textContent:'';
+      if(/ข้อมูลบิล/.test(t)) c.classList.add('smb-c-bill'); else if(/รถที่จัดส่ง/.test(t)) c.classList.add('smb-c-veh');
+      else if(/รายการสินค้า/.test(t)) c.classList.add('smb-c-items'); else if(/สรุปยอด/.test(t)) c.classList.add('smb-c-sum'); else if(/ชำระ/.test(t)) c.classList.add('smb-c-pay');
+    });
+  }
+  function build(){
+    if(built) return; built=true; mark();
+    var seg=document.createElement('div'); seg.id='smbSeg';
+    seg.innerHTML='<button type="button" data-t="sell" class="on">ออกบิลใหม่</button><button type="button" data-t="day">บิลวันนี้</button>';
+    seg.onclick=function(e){ var b=e.target.closest('button'); if(b) goTab(b.dataset.t); };
+    var app=$('app'), first=$('pane-sell'); app.insertBefore(seg, first);
+    var ch=document.createElement('div'); ch.id='smbChips';
+    var iw=$('itemWrap'); iw.parentNode.insertBefore(ch, iw);
+    var mo=document.createElement('button'); mo.type='button'; mo.id='smbMore';
+    mo.onclick=function(){ var p=$('pane-sell'); p.classList.toggle('smb-open'); moreTxt(); };
+    $('pane-sell').appendChild(mo);
+    new MutationObserver(function(){ if(on) enhanceItems(); }).observe(iw,{childList:true});
+  }
+  function moreTxt(){ var p=$('pane-sell'), mo=$('smbMore'); if(!mo) return;
+    var bits=[]; var pl=$('fPlate')&&$('fPlate').value.trim(); if(pl) bits.push('รถ '+pl); if(typeof vat!=='undefined'&&vat==='ex') bits.push('VAT 7%'); if($('fRemark')&&$('fRemark').value.trim()) bits.push('มีหมายเหตุ');
+    mo.innerHTML='<span>รถที่จัดส่ง · VAT · หมายเหตุ'+(bits.length?' <small style="color:#0f7b3f">('+bits.join(' · ')+')</small>':'')+'</span><b>'+(p.classList.contains('smb-open')?'− ซ่อน':'+ เพิ่ม')+'</b>'; }
+  function chips(){
+    var c=$('smbChips'); if(!c) return;
+    var ps=(typeof getProds==='function')?getProds():[];
+    c.innerHTML='<div class="smb-lb">สินค้า — แตะเพื่อใส่</div>'+ps.map(function(p){ return '<button type="button" class="smb-chip" data-id="'+p.id+'">+ '+(typeof esc==='function'?esc(p.name):p.name)+'</button>'; }).join('');
+    [].forEach.call(c.querySelectorAll('.smb-chip'),function(b){ b.onclick=function(){ addProd(b.dataset.id); }; });
+  }
+  function addProd(pid){
+    var iw=$('itemWrap'), rows=[].slice.call(iw.children);
+    var hit=rows.find(function(it){ var s=it.querySelector('select'); return s&&s.value===pid; });
+    if(hit){ var q=hit.querySelector('.q'); q.value=(parseFloat(q.value)||0)+1; recalc(); flash(hit); return; }
+    var empty=rows.find(function(it){ var s=it.querySelector('select'); return s&&!s.value; });
+    if(!empty){ addItem(); empty=iw.lastElementChild; }
+    var sel=empty.querySelector('select'); sel.value=pid; pickProd(sel); flash(empty);
+  }
+  function flash(el){ el.style.transition='background .4s'; el.style.background='#e8f5ee'; setTimeout(function(){ el.style.background=''; },450); }
+  function enhanceItems(){
+    [].forEach.call($('itemWrap').children,function(it){
+      var q=it.querySelector('.q'); if(!q || q.parentNode.classList.contains('smb-stp')) return;
+      var w=document.createElement('div'); w.className='smb-stp';
+      var m=document.createElement('button'); m.type='button'; m.textContent='−';
+      var p=document.createElement('button'); p.type='button'; p.textContent='+';
+      q.parentNode.insertBefore(w,q); w.appendChild(m); w.appendChild(q); w.appendChild(p);
+      q.setAttribute('inputmode','decimal');
+      m.onclick=function(){ q.value=Math.max(0,(parseFloat(q.value)||0)-1); recalc(); };
+      p.onclick=function(){ q.value=(parseFloat(q.value)||0)+1; recalc(); };
+      var lb=it.querySelector('.nums>div:nth-child(3) .mini'); if(lb) lb.textContent='ราคา/หน่วย';
+    });
+  }
+  function undoItems(){
+    [].forEach.call(document.querySelectorAll('#itemWrap .smb-stp'),function(w){ var q=w.querySelector('.q'); w.parentNode.insertBefore(q,w); w.remove(); });
+  }
+  var ORIG=[];
+  function swap(toM){
+    if(toM){ ORIG=[]; document.querySelectorAll('#pane-sell h2, #pane-sell .paybtns button, #pane-sell .vatbtns button, #pane-sell .addbtn, #pane-sell .ghost, #saveBtn, #pane-day .card h2, #pane-day .ghost').forEach(function(e){
+        if(e.children.length && e.tagName==='H2'){ var n=e.firstChild; if(n&&n.nodeType===3){ ORIG.push([n,n.nodeValue]); n.nodeValue=strip(n.nodeValue); } return; }
+        ORIG.push([e,e.textContent,1]); e.textContent=strip(e.textContent); });
+    } else { ORIG.forEach(function(o){ if(o[2]) o[0].textContent=o[1]; else o[0].nodeValue=o[1]; }); ORIG=[]; }
+  }
+  function saveTxt(){ var b=$('saveBtn'); if(!b||!on) return; var g=($('tGrand')||{}).textContent||''; b.textContent='บันทึกบิล '+g; }
+  function daySeg(){ var s=$('smbSeg'); if(!s) return; var n=0; try{ var d=(typeof todayYMD==='function')?todayYMD():''; n=load(K.bills,[]).filter(function(b){ return b.date===d && b.status!=='cancelled'; }).length; }catch(e){}
+    var b=s.querySelector('[data-t="day"]'); if(b) b.textContent='บิลวันนี้'+(n?' ('+n+')':''); }
+  function apply(){
+    var want=MQ.matches; if(want===on) return; on=want;
+    if(on){ build(); document.documentElement.classList.add('smb'); swap(true); chips(); enhanceItems(); moreTxt(); saveTxt(); daySeg(); }
+    else { document.documentElement.classList.remove('smb'); swap(false); undoItems(); var b=$('saveBtn'); if(b) b.textContent='💾 บันทึก & พิมพ์บิล'; }
+  }
+  function wrap(n,after){ var f=window[n]; if(typeof f!=='function') return; window[n]=function(){ var r=f.apply(this,arguments); try{ if(on) after.apply(this,arguments); }catch(e){} return r; }; }
+  wrap('recalc',function(){ saveTxt(); });
+  wrap('goTab',function(t){ var s=$('smbSeg'); if(s) [].forEach.call(s.children,function(b){ b.classList.toggle('on',b.dataset.t===t); }); s&&(s.style.display=(t==='sell'||t==='day')?'':'none'); daySeg(); window.scrollTo(0,0); });
+  wrap('renderProds',function(){ chips(); });
+  wrap('renderDay',function(){ daySeg(); });
+  wrap('setVat',function(){ moreTxt(); });
+  wrap('onPlateInput',function(){ moreTxt(); });
+  wrap('startApp',function(){ chips(); enhanceItems(); saveTxt(); daySeg(); });
+  (function(){ var f=window.saveBill; if(typeof f!=='function') return; window.saveBill=function(){ var r=f.apply(this,arguments); var done=function(){ if(on){ saveTxt(); daySeg(); moreTxt(); } }; if(r&&typeof r.then==='function') r.then(done,done); else done(); return r; }; })();
+  if(MQ.addEventListener) MQ.addEventListener('change',apply); else if(MQ.addListener) MQ.addListener(apply);
+  apply();
+})();
+</script>
 </body>
 </html>

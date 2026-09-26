@@ -1112,13 +1112,17 @@ select{color-scheme:light;}
             <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px">เพิ่มทะเบียนใหม่</label>
             <input type="text" id="veh-plate-in" placeholder="ทะเบียน เช่น 81-5080" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:140px">
             <input type="text" id="veh-owner-in" placeholder="ชื่อเจ้าของรถ" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:140px">
+            <select id="veh-kind-in" class="veh-sel"><option value="truck">รถบรรทุก</option><option value="boat">เรือ</option><option value="excavator">แม็กโคร</option></select>
+            <label class="veh-chk"><input type="checkbox" id="veh-ours-in" onchange="var o=document.getElementById('veh-owner-in'); if(this.checked&&!o.value) o.value='รถบริษัท';"> รถเรา</label>
             <button class="btn btn-gold" onclick="vehAdd()">➕ เพิ่ม</button>
           </div>
           <div id="veh-add-msg" class="smsg" style="margin-bottom:8px"></div>
+          <div id="veh-filter" class="veh-filter"><button data-f="ours" onclick="vehSetFilter('ours')">รถเรา</button><button data-f="partner" onclick="vehSetFilter('partner')">รถร่วม</button><button data-f="all" class="on" onclick="vehSetFilter('all')">ทั้งหมด</button></div>
+          <p style="font-size:12px;color:var(--muted);margin:0 0 10px">ติ๊ก <b>รถเรา</b> = ขึ้นให้เลือกในหน้าเบิกน้ำมัน · เรือ/แม็กโครเพิ่มที่นี่ได้ (ช่องเจ้าของใส่ "รถบริษัท") · <b>มิเตอร์</b> = ให้ช่องเลขไมล์/ชั่วโมงโผล่ตอนเบิกน้ำมัน · <b>รุ่งชัย</b> = คนขับบันทึกในโปรแกรมค่าเที่ยวรุ่งชัยด้วย</p>
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th>ทะเบียน</th><th>ชื่อที่กรอก</th><th>Canonical (ยืนยันแล้ว)</th><th></th>
+                <th>ทะเบียน / ชื่อ</th><th>ประเภท</th><th>รถเรา</th><th>มิเตอร์</th><th>โปรแกรมรุ่งชัย</th><th>ชื่อที่กรอก</th><th>Canonical (ยืนยันแล้ว)</th><th></th>
               </tr></thead>
               <tbody id="veh-tbody"></tbody>
             </table>
@@ -1273,6 +1277,7 @@ select{color-scheme:light;}
             </div>
             <div id="empCheckList" style="padding:6px 0;"></div>
             <div style="padding:10px 14px;border-top:1px solid var(--border);">
+              <div id="attSpSum" class="att-sp-sum" style="display:none"></div>
               <button class="btn btn-gold" style="width:100%;font-size:13px;" onclick="addSelectedEmps()">➕ เพิ่มที่เลือก</button>
             </div>
           </div>
@@ -1299,6 +1304,7 @@ select{color-scheme:light;}
           <input type="month" id="wdMonth" class="filter-input" oninput="renderWdPanel()">
           <button class="btn btn-gold" onclick="submitAllWithdrawals()">💾 บันทึกที่ติ๊ก</button>
         </div>
+        <div id="wdPerHint" class="wd-per-hint"></div>
         <div id="wdPanel"></div>
       </div>
 
@@ -1405,27 +1411,18 @@ select{color-scheme:light;}
       </div>
       <!-- SUB 1 เบิกออก -->
       <div id="fuelSub1" style="display:none;">
-        <div class="card">
-          <div class="table-toolbar"><div class="table-toolbar-title">📤 บันทึกเบิกน้ำมันจากถัง</div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 0;">
-            <div><label class="pr-label">วันที่เบิก *</label><input type="date" id="fOutDate" class="pr-input"></div>
-            <div>
-              <label class="pr-label">ประเภท *</label>
-              <select id="fOutType" class="pr-input" onchange="fuelOutTypeChange()">
-                <option value="">-- เลือก --</option>
-                <option value="boat">🚢 เรือ</option>
-                <option value="excavator">🏗️ แม็กโคร</option>
-                <option value="truck">🚛 รถบรรทุก</option>
-              </select>
-            </div>
-            <div id="fOutMachineWrap">
-              <label class="pr-label" id="fOutMachineLabel">เลขเครื่อง / ทะเบียน *</label>
-              <input type="text" id="fOutMachineId" class="pr-input" placeholder="เช่น กข-1234">
-            </div>
-            <div><label class="pr-label">จำนวนลิตร *</label><input type="number" id="fOutLiters" class="pr-input" placeholder="ลิตร" min="1"></div>
-            <div style="grid-column:1/-1;"><label class="pr-label">หมายเหตุ</label><input type="text" id="fOutNote" class="pr-input" placeholder="(ไม่บังคับ)"></div>
+        <div class="card fx-card" id="fxCard">
+          <div class="fx-h"><div class="fx-title">เบิกน้ำมันจากถัง — หลายคันพร้อมกัน</div><a class="fx-histlink" href="#fuelOutList" onclick="document.getElementById('fuelOutList').scrollIntoView({behavior:'smooth'});return false;">ประวัติเบิกออก ↓</a></div>
+          <div class="fx-top">
+            <div class="fx-datebox"><label class="fx-lb" for="fOutDate">วันที่เบิก</label><input type="date" id="fOutDate" class="fx-in" onchange="fxRender()"></div>
+            <div class="fx-sum"><div class="fx-kp fx-kp-tank">คงเหลือในถัง<b id="fxTank">–</b></div><div class="fx-kp">ชุดนี้<b id="fxBatch">0 ลิตร · 0 คัน</b></div></div>
           </div>
-          <button class="pr-save-btn" onclick="saveFuelOut()" style="margin-top:8px;">💾 บันทึกเบิกออก</button>
+          <div class="fx-head"><span>รูปหัวจ่าย</span><span>เครื่อง / ทะเบียน</span><span>จำนวนลิตร</span><span>เลขไมล์ / ชม. <i>(ถ้ามี)</i></span><span></span></div>
+          <div id="fxRows"></div>
+          <button type="button" class="fx-add" id="fxAddBtn" onclick="fxAddRow(true)">＋ เพิ่มคัน</button>
+          <div class="fx-kbd">คีย์บอร์ด: <kbd>Tab</kbd> ไปช่องถัดไป · <kbd>Enter</kbd> ในช่องลิตรแถวสุดท้าย = เพิ่มคันใหม่ · แตะช่องรูป = ถ่ายรูป หรือเลือกจากอัลบั้ม (รูปที่บันทึกจาก LINE)</div>
+          <div class="fx-foot"><div class="fx-warnbox" id="fxWarn" style="display:none"></div><button type="button" class="fx-save" id="fxSaveBtn" onclick="fxSave()"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5h11L19.5 8v11.5h-15z"/><path d="M8 4.5v5h7v-5M8 19v-5h8v5"/></svg><span id="fxSaveTxt">บันทึกทั้งหมด</span></button></div>
+          <input type="file" id="fxFile" accept="image/*" style="display:none" onchange="fxFilePicked(this)">
         </div>
         <div class="card" style="margin-top:0;">
           <div class="table-toolbar"><div class="table-toolbar-title">📋 ประวัติเบิกออก</div></div>
@@ -2363,7 +2360,8 @@ function daysInMonth(ym) {
 }
 
 function todayYMD() {
-  return new Date().toISOString().slice(0, 10);
+  // วันที่ตามเวลาไทย (เดิมใช้ UTC → ก่อน 07:00 ได้วันของเมื่อวาน)
+  return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
 function currentYM() {
@@ -2656,10 +2654,12 @@ function attDateChanged() {
   const v = document.getElementById('attDate').value;
   document.getElementById('attDateDisplay').textContent = v ? isoToBE(v) : 'เลือกวันที่';
   const ym = v ? v.slice(0, 7) : currentYM();
+  attLoading = true;
   prLoadAttendance(ym).then(() => {
+    attLoading = false;
     renderAttList();
     renderEmpCheckList();
-  });
+  }, () => { attLoading = false; });
 }
 
 function setQuickType(type) {
@@ -2668,6 +2668,7 @@ function setQuickType(type) {
   document.getElementById('attBtnHalf').className  = 'att-btn' + (type==='half'  ? ' sel-half'  : '');
   document.getElementById('attBtnHours').className = 'att-btn' + (type==='hours' ? ' sel-hours' : '');
   document.getElementById('attHoursRow').style.display = type === 'hours' ? 'flex' : 'none';
+  if (typeof attSpSummary === 'function') attSpSummary();
 }
 
 function renderEmpCheckList() {
@@ -2675,47 +2676,116 @@ function renderEmpCheckList() {
   const container = document.getElementById('empCheckList');
   if (!container) return;
   const active = prEmployees.filter(e => e.active);
+  if (attSpDate !== date) { attSpSel = {}; attSpChk = {}; attSpDate = date; }
   container.innerHTML = active.map(emp => {
     const already = date && prAttendance[date + '_' + emp.id];
-    return `<label style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='var(--bg-card-hover)'" onmouseout="this.style.background=''">
-      <input type="checkbox" id="chk_${emp.id}" style="width:15px;height:15px;accent-color:var(--accent-amber);cursor:pointer;" ${already ? 'checked' : ''}>
+    const roles = emp.specialRoles || [];
+    const on = !already && attSpChecked(emp.id);
+    const chips = (on && roles.length) ? `<div class="att-sp-row">` + roles.map((sr, i) => {
+        const sel = attSpIsOn(emp.id, sr.name);
+        return `<button type="button" class="att-sp-chip${sel ? ' on' : ''}" onclick="attSpToggle('${emp.id}',${i})"><span class="att-sp-bx">${sel ? '✓' : ''}</span>${attEsc(sr.name)} +${fmtBaht(sr.ratePerDay || 0)} ฿</button>`;
+      }).join('') + `</div>` : '';
+    return `<div class="att-emp-item"><label style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:${already?'default':'pointer'};transition:background 0.15s;" onmouseover="this.style.background='var(--bg-card-hover)'" onmouseout="this.style.background=''" ${already ? 'title="บันทึกแล้ว — แก้ไขที่รายการลงงานด้านขวา (✏️)"' : ''}>
+      <input type="checkbox" id="chk_${emp.id}" style="width:15px;height:15px;accent-color:var(--accent-amber);cursor:pointer;" ${already ? 'checked disabled data-saved="1"' : (on ? 'checked' : '')} onchange="attChkChanged('${emp.id}')">
       <span style="font-size:14px;font-weight:${already?'700':'400'};color:${already?'var(--accent-green)':'var(--text-primary)'};">${emp.nickname}</span>
       ${already ? '<span style="font-size:10px;color:var(--accent-green);margin-left:auto;">✓ บันทึกแล้ว</span>' : ''}
-    </label>`;
+    </label>${chips}</div>`;
   }).join('');
+  attSpSummary();
 }
 
-function selectAllEmp()   { document.querySelectorAll('[id^="chk_"]').forEach(cb => cb.checked = true); }
-function deselectAllEmp() { document.querySelectorAll('[id^="chk_"]').forEach(cb => cb.checked = false); }
+// ── งานพิเศษรายวัน (ติ๊กตอนลงเวลา · ค่าเริ่มต้น = ไม่ติ๊ก) ──
+var attSpSel = {};      // { empId: { roleName: true } } — เฉพาะชุดที่กำลังจะเพิ่ม
+var attSpChk = {};      // { empId: true } — ติ๊กชื่อไว้ (ยังไม่บันทึก)
+var attSpDate = null;
+function attSpChecked(empId) { return !!attSpChk[empId]; }
+function attEsc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function attSpIsOn(empId, name) { return !!(attSpSel[empId] && attSpSel[empId][name]); }
+function attChkChanged(empId) {
+  const cb = document.getElementById('chk_' + empId);
+  attSpChk[empId] = !!(cb && cb.checked);
+  if (!attSpChk[empId]) delete attSpSel[empId];
+  renderEmpCheckList();
+}
+function attSpToggle(empId, idx) {
+  const emp = prEmployees.find(e => e.id === empId); if (!emp) return;
+  const sr = (emp.specialRoles || [])[idx]; if (!sr) return;
+  attSpSel[empId] = attSpSel[empId] || {};
+  if (attSpSel[empId][sr.name]) delete attSpSel[empId][sr.name]; else attSpSel[empId][sr.name] = true;
+  renderEmpCheckList();
+}
+function attSpWork(emp) {
+  return (emp.specialRoles || []).filter(sr => attSpIsOn(emp.id, sr.name)).map(sr => ({ name: sr.name, amount: sr.ratePerDay || 0 }));
+}
+function attSpDayBase(emp, date) {
+  const type = attSelectedType;
+  const h = parseFloat((document.getElementById('attHoursInput') || {}).value) || 0;
+  const unit = emp.type === 'daily' ? emp.rate : emp.rate / daysInMonth(date.slice(0, 7));
+  return type === 'full' ? unit : type === 'half' ? unit / 2 : unit * (h / 8);
+}
+function attSpSummaryLines() {
+  const date = document.getElementById('attDate').value;
+  const out = [];
+  prEmployees.filter(e => e.active).forEach(emp => {
+    if (date && prAttendance[date + '_' + emp.id]) return;
+    if (!attSpChecked(emp.id)) return;
+    const sw = attSpWork(emp); if (!sw.length) return;
+    const sp = sw.reduce((a, x) => a + x.amount, 0);
+    out.push(emp.nickname + ' + ' + sw.map(x => x.name + ' ' + fmtBaht(x.amount) + ' ฿').join(', ') + ' · ค่าแรงวันนี้ ' + fmtBaht(Math.round((attSpDayBase(emp, date || todayYMD()) + sp) * 100) / 100) + ' ฿');
+  });
+  return out;
+}
+function attSpSummary() {
+  const el = document.getElementById('attSpSum'); if (!el) return;
+  const L = attSpSummaryLines();
+  el.innerHTML = L.map(t => '<div>' + attEsc(t) + '</div>').join('');
+  el.style.display = L.length ? 'block' : 'none';
+}
 
+function selectAllEmp()   { document.querySelectorAll('[id^="chk_"]').forEach(cb => { if (!cb.disabled) { cb.checked = true; attSpChk[cb.id.slice(4)] = true; } }); renderEmpCheckList(); }
+function deselectAllEmp() { document.querySelectorAll('[id^="chk_"]').forEach(cb => { if (!cb.disabled) { cb.checked = false; attSpChk[cb.id.slice(4)] = false; } }); attSpSel = {}; renderEmpCheckList(); }
+
+var attLoading = false;
 async function addSelectedEmps() {
   const date = document.getElementById('attDate').value;
   if (!date) { toast('⚠️ เลือกวันที่ก่อน'); return; }
+  if (attLoading) { toast('⏳ กำลังโหลดข้อมูลวันที่เลือก รอสักครู่แล้วกดใหม่'); return; }
   const type = attSelectedType;
   const hours = type === 'hours' ? (parseFloat(document.getElementById('attHoursInput').value) || 0) : null;
   if (type === 'hours' && (!hours || hours <= 0)) { toast('⚠️ กรอกจำนวนชั่วโมงก่อน'); return; }
 
+  // เพิ่มเฉพาะคนที่ติ๊กและยังไม่ได้บันทึกของวันนี้ — คนที่บันทึกแล้วไม่ถูกเขียนทับ (กันงานพิเศษ/ประเภทเดิมหาย) แก้ได้ที่ ✏️
   const selected = prEmployees.filter(e => {
+    if (!e.active || prAttendance[date + '_' + e.id]) return false;
     const cb = document.getElementById('chk_' + e.id);
     return cb && cb.checked;
   });
-  if (!selected.length) { toast('⚠️ เลือกพนักงานก่อน'); return; }
+  if (!selected.length) { toast('⚠️ เลือกพนักงานที่ยังไม่ได้ลงเวลาก่อน'); return; }
 
   toast('⏳ กำลังบันทึก...');
   try {
+    // เช็กกับฐานข้อมูลจริงอีกรอบ (กันแคชเก่า/อีกเครื่องบันทึกไปแล้ว) — มีอยู่แล้ว = ข้าม ไม่เขียนทับ
+    const exist = await Promise.all(selected.map(emp => prDb().collection('attendance').doc(date + '_' + emp.id).get().then(d => d.exists ? d.data() : null).catch(() => null)));
+    const skipped = [];
+    exist.forEach((d, i) => { if (d) { prAttendance[date + '_' + selected[i].id] = d; skipped.push(selected[i].nickname); } });
+    const toSave = selected.filter((e, i) => !exist[i]);
+    if (!toSave.length) { renderAttList(); renderEmpCheckList(); toast('ℹ️ ' + skipped.join(', ') + ' บันทึกไว้แล้ว — แก้ไขที่รายการลงงาน'); return; }
     const batch = prDb().batch();
     const ym = date.slice(0, 7);
-    selected.forEach(emp => {
+    const pending = {};
+    toSave.forEach(emp => {
       const key = date + '_' + emp.id;
-      const data = { empId: emp.id, date, month: ym, type, hours: hours || null, specialWork: [],
+      const data = { empId: emp.id, date, month: ym, type, hours: hours || null, specialWork: attSpWork(emp),
         updatedAt: new Date().toISOString(), updatedBy: typeof curEmail !== 'undefined' ? curEmail : 'admin' };
-      prAttendance[key] = data;
+      pending[key] = data;
       batch.set(prDb().collection('attendance').doc(key), data);
     });
     await batch.commit();
+    Object.assign(prAttendance, pending);
+    selected.forEach(emp => { delete attSpSel[emp.id]; delete attSpChk[emp.id]; });
     renderAttList();
     renderEmpCheckList();
-    toast('✅ บันทึก ' + selected.length + ' คนแล้ว');
+    toast('✅ บันทึก ' + toSave.length + ' คนแล้ว' + (skipped.length ? ' (ข้าม ' + skipped.join(', ') + ' — บันทึกไว้แล้ว)' : ''));
   } catch(e) {
     toast('❌ บันทึกไม่สำเร็จ: ' + e.message);
   }
@@ -2876,7 +2946,44 @@ function setHours(empId, date, val) { /* handled by saveAttEdit */ }
 // ══════════════════════════════════════════════════════════
 function populateWdEmpSel() {}
 
+
+// ── เบิกเงิน: เลือกรอบ+เดือนตามวันที่วันนี้ (เวลาไทย) · เปลี่ยนเองได้แต่เตือน ──
+function thaiTodayYMD() {
+  const d = new Date(Date.now() + 7 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+function wdTodayPeriod() {
+  const t = thaiTodayYMD();
+  return { ym: t.slice(0, 7), period: (+t.slice(8, 10) <= 15) ? '1-15' : '16-end', date: t };
+}
+function wdAutoPeriod() {
+  const x = wdTodayPeriod();
+  const sel = document.getElementById('wdPeriodSel'), mon = document.getElementById('wdMonth');
+  if (sel) sel.value = x.period;
+  if (mon) mon.value = x.ym;
+  wdPeriodCheck();
+}
+function wdPeriodCheck() {
+  const x = wdTodayPeriod();
+  const sel = document.getElementById('wdPeriodSel'), mon = document.getElementById('wdMonth');
+  if (!sel || !mon) return true;
+  const ok = sel.value === x.period && (mon.value || x.ym) === x.ym;
+  sel.classList.toggle('wd-off', !ok); mon.classList.toggle('wd-off', !ok);
+  const perTxt = x.period === '1-15' ? 'รอบที่ 1 (1–15)' : 'รอบที่ 2 (16–สิ้นเดือน)';
+  const dd = x.date.slice(8, 10) + '/' + x.date.slice(5, 7);
+  const msg = ok ? '✓ เลือกให้ตามวันที่วันนี้ (' + dd + ')'
+    : '⚠️ วันนี้ ' + dd + ' อยู่ ' + perTxt + ' เดือน ' + x.ym + ' — ที่เลือกอยู่ไม่ตรง ยอดจะไปหักงวดที่เลือก (อาจเป็นงวดที่จ่ายไปแล้ว) แน่ใจไหม?';
+  const h = document.getElementById('wdPerHint');
+  if (h) { h.textContent = msg; h.className = 'wd-per-hint' + (ok ? '' : ' off'); }
+  const m = document.getElementById('mbpWdHint');
+  if (m) { m.textContent = msg.replace(/^[✓⚠️ ]+/, ''); m.className = 'mb-p-wdhint' + (ok ? '' : ' off'); }
+  const mb = document.getElementById('mbpWdPer');
+  if (mb && mb.parentNode) mb.parentNode.classList.toggle('wd-off', !ok);
+  return ok;
+}
+
 async function renderWdPanel() {
+  wdPeriodCheck();
   const period = document.getElementById('wdPeriodSel').value;
   const ym     = document.getElementById('wdMonth').value || currentYM();
   if (!document.getElementById('wdMonth').value) document.getElementById('wdMonth').value = ym;
@@ -2956,6 +3063,10 @@ function checkWdOverdraw(empId, earned) {
 }
 
 async function submitAllWithdrawals() {
+  if (typeof wdPeriodCheck === 'function' && !wdPeriodCheck()) {
+    const x = wdTodayPeriod();
+    if (!confirm('รอบที่เลือกไม่ตรงกับวันนี้ (วันนี้อยู่ ' + (x.period === '1-15' ? 'รอบที่ 1' : 'รอบที่ 2') + ' เดือน ' + x.ym + ')\nยอดเบิกจะไปหักงวดที่เลือกไว้ — ยืนยันบันทึกไหม?')) return;
+  }
   const period = document.getElementById('wdPeriodSel').value;
   const ym     = document.getElementById('wdMonth').value || currentYM();
   const checked = prEmployees.filter(e => {
@@ -3619,7 +3730,7 @@ async function initPayrollTab() {
   const today = todayYMD();
   document.getElementById('attDate').value = today;
   document.getElementById('attDateDisplay').textContent = isoToBE(today);
-  document.getElementById('wdMonth').value = currentYM();
+  wdAutoPeriod();
   document.getElementById('sumMonth').value = currentYM();
   setQuickType('full');
 
@@ -6138,21 +6249,45 @@ function listenVeh(){
     drawVeh();
   });
 }
+var vehFilter='all';
+var VEH_KIND={truck:'รถ',boat:'เรือ',excavator:'แม็กโคร'};
+function vehKindOf(v){ return (v&&v.kind)||'truck'; }
 function drawVeh(){
-  var plates=Object.keys(vehData).sort();
+  var tabs=document.getElementById('veh-filter');
+  if(tabs) [].forEach.call(tabs.querySelectorAll('button'),function(b){ b.classList.toggle('on',b.dataset.f===vehFilter); });
+  var all=Object.keys(vehData).sort(function(a,b){ var ka=vehKindOf(vehData[a]), kb=vehKindOf(vehData[b]); return ka===kb?a.localeCompare(b):(ka<kb?1:-1); });
+  var cnt={ours:0,partner:0}; all.forEach(function(p){ if(vehData[p].ours) cnt.ours++; else cnt.partner++; });
+  if(tabs){ var bs=tabs.querySelectorAll('button'); if(bs[0]) bs[0].textContent='รถเรา ('+cnt.ours+')'; if(bs[1]) bs[1].textContent='รถร่วม ('+cnt.partner+')'; if(bs[2]) bs[2].textContent='ทั้งหมด ('+all.length+')'; }
+  var plates=all.filter(function(p){ var o=!!vehData[p].ours; return vehFilter==='all'||(vehFilter==='ours'?o:!o); });
   var tb=document.getElementById('veh-tbody'); if(!tb) return;
-  if(!plates.length){ tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มีทะเบียน — เพิ่มด้านบน</td></tr>'; return; }
+  if(!plates.length){ tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">'+(all.length?'ไม่มีรายการในแถบนี้':'ยังไม่มีทะเบียน — เพิ่มด้านบน')+'</td></tr>'; return; }
+  function sel(p,f,val,opts){ return '<select class="veh-sel" onchange="vehSetField(\''+p+'\',\''+f+'\',this.value)">'+opts.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===val?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>'; }
   tb.innerHTML=plates.map(function(p){
-    var v=vehData[p], diff=v.ownerName!==v.canonical;
-    return '<tr><td><b>'+p+'</b></td><td>'+v.ownerName+'</td>'
-      +'<td><input type="text" value="'+v.canonical+'" data-plate="'+p+'"'
+    var v=vehData[p], diff=v.ownerName!==v.canonical, k=vehKindOf(v);
+    return '<tr'+(v.ours?' class="veh-ours"':'')+'><td><b>'+p+'</b></td>'
+      +'<td>'+sel(p,'kind',k,[['truck','รถบรรทุก'],['boat','เรือ'],['excavator','แม็กโคร']])+'</td>'
+      +'<td style="text-align:center"><label class="veh-chk"><input type="checkbox" '+(v.ours?'checked':'')+' onchange="vehSetField(\''+p+'\',\'ours\',this.checked)"> รถเรา</label></td>'
+      +'<td>'+sel(p,'meter',v.meter||'',[['','ไม่มีมิเตอร์'],['km','เลขไมล์ (กม.)'],['hr','ชั่วโมงเครื่อง']])+'</td>'
+      +'<td style="text-align:center"><label class="veh-chk"><input type="checkbox" '+(v.rungchai?'checked':'')+' onchange="vehSetField(\''+p+'\',\'rungchai\',this.checked)"> รุ่งชัย</label></td>'
+      +'<td>'+(v.ownerName||'')+'</td>'
+      +'<td><input type="text" value="'+(v.canonical||'')+'" data-plate="'+p+'"'
       +' style="padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;font-family:var(--font);width:140px">'
       +(diff?' <span class="badge-warn">แก้สะกด</span>':'')+'</td>'
-      +'<td>'
+      +'<td style="white-space:nowrap">'
       +'<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="vehSaveCanonical(\''+p+'\')">💾</button> '
       +'<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--err)" onclick="vehDelete(\''+p+'\')">🗑️</button>'
       +'</td></tr>';
   }).join('');
+}
+function vehSetFilter(f){ vehFilter=f; drawVeh(); }
+function vehSetField(plate,field,val){
+  if(!vehData[plate]) return;
+  var upd={}; upd[field]=val;
+  var old=vehData[plate][field];
+  vehData[plate][field]=val;
+  db.collection('vehicles').doc(plate).update(upd)
+    .then(function(){ setMsg('veh-add-msg','✅ อัปเดต '+plate,'ok'); drawVeh(); if(typeof fxOnVehChange==='function') fxOnVehChange(); })
+    .catch(function(e){ if(vehData[plate]) vehData[plate][field]=old; drawVeh(); setMsg('veh-add-msg','❌ '+e.message,'err'); });
 }
 function vehAdd(){
   var plate=(document.getElementById('veh-plate-in').value||'').trim().toUpperCase();
@@ -6175,9 +6310,12 @@ function fuzzyConfirm(isSame){
   fuzzyPending=null;
 }
 function vehSave(plate,ownerName,canonical){
-  db.collection('vehicles').doc(plate).set({ownerName:ownerName,canonical:canonical,active:true})
+  var kEl=document.getElementById('veh-kind-in'), oEl=document.getElementById('veh-ours-in');
+  var rec={ownerName:ownerName,canonical:canonical,active:true,kind:(kEl&&kEl.value)||'truck',ours:!!(oEl&&oEl.checked)};
+  db.collection('vehicles').doc(plate).set(rec)
     .then(function(){ setMsg('veh-add-msg','✅ เพิ่ม '+plate+' → '+canonical,'ok');
-      document.getElementById('veh-plate-in').value=''; document.getElementById('veh-owner-in').value=''; })
+      document.getElementById('veh-plate-in').value=''; document.getElementById('veh-owner-in').value='';
+      var oc=document.getElementById('veh-ours-in'); if(oc) oc.checked=false; })
     .catch(function(e){ setMsg('veh-add-msg','❌ '+e.message,'err'); });
 }
 function vehSaveCanonical(plate){
@@ -6627,9 +6765,9 @@ function findPlateSuggestion(plate){
   return null;
 }
 function resolvePlate(plate, canonical, ownerName){
-  db.collection('vehicles').doc(plate).set({ownerName:ownerName,canonical:canonical,active:true})
+  db.collection('vehicles').doc(plate).set({ownerName:ownerName,canonical:canonical,active:true},{merge:true})
     .then(function(){
-      vehData[plate]={ownerName:ownerName,canonical:canonical,active:true};
+      vehData[plate]=Object.assign(vehData[plate]||{}, {ownerName:ownerName,canonical:canonical,active:true});
       _plateQueue.shift();
       nextPlateResolve();
     }).catch(function(e){ alert('บันทึกไม่สำเร็จ: '+e.message); });
@@ -7825,7 +7963,7 @@ function drawFuelOutList() {
       +'<td>'+(typeLabel[r.type]||r.type)+'</td>'
       +'<td>'+(r.machine_id||'—')+'</td>'
       +'<td style="text-align:right;color:#ef5350;">'+((r.liters||0).toLocaleString('th-TH',{minimumFractionDigits:0}))+'</td>'
-      +'<td style="color:#6b7280;font-size:.7rem;">'+(r.note||'—')+'</td>'
+      +'<td style="color:#6b7280;font-size:.7rem;">'+([r.note, (r.meter!=null&&r.meter!=='')?((r.meterUnit==='hr'?'ชม. ':'ไมล์ ')+Number(r.meter).toLocaleString('th-TH')):''].filter(Boolean).join(' · ')||(r.photoId?'':'—'))+(r.photoId?' <button class="fx-vbtn" onclick="fxViewPhoto(\''+r._id+'\')">ดูรูป</button>':'')+'</td>'
       +'<td><button onclick="delFuelDoc(\'fuel_out\',\''+r._id+'\')" style="background:none;border:none;color:#ef5350;cursor:pointer;font-size:.85rem;">🗑️</button></td>'
       +'</tr>';
   });
@@ -9008,8 +9146,8 @@ html.mb #editCustModal .modal-actions .btn-gold{background:var(--m-green);color:
     x:'<path d="M6 6l12 12M18 6L6 18"/>',
     cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2.1 1.2M17.7 15.3l2.1 1.2M4.2 16.5l2.1-1.2M17.7 8.7l2.1-1.2"/>'
   };
-  var TITLE = {1:'ท่าทราย ธนเศรษฐ์ศิริ',2:'หักน้ำหนัก',3:'ใบแจ้งหนี้ลูกค้า',4:'สรุปผู้บริหาร',5:'ค่าเที่ยวรถร่วม',6:'เงินเดือน',7:'น้ำมัน',8:'รายจ่าย',9:'ลูกค้า'};
-  var NAV = [[1,'imp','นำเข้า'],[5,'fr','ค่าเที่ยว'],[6,'pay','เงินเดือน'],[7,'fuel','น้ำมัน']];
+  var TITLE = {1:'ใบชั่ง ท่าทรายสังคม',2:'หักน้ำหนัก',3:'ใบแจ้งหนี้ลูกค้า',4:'สรุปผู้บริหาร',5:'ค่าเที่ยวรถร่วม',6:'เงินเดือน',7:'น้ำมัน',8:'รายจ่าย',9:'ลูกค้า',10:'ทรายแหล่งอื่น',11:'ขาย'};
+  var NAV = [[11,'box','ขาย'],[6,'pay','เงินเดือน'],[7,'fuel','น้ำมัน']];   // 26 ก.ย.69: ขาย · เงินเดือน · น้ำมัน · เมนู
   var MTH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   var curTab = 1, heroSeg = 0, heroDate = '';
   function isAdm(){ return typeof curRole!=='undefined' && curRole==='admin'; }
@@ -9036,13 +9174,13 @@ html.mb #editCustModal .modal-actions .btn-gold{background:var(--m-green);color:
     var top=el('header','mbx'); top.id='mbTop';
     top.innerHTML='<button class="mb-ib" aria-label="บัญชี" onclick="mbOpen(\'mbShAcct\')">'+S(I.user,19)+'</button>'
       +'<div class="mb-tt" id="mbTitle">ท่าทราย ธนเศรษฐ์ศิริ</div>'
-      +'<button class="mb-ib" aria-label="เมนู" onclick="mbOpen(\'mbShMore\')">'+S(I.menu,19)+'</button>';
+      +'<button class="mb-ib" aria-label="เมนู" onclick="mbMenuOpen()">'+S(I.menu,19)+'</button>';
     var tb=app.querySelector('.topbar'); app.insertBefore(top, tb);
 
     // เมนูล่าง
     var nav=el('nav','mbx'); nav.id='mbNav';
     nav.innerHTML=NAV.map(function(n){ return '<button data-t="'+n[0]+'" onclick="goTab('+n[0]+')">'+S(I[n[1]],22)+'<span class="nl">'+n[2]+'</span></button>'; }).join('')
-      +'<button data-t="more" onclick="mbOpen(\'mbShMore\')">'+S(I.menu,22)+'<span class="nl">เพิ่มเติม</span></button>';
+      +'<button data-t="more" onclick="mbMenuOpen()">'+S(I.menu,22)+'<span class="nl">เมนู</span></button>';
     app.appendChild(nav);
 
     // mask + sheets
@@ -10549,6 +10687,7 @@ function xsJrPriceSave(){
     ]}
   ];
   var ITEMS=[], cur=null;
+  window.SB_TREE=T; window.sbItems=ITEMS; window.sbRunIdx=function(i){ if(ITEMS[i]) run(ITEMS[i]); };
   function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
   function isAdm(){ return typeof curRole!=='undefined' && curRole==='admin'; }
   function build(nodes){
@@ -10632,6 +10771,1539 @@ function xsJrPriceSave(){
     mark(ITEMS.filter(function(x){return x.go.t===1;})[0]);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+<!-- ============================================================
+     MOBILE LAYER · แท็บเงินเดือน (เฟส 2 รอบ 3) — ตามแบบ _mobile-เงินเดือน.html
+     มีผลเฉพาะจอ ≤700px (html.mb) · จอคอมได้โค้ดเดิมเป๊ะ
+============================================================ -->
+<style id="mb-css-pay">
+@media(max-width:700px){
+
+/* ── ซ่อนของจอคอมในแท็บเงินเดือน ── */
+html.mb #pr-att>.filter-row,
+html.mb #pr-att>div[style*="240px"],
+html.mb #attActionBar,
+html.mb #pr-wd>.filter-row,
+html.mb #wdPanel,
+html.mb #pr-sum>.filter-row,
+html.mb #payrollSumContent>div:first-child,
+html.mb #pr-cyc>.filter-row,
+html.mb #cycContent>div:not(.table-wrap),
+html.mb #pr-pay>.filter-row,
+html.mb #payHistContent,
+html.mb #pr-reg>div[style*="flex-end"],
+html.mb #empRegList,
+html.mb #tp6 .table-toolbar,
+html.mb #tp6 tfoot{display:none!important;}
+
+/* ── กล่อง / หัวข้อ ── */
+html.mb .mb-p-card{background:#fff;border:1px solid var(--m-line);border-radius:16px;padding:14px;margin-top:12px;}
+html.mb .mb-p-card.tb{padding:2px 12px;}
+html.mb .mb-p-lb{font-size:12px;color:var(--m-text2);margin-bottom:5px;display:block;font-weight:600;}
+html.mb .mb-p-sec{padding:18px 0 0;}
+html.mb .mb-p-sect{font-size:15.5px;font-weight:800;color:var(--m-text);}
+html.mb .mb-p-sect small{font-size:13.5px;font-weight:600;color:var(--m-muted);margin-left:6px;}
+html.mb .mb-p-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+html.mb .mb-p-row2>div{min-width:0;}
+
+/* ── ช่องกรอก ── */
+html.mb .mb-p-in{position:relative;width:100%;min-height:48px;border:1px solid #dde4e8;border-radius:12px;background:#fff;
+  padding:0 12px;font-size:16px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--m-text);
+  font-weight:600;overflow:hidden;}
+html.mb .mb-p-in>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html.mb .mb-p-in.mut{color:var(--m-muted);font-weight:500;}
+html.mb .mb-p-in>input,html.mb .mb-p-in>select{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:0;
+  background:transparent;cursor:pointer;}
+html.mb .mb-p-in>input.sh{position:static;opacity:1;flex:1;height:44px;font-weight:700;color:var(--m-text);
+  font-variant-numeric:tabular-nums;text-align:right;padding:0;min-width:0;}
+html.mb .mb-p-in.on{border-color:var(--m-green);box-shadow:0 0 0 2px rgba(26,138,74,.12);}
+
+/* ── แถบสลับ 3 อัน ── */
+html.mb .mb-p-seg{display:grid;grid-template-columns:repeat(3,1fr);background:#eef2f4;border-radius:12px;padding:4px;gap:4px;margin:12px 0 4px;}
+html.mb .mb-p-seg button{min-height:44px;border:none;background:transparent;border-radius:9px;font-family:var(--font);
+  font-size:14.5px;font-weight:600;color:var(--m-text2);cursor:pointer;}
+html.mb .mb-p-seg button.on{background:var(--m-green);color:#fff;font-weight:800;}
+
+/* ── หัวข้อในกล่อง ── */
+html.mb .mb-p-ch{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 2px;}
+html.mb .mb-p-ch b{font-size:15px;font-weight:800;color:var(--m-text);}
+html.mb .mb-p-ca{background:none;border:none;font-family:var(--font);font-size:13.5px;font-weight:700;
+  color:var(--m-green);cursor:pointer;min-height:44px;padding:0 4px;}
+
+/* ── แถวติ๊กรายชื่อ ── */
+html.mb .mb-p-pr{display:flex;align-items:center;gap:11px;padding:0 2px;min-height:54px;border-bottom:1px solid #f1f4f6;cursor:pointer;}
+html.mb .mb-p-pr:last-child{border-bottom:none;}
+html.mb .mb-p-box{width:23px;height:23px;border-radius:7px;border:2px solid #c6cdd3;flex:0 0 23px;
+  display:flex;align-items:center;justify-content:center;color:transparent;}
+html.mb .mb-p-pr.on .mb-p-box{background:var(--m-green);border-color:var(--m-green);color:#fff;}
+html.mb .mb-p-nm{flex:1;font-size:15px;font-weight:700;color:var(--m-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html.mb .mb-p-tag{font-size:11.5px;background:var(--m-green-bg);color:var(--m-green-d);border-radius:7px;padding:3px 8px;font-weight:700;white-space:nowrap;}
+html.mb .mb-p-mut{color:var(--m-muted);font-size:12.5px;white-space:nowrap;font-variant-numeric:tabular-nums;}
+html.mb .mb-p-red{color:var(--m-red);font-size:12.5px;margin:2px 0 6px;font-variant-numeric:tabular-nums;}
+
+/* ── ปุ่ม ── */
+html.mb .mb-p-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;
+  border:none;border-radius:13px;background:var(--m-green);color:#fff;font-family:var(--font);font-size:16px;font-weight:800;cursor:pointer;}
+html.mb .mb-p-btn.gh{background:#fff;border:1px solid #dde4e8;color:var(--m-text2);}
+html.mb .mb-p-btn.dg{background:#fff;border:1px solid #f1c9c3;color:var(--m-red);}
+html.mb .mb-p-btn.solidred{background:var(--m-red);border:none;color:#fff;}
+html.mb .mb-shbtn.solidred{background:var(--m-red);border-color:var(--m-red);color:#fff;font-weight:800;}
+html.mb .mb-p-btn+.mb-p-btn{margin-top:9px;}
+html.mb .mb-p-two{display:grid;grid-template-columns:1fr 1.3fr;gap:10px;margin-top:12px;}
+html.mb .mb-p-two .mb-p-btn+.mb-p-btn{margin-top:0;}
+html.mb .mb-p-fab{position:sticky;bottom:calc(var(--m-navh) + env(safe-area-inset-bottom) + 10px);z-index:8;margin-top:12px;}
+html.mb .mb-p-fab .mb-p-btn{box-shadow:0 6px 18px rgba(17,97,54,.22);}
+html.mb .mb-p-full{min-height:44px;border-radius:10px;border:1px solid #cfe6d8;background:var(--m-green-bg);
+  color:var(--m-green-d);font-family:var(--font);font-size:13px;font-weight:800;padding:0 12px;white-space:nowrap;cursor:pointer;}
+
+/* ── ช่องกรอกย่อย / แถวปุ่ม ── */
+html.mb .mb-p-hrs{display:flex;align-items:center;gap:10px;margin-top:8px;}
+html.mb .mb-p-lb0{font-size:12px;color:var(--m-text2);font-weight:600;margin:0;}
+html.mb .mb-p-grow{flex:1;}
+html.mb .mb-p-cur{color:var(--m-text2);font-weight:600;}
+html.mb .mb-p-amt{display:flex;gap:9px;align-items:center;margin-top:8px;}
+html.mb .mb-p-act{margin-top:12px;}
+html.mb .mb-p-fld{margin-top:12px;}
+html.mb .mb-p-pdf{min-height:48px;color:var(--m-green-d);border-color:#cfe6d8;}
+html.mb .mb-p-dayr{display:flex;align-items:center;gap:8px;}
+html.mb .mb-p-shrow2{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+html.mb .mb-p-shrow2.top{justify-content:flex-start;gap:12px;}
+html.mb .mb-p-t2{margin-top:2px;}
+html.mb .mb-p-ml{margin-left:6px;}
+html.mb .mb-p-lite{font-weight:500;}
+html.mb .mb-p-k{font-weight:700;color:var(--m-text);}
+
+/* ── การ์ดยอดเขียว ── */
+html.mb .mb-p-hero{margin-top:12px;border-radius:18px;overflow:hidden;box-shadow:0 6px 20px rgba(17,97,54,.18);}
+html.mb .mb-p-hb{background:linear-gradient(135deg,var(--m-green) 0%,var(--m-green-l) 100%);padding:16px 18px;color:#fff;}
+html.mb .mb-p-hs{font-size:12.5px;opacity:.88;}
+html.mb .mb-p-hn{font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1.15;font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html.mb .mb-p-hn i{font-style:normal;font-size:15px;font-weight:600;opacity:.9;margin-left:4px;}
+html.mb .mb-p-hf{background:#fff;display:flex;}
+html.mb .mb-p-hf>div{flex:1;padding:11px 12px;min-width:0;}
+html.mb .mb-p-hf>div+div{border-left:1px solid var(--m-line);}
+html.mb .mb-p-hf .l{font-size:11.5px;color:var(--m-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html.mb .mb-p-hf .v{font-size:15.5px;font-weight:800;color:var(--m-text);margin-top:2px;font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* ── กล่องอธิบาย / เตือน ── */
+html.mb .mb-p-note{background:#eef5fb;border:1px solid #d3e3f1;border-radius:12px;padding:11px 12px;font-size:12.5px;
+  line-height:1.65;color:#31556f;margin-top:12px;}
+html.mb .mb-p-warn{background:var(--m-orange-bg);border:1px solid #f3ddbc;border-radius:12px;padding:11px 12px;
+  font-size:12.5px;line-height:1.6;color:#8a5a12;margin-top:12px;}
+html.mb .mb-p-ok{background:var(--m-green-bg);border:1px solid #cfe6d8;border-radius:12px;padding:11px 12px;
+  font-size:12.5px;line-height:1.6;color:var(--m-green-d);margin-top:12px;}
+html.mb .mb-p-err{background:#fdecea;border:1px solid #f3cdc7;border-radius:12px;padding:11px 12px;
+  font-size:12.5px;line-height:1.6;color:#8d2b1f;margin-top:12px;}
+html.mb .mb-p-chip{display:flex;align-items:center;justify-content:center;gap:7px;background:#f2f5f6;border-radius:11px;
+  padding:10px;font-size:12.5px;color:var(--m-text2);margin-top:10px;}
+html.mb .mb-p-empty{color:var(--m-muted);font-size:13.5px;padding:18px 2px;}
+
+/* ── ตารางของหน้าเงินเดือน (ที่เราวาดเอง) ── */
+html.mb table.mb-p-t{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;}
+html.mb table.mb-p-t th{font-size:11px;color:#6b7680;text-align:left;font-weight:700;padding:8px 4px;
+  border-bottom:1px solid var(--m-line);background:#fafbfc;}
+html.mb table.mb-p-t td{padding:11px 4px;border-bottom:1px solid #f2f4f6;color:var(--m-text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html.mb table.mb-p-t tr:last-child td{border-bottom:none;}
+html.mb table.mb-p-t .r{text-align:right;font-variant-numeric:tabular-nums;}
+html.mb table.mb-p-t td.r{font-weight:700;}
+html.mb table.mb-p-t td.mut{color:var(--m-muted);font-weight:500;}
+html.mb table.mb-p-t tr.sum td{border-top:1px solid var(--m-line);font-weight:800;}
+html.mb table.mb-p-t tr.sum td.r{color:var(--m-green-d);}
+html.mb table.mb-p-t tbody tr.tap:active td{background:var(--m-green-bg);}
+
+/* ── ตารางจอคอมที่เอามาย่อ (สรุปรายเดือน/ตามงวด) — ใช้ของกลาง .mbt ที่มีอยู่แล้ว ── */
+html.mb #payrollSumContent.mbt,html.mb #cycContent.mbt{margin-top:12px;}
+html.mb .mbt .table-wrap{border:none!important;border-radius:0!important;background:transparent!important;
+  box-shadow:none!important;margin:0!important;overflow:visible!important;}
+html.mb .mbt .overflow-x{overflow:visible!important;}
+html.mb .mbt tbody tr.mb-p-hl td{background:#fffaf2!important;}
+html.mb .mbt tbody tr.mb-p-neg td{background:#fdf6f5!important;}
+html.mb .mbt tbody tr.mb-p-neg td:last-child{color:var(--m-red)!important;}
+html.mb .mbt tbody td.mb-p-negv{color:var(--m-red)!important;}
+html.mb .mb-p-in>input.sh::placeholder{color:var(--m-muted);font-weight:500;}
+
+/* ── การ์ดวันในประวัติการจ่าย ── */
+html.mb .mb-p-day{background:#fff;border:1px solid var(--m-line);border-radius:16px;padding:12px;margin-top:10px;}
+html.mb .mb-p-dayh{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;min-height:44px;}
+html.mb .mb-p-dayh .d{font-size:15px;font-weight:800;color:var(--m-text);}
+html.mb .mb-p-dayh .c{font-size:12.5px;color:var(--m-muted);}
+html.mb .mb-p-dayh .a{font-size:16px;font-weight:800;color:var(--m-green-d);font-variant-numeric:tabular-nums;}
+html.mb .mb-p-day.open .mb-p-dayh{border-bottom:1px solid #f0f2f4;padding-bottom:9px;}
+html.mb .mb-p-day .mb-p-dayb{display:none;}
+html.mb .mb-p-day.open .mb-p-dayb{display:block;}
+html.mb .mb-p-day svg.mi{transition:transform .2s;color:var(--m-muted);}
+html.mb .mb-p-day.open svg.mi{transform:rotate(180deg);}
+
+/* ── การ์ดทะเบียนพนักงาน ── */
+html.mb .mb-p-emp{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;background:#fff;
+  border:1px solid var(--m-line);border-radius:16px;padding:13px;margin-top:10px;cursor:pointer;min-height:54px;}
+html.mb .mb-p-emp.off{opacity:.6;}
+html.mb .mb-p-emp .n{font-size:16px;font-weight:800;color:var(--m-text);}
+html.mb .mb-p-emp .f{font-size:12.5px;color:var(--m-muted);font-weight:500;margin-left:5px;}
+html.mb .mb-p-emp .s{font-size:12.5px;color:var(--m-muted);margin-top:3px;}
+html.mb .mb-p-emp svg.mi{color:var(--m-muted);margin-top:3px;}
+html.mb .mb-p-pause{display:inline-block;background:#f2f5f6;color:var(--m-text2);border-radius:7px;padding:2px 8px;
+  font-size:11px;font-weight:700;margin-left:6px;}
+
+/* ── sheet: รายละเอียด / ยืนยัน ── */
+html.mb .mb-p-sh{padding:0 18px;}
+html.mb .mb-p-sht{font-size:19px;font-weight:800;color:var(--m-text);}
+html.mb .mb-p-shs{font-size:13px;color:var(--m-muted);margin-top:2px;}
+html.mb .mb-p-kv{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;
+  border-bottom:1px solid #f2f4f6;font-size:14.5px;}
+html.mb .mb-p-kv span{color:var(--m-text2);}
+html.mb .mb-p-kv b{font-weight:800;color:var(--m-text);font-variant-numeric:tabular-nums;text-align:right;}
+html.mb .mb-p-kv.big b{font-size:18px;color:var(--m-green-d);}
+html.mb .mb-p-kv.neg b{color:var(--m-red);}
+html.mb .mb-p-kv.last{border-bottom:none;}
+html.mb .mb-p-shh{font-size:14.5px;font-weight:800;color:var(--m-text);margin:14px 0 2px;}
+html.mb .mb-p-ico{width:38px;height:38px;border-radius:12px;background:#fdecea;color:var(--m-red);flex:0 0 38px;
+  display:flex;align-items:center;justify-content:center;}
+html.mb .mb-p-new{display:inline-block;background:#fff4e5;border:1px dashed #e0a458;color:#8a5a12;font-size:11px;
+  font-weight:800;border-radius:7px;padding:3px 9px;margin-bottom:8px;}
+
+/* ── หน้าต่างเพิ่ม/แก้ไขพนักงาน → sheet จากล่าง ── */
+html.mb #empModalOverlay{align-items:flex-end!important;padding:0!important;}
+html.mb #empModalOverlay .emp-modal{width:100%!important;max-width:none!important;max-height:88vh;overflow-y:auto;
+  border-radius:18px 18px 0 0!important;padding:18px 16px calc(env(safe-area-inset-bottom) + 18px)!important;}
+html.mb #empModalOverlay .form-input{font-size:16px!important;min-height:48px;}
+html.mb #empModalOverlay .type-btn,html.mb #empModalOverlay .btn{min-height:46px;font-size:15px;}
+html.mb #empModalOverlay .type-toggle{display:flex;gap:8px;}
+html.mb #empModalOverlay .type-toggle .type-btn{flex:1;}
+}
+</style>
+
+<script id="mb-js-pay">
+(function(){
+  var MB=window.MB; if(!MB) return;
+  var $=MB.$, S=MB.S, I=MB.I, clean=MB.clean, el=MB.el;
+
+  /* ไอคอนเส้นเพิ่มเติมของหน้าเงินเดือน */
+  var J={
+    pen:'<path d="M16.5 4.5 19.5 7.5 8 19H5v-3z"/>',
+    trash:'<path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l.9 12.2h9.2L17.5 7M10 11v5M14 11v5"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',
+    check:'<path d="m5 12.5 4.5 4.5L19 7"/>',
+    send:'<path d="M20.5 3.5 10.5 13.5M20.5 3.5 14 20.5l-3.5-7-7-3.5z"/>',
+    save:'<path d="M5 4.5h11L19.5 8v11.5h-15z"/><path d="M8 4.5v5h7v-5M8 19v-5h8v5"/>',
+    print:'<path d="M7 9V4h10v5M7 18H4.5v-7h15v7H17"/><rect x="7" y="14.5" width="10" height="5.5" rx="1"/>'
+  };
+
+  /* ── helper ── */
+  function fb(n){ return (typeof fmtBaht==='function')?fmtBaht(n):String(n); }
+  function be(d){ return (typeof isoToBE==='function')?isoToBE(d):(d||''); }
+  function ymNow(){ return (typeof currentYM==='function')?currentYM():''; }
+  function EMPS(){ return (typeof prEmployees!=='undefined'&&prEmployees)?prEmployees:[]; }
+  function ACTIVE(){ return EMPS().filter(function(e){ return e.active; }); }
+  function ATT(){ return (typeof prAttendance!=='undefined'&&prAttendance)?prAttendance:{}; }
+  function WD(){ return (typeof prWithdrawals!=='undefined'&&prWithdrawals)?prWithdrawals:[]; }
+  function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function empOf(id){ return EMPS().filter(function(e){ return e.id===id; })[0]; }
+  function rateTxt(e){ return fb(e.rate)+(e.type==='daily'?'/วัน':'/ด.'); }
+  function rateLong(e){ return fb(e.rate)+' ฿'+(e.type==='daily'?'/วัน':'/เดือน'); }
+  function typeTxt(r){
+    if(!r||!r.type||r.type==='absent') return 'ขาด';
+    if(r.type==='full') return 'เต็มวัน';
+    if(r.type==='half') return 'ครึ่งวัน';
+    return 'รายชั่วโมง';
+  }
+  function hoursOf(r){
+    if(!r||!r.type||r.type==='absent') return 0;
+    if(r.type==='full') return 8;
+    if(r.type==='half') return 4;
+    return r.hours||0;
+  }
+  function spTotal(r){ return ((r&&r.specialWork)||[]).reduce(function(s,x){ return s+(x.amount||0); },0); }
+  function curSub(){ var a=document.querySelector('#tp6 .pr-content.active'); return a?a.id.replace('pr-',''):'att'; }
+  function sheet(){ return $('mbShSub'); }
+  function openSheet(html){ var sh=sheet(); if(!sh) return; sh.innerHTML='<div class="mb-grab"></div>'+html; MB.open('mbShSub'); return sh; }
+
+  /* ══════════════════════════════════════════════════════════
+     ตารางจอคอม → ย่อ + เลือกคอลัมน์ (กลไกเดียวกับแท็บน้ำมัน)
+  ══════════════════════════════════════════════════════════ */
+  var CFG={
+    payrollSumContent:{
+      head:['พนักงาน','วันทำงาน','ค่าแรงรอบ 1','ค่าแรงรอบ 2','งานพิเศษ','รวมค่าแรง','หักปกส','เบิกไปแล้ว','คงเหลือ'],
+      right:[1,2,3,4,5,6,7,8], def:[5,6,8], ell:[], title:'สรุปรายเดือน'
+    },
+    cycContent:{
+      head:['พนักงาน','วันทำงาน','ค่าแรงงวด','งานพิเศษ','หักปกส','เบิกไปแล้ว','รอรับงวดนี้'],
+      right:[1,2,3,4,5,6], def:[2,5,6], ell:[], title:'สรุปเงินเดือน (ตามงวด)'
+    }
+  };
+  function pref(key){ try{ var v=JSON.parse(localStorage.getItem('mb_cols_'+key)||'null'); if(Array.isArray(v)&&v.length) return v; }catch(e){} return CFG[key].def.slice(); }
+  function savePref(key,v){ try{ localStorage.setItem('mb_cols_'+key, JSON.stringify(v)); }catch(e){} }
+  var shown={};
+  function tbl(key){ var c=$(key); return c && c.querySelector('table'); }
+  function setCols(key,list){
+    var t=tbl(key); if(!t) return;
+    var st=t.querySelector('style.mb-cs'); if(!st){ st=document.createElement('style'); st.className='mb-cs'; t.insertBefore(st,t.firstChild); }
+    st.textContent=[0].concat(list).map(function(i){ return '#'+key+' [data-c="'+i+'"]'; }).join(',')+'{display:table-cell}';
+  }
+  function fits(key){
+    var c=$(key), t=tbl(key); if(!c||!t||!c.clientWidth) return true;
+    t.classList.add('mb-meas'); var n=t.offsetWidth; t.classList.remove('mb-meas');
+    return n<=c.clientWidth;
+  }
+  function fit(key){
+    var list=pref(key).slice(); setCols(key,list);
+    while(list.length>1 && !fits(key)){ list.pop(); setCols(key,list); }
+    shown[key]=list; label(key);
+  }
+  function label(key){
+    var b=$('mbc_'+key); if(!b) return; var cfg=CFG[key], p=pref(key), sh=shown[key]||[];
+    var hid=p.filter(function(i){ return sh.indexOf(i)<0; }).length;
+    b.innerHTML=S(I.filter,15)+'<span class="mb-th-l">แสดง: <b>'+[0].concat(sh).map(function(i){ return cfg.head[i]; }).join(' · ')+'</b>'
+      +(hid>0?' <span style="color:var(--m-orange)">(จอไม่พอ ซ่อน '+hid+')</span>':'')+'</span><span class="mb-th-a">เลือกคอลัมน์</span>';
+  }
+  function transform(key){
+    if(!MB.on()) return;
+    var c=$(key), t=tbl(key), cfg=CFG[key]; if(!c||!t) return;
+    c.classList.add('mbt');
+    var ths=t.querySelectorAll('thead th');
+    [].forEach.call(ths, function(th,i){
+      if(cfg.head[i]===undefined) return;
+      if(i>0) th.dataset.c=i;
+      th.textContent=cfg.head[i];
+      if(cfg.right.indexOf(i)>=0) th.classList.add('mb-r');
+    });
+    [].forEach.call(t.querySelectorAll('tbody tr'), function(tr){
+      var tds=tr.children; if(tds.length<2) return;
+      var a=tr.querySelector('[onclick*="openEmpDetail"]');
+      if(a){ var m=/openEmpDetail\('([^']+)','([^']+)'/.exec(a.getAttribute('onclick')||''); if(m){ tr.dataset.emp=m[1]; tr.dataset.ym=m[2]; } }
+      [].forEach.call(tds, function(td,i){
+        if(cfg.head[i]===undefined) return;
+        if(i>0) td.dataset.c=i;
+        if(cfg.right.indexOf(i)>=0) td.classList.add('mb-r');
+        if(cfg.ell.indexOf(i)>=0) td.classList.add('mb-ell');
+        var nm = i===0 ? td.querySelector('[onclick*="openEmpDetail"]') : null;   // ตัดตัวอักษรย่อหน้าชื่อออก
+        var v = clean((nm?nm.textContent:td.textContent)).replace(/\s*฿$/,'');
+        td.textContent=v;
+        if(i>0 && /^[-−]/.test(v)) td.classList.add('mb-p-negv');
+      });
+      tr.classList.add('mb-tap');
+      if(key==='payrollSumContent'){ if(/\d/.test(tds[6]?tds[6].textContent:'')) tr.classList.add('mb-p-hl'); }
+      if(key==='cycContent'){ if(/^-|^−/.test((tds[6]?tds[6].textContent:'').trim())) tr.classList.add('mb-p-neg'); }
+    });
+    if(!$('mbc_'+key)){
+      var b=document.createElement('button'); b.type='button'; b.className='mbx mb-thint'; b.id='mbc_'+key;
+      b.onclick=function(){ colSheet(key); }; c.appendChild(b);
+    } else c.appendChild($('mbc_'+key));
+    if(!c.dataset.mbTap){
+      c.dataset.mbTap='1';
+      c.addEventListener('click', function(e){
+        if(!MB.on()) return;
+        var tr=e.target.closest('tbody tr'); if(!tr||!tr.classList.contains('mb-tap')) return;
+        if(e.target.closest('button,a,input')) return;
+        if(tr.dataset.emp) empSheet(tr.dataset.emp, tr.dataset.ym);
+      });
+    }
+    fit(key);
+  }
+  function colSheet(key){
+    var cfg=CFG[key], sh=sheet();
+    function draw(){
+      var cur=shown[key]||[];
+      var html='<div class="mb-grab"></div><div class="mb-sht">เลือกคอลัมน์ที่จะแสดง</div>'
+        +'<div class="mb-sub">เลือกได้เท่าที่หน้าจอพอดี ไม่ต้องปัดซ้ายขวา · เครื่องนี้จะจำไว้</div>'
+        +'<div class="mb-ci on lock"><div class="mb-cbox">'+S(J.check,14)+'</div><div class="mb-ci-n">'+cfg.head[0]+'</div><div class="mb-ci-r">ตรึงไว้เสมอ</div></div>';
+      cfg.head.forEach(function(h,i){
+        if(i===0||h===null) return;
+        var onI=cur.indexOf(i)>=0, full=false;
+        if(!onI){ setCols(key,cur.concat([i])); full=!fits(key); setCols(key,cur); }
+        html+='<div class="mb-ci'+(onI?' on':'')+(full?' full':'')+'" data-i="'+i+'"><div class="mb-cbox">'+(onI?S(J.check,14):'')+'</div><div class="mb-ci-n">'+h+'</div><div class="mb-ci-r">'+(full?'จอไม่พอ':'')+'</div></div>';
+      });
+      html+='<div class="mb-shrow"><button class="mb-shbtn" data-a="def">ค่าเริ่มต้น</button><button class="mb-shbtn pri" data-a="ok">ใช้ '+((shown[key]||[]).length+1)+' คอลัมน์นี้</button></div>';
+      sh.innerHTML=html;
+      [].forEach.call(sh.querySelectorAll('.mb-ci[data-i]'), function(r){
+        r.onclick=function(){
+          var i=+r.dataset.i, cur2=shown[key]||[];
+          if(cur2.indexOf(i)>=0){ savePref(key, pref(key).filter(function(x){ return x!==i; })); }
+          else{
+            setCols(key,cur2.concat([i])); var ok=fits(key); setCols(key,cur2);
+            if(!ok){ r.classList.remove('shake'); void r.offsetWidth; r.classList.add('shake'); r.querySelector('.mb-ci-r').textContent='จอไม่พอ · เอาอันอื่นออกก่อน'; return; }
+            savePref(key, cur2.concat([i]).concat(pref(key).filter(function(x){ return cur2.indexOf(x)<0 && x!==i; })));
+          }
+          fit(key); draw();
+        };
+      });
+      sh.querySelector('[data-a="def"]').onclick=function(){ savePref(key, cfg.def.slice()); fit(key); draw(); };
+      sh.querySelector('[data-a="ok"]').onclick=MB.close;
+    }
+    draw(); MB.open('mbShSub');
+  }
+  function untransform(){
+    Object.keys(CFG).forEach(function(key){
+      var c=$(key); if(c) c.classList.remove('mbt');
+      var b=$('mbc_'+key); if(b) b.remove();
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     สร้างโครงมือถือ (ครั้งเดียว)
+  ══════════════════════════════════════════════════════════ */
+  var built=false;
+  function build(){
+    if(built) return; if(!$('tp6')) return; built=true;
+
+    /* ── 1 บันทึกเวลาทำงาน ── */
+    var att=el('div','mbx','');
+    att.id='mbpAtt';
+    att.innerHTML=
+      '<div class="mb-p-card">'
+      + '<span class="mb-p-lb">วันที่</span>'
+      + '<div class="mb-p-in" id="mbpDateBox"><span id="mbpDateTxt">เลือกวันที่</span>'+S(I.cal,19)+'<input type="date" id="mbpDate"></div>'
+      + '<div class="mb-p-seg" id="mbpSeg">'
+      +   '<button type="button" data-t="full">เต็มวัน</button><button type="button" data-t="half">ครึ่งวัน</button><button type="button" data-t="hours">รายชั่วโมง</button>'
+      + '</div>'
+      + '<div id="mbpHrsRow" class="mb-p-hrs" hidden>'
+      +   '<span class="mb-p-lb0">ชั่วโมง</span><div class="mb-p-in mb-p-grow"><input class="sh" type="number" id="mbpHrs" min="0.5" max="16" step="0.5" value="8"></div>'
+      + '</div>'
+      + '<div class="mb-p-ch"><b>เลือกพนักงาน</b><span><button type="button" class="mb-p-ca" id="mbpAll">เลือกทั้งหมด</button><span style="color:#c9d3d9"> · </span><button type="button" class="mb-p-ca" id="mbpNone">ล้าง</button></span></div>'
+      + '<div id="mbpPick"></div>'
+      + '</div>'
+      + '<div class="mb-p-fab"><div class="mb-p-spsum" id="mbpSpSum" style="display:none"></div><button type="button" class="mb-p-btn" id="mbpAdd">'+S(J.plus,20)+'<span>เพิ่มที่เลือก</span></button></div>'
+      + '<div class="mb-p-sec"><div class="mb-p-sect">ลงงานวันนี้ <small id="mbpDaySub"></small></div></div>'
+      + '<div class="mb-p-card tb" id="mbpDayTbl"></div>'
+      + '<div class="mb-p-chip">'+S(J.pen,16)+'แตะชื่อเพื่อแก้ไข หรือ ลบ</div>'
+      + '<div class="mb-p-two"><button type="button" class="mb-p-btn gh" id="mbpEditHint">'+S(J.pen,19)+'แก้ไข</button>'
+      +   '<button type="button" class="mb-p-btn" id="mbpSend">'+S(J.send,19)+'ส่งรายงาน</button></div>';
+    $('pr-att').appendChild(att);
+
+    $('mbpDate').oninput=function(){
+      var d=$('mbpDate').value; if(!d) return;
+      var a=$('attDate'); if(a){ a.value=d; if(typeof attDateChanged==='function') attDateChanged(); }
+      drawAtt();
+    };
+    [].forEach.call($('mbpSeg').children, function(b){
+      b.onclick=function(){ if(typeof setQuickType==='function') setQuickType(b.dataset.t); syncSeg(); };
+    });
+    $('mbpHrs').oninput=function(){ var h=$('attHoursInput'); if(h) h.value=$('mbpHrs').value; };
+    $('mbpAll').onclick=function(){ if(typeof selectAllEmp==='function') selectAllEmp(); drawPick(); };
+    $('mbpNone').onclick=function(){ if(typeof deselectAllEmp==='function') deselectAllEmp(); drawPick(); };
+    $('mbpAdd').onclick=function(){ var h=$('attHoursInput'); if(h) h.value=$('mbpHrs').value; if(typeof addSelectedEmps==='function') addSelectedEmps(); };
+    $('mbpEditHint').onclick=function(){ if(typeof toast==='function') toast('แตะชื่อในตาราง "ลงงานวันนี้" เพื่อแก้ไข หรือ ลบ'); };
+    $('mbpSend').onclick=function(){ if(typeof submitAttReport==='function') submitAttReport(); };
+
+    /* ── 2 บันทึกเบิกเงิน ── */
+    var wd=el('div','mbx','');
+    wd.id='mbpWd';
+    wd.innerHTML=
+      '<div class="mb-p-row2">'
+      + '<div><span class="mb-p-lb">รอบ</span><div class="mb-p-in"><span id="mbpWdPerTxt">–</span>'+S(I.chev,19)
+      +   '<select id="mbpWdPer"><option value="1-15">รอบที่ 1 (1–15)</option><option value="16-end">รอบที่ 2 (16–สิ้นเดือน)</option></select></div></div>'
+      + '<div><span class="mb-p-lb">เดือน</span><div class="mb-p-in"><span id="mbpWdMonTxt">–</span>'+S(I.cal,19)
+      +   '<input type="month" id="mbpWdMon"></div></div>'
+      + '</div>'
+      + '<div class="mb-p-wdhint" id="mbpWdHint"></div>'
+      + '<div id="mbpWdList"></div>'
+      + '<div class="mb-p-sec"><div class="mb-p-sect">ประวัติเบิกรอบนี้ <small id="mbpWdHistSub"></small></div></div>'
+      + '<div class="mb-p-card tb" id="mbpWdHist"></div>'
+      + '<div class="mb-p-note" id="mbpWdNote"></div>'
+      + '<div class="mb-p-act"><button type="button" class="mb-p-btn" id="mbpWdSave">'+S(J.save,19)+'<span>บันทึกที่ติ๊ก</span></button></div>';
+    $('pr-wd').appendChild(wd);
+    $('mbpWdPer').onchange=function(){ var s=$('wdPeriodSel'); if(s){ s.value=$('mbpWdPer').value; if(typeof renderWdPanel==='function') renderWdPanel(); } };
+    $('mbpWdMon').oninput=function(){ var m=$('wdMonth'); if(m){ m.value=$('mbpWdMon').value; if(typeof renderWdPanel==='function') renderWdPanel(); } };
+    $('mbpWdSave').onclick=function(){ if(typeof submitAllWithdrawals==='function') submitAllWithdrawals(); };
+
+    /* ── 3 สรุปรายเดือน ── */
+    var sum=el('div','mbx','');
+    sum.id='mbpSum';
+    sum.innerHTML=
+      '<div class="mb-p-row2">'
+      + '<div><span class="mb-p-lb">เดือน</span><div class="mb-p-in"><span id="mbpSumMonTxt">–</span>'+S(I.cal,19)+'<input type="month" id="mbpSumMon"></div></div>'
+      + '<div><span class="mb-p-lb">&nbsp;</span><button type="button" class="mb-p-btn gh mb-p-pdf" id="mbpSumPdf">'+S(J.print,19)+'PDF</button></div>'
+      + '</div>'
+      + '<div id="mbpSumHero"></div>';
+    $('pr-sum').insertBefore(sum, $('payrollSumContent'));
+    $('mbpSumMon').oninput=function(){ var m=$('sumMonth'); if(m){ m.value=$('mbpSumMon').value; if(typeof renderPayrollSummary==='function') renderPayrollSummary(); } };
+    $('mbpSumPdf').onclick=function(){ if(typeof exportPayrollPDF==='function') exportPayrollPDF(); };
+
+    /* ── 4 สรุปเงินเดือน (ตามงวด) ── */
+    var cyc=el('div','mbx','');
+    cyc.id='mbpCyc';
+    cyc.innerHTML=
+      '<div class="mb-p-fld"><span class="mb-p-lb">งวด</span><div class="mb-p-in"><span id="mbpCycPerTxt">–</span>'+S(I.chev,19)
+      + '<select id="mbpCycPer"><option value="1-15">รอบที่ 1 (1–15) — จ่ายกลางเดือน</option><option value="16-end">รอบที่ 2 (16–สิ้นเดือน) — จ่ายสิ้นเดือน</option></select></div></div>'
+      + '<div class="mb-p-row2">'
+      + '<div><span class="mb-p-lb">เดือน</span><div class="mb-p-in"><span id="mbpCycMonTxt">–</span>'+S(I.cal,19)+'<input type="month" id="mbpCycMon"></div></div>'
+      + '<div><span class="mb-p-lb">&nbsp;</span><button type="button" class="mb-p-btn gh mb-p-pdf" id="mbpCycPdf">'+S(J.print,19)+'PDF</button></div>'
+      + '</div>'
+      + '<div id="mbpCycHero"></div>'
+      + '<div class="mb-p-note" id="mbpCycNote"></div>';
+    $('pr-cyc').insertBefore(cyc, $('cycContent'));
+    var cycf=el('div','mbx',''); cycf.id='mbpCycFoot'; $('pr-cyc').appendChild(cycf);
+    $('mbpCycPer').onchange=function(){ var s=$('cycPeriodSel'); if(s){ s.value=$('mbpCycPer').value; if(typeof renderCycleSummary==='function') renderCycleSummary(); } };
+    $('mbpCycMon').oninput=function(){ var m=$('cycMonth'); if(m){ m.value=$('mbpCycMon').value; if(typeof renderCycleSummary==='function') renderCycleSummary(); } };
+    $('mbpCycPdf').onclick=function(){ if(typeof exportCyclePDF==='function') exportCyclePDF(); };
+
+    /* ── 5 ประวัติการจ่าย ── */
+    var pay=el('div','mbx','');
+    pay.id='mbpPay';
+    pay.innerHTML=
+      '<div class="mb-p-row2">'
+      + '<div><span class="mb-p-lb">เดือน</span><div class="mb-p-in"><span id="mbpPayMonTxt">–</span>'+S(I.cal,19)+'<input type="month" id="mbpPayMon"></div></div>'
+      + '<div><span class="mb-p-lb">&nbsp;</span><button type="button" class="mb-p-btn gh mb-p-pdf" id="mbpPayPdf">'+S(J.print,19)+'PDF</button></div>'
+      + '</div>'
+      + '<div id="mbpPayHero"></div><div id="mbpPayList"></div>';
+    $('pr-pay').appendChild(pay);
+    $('mbpPayMon').oninput=function(){ var m=$('payHistMonth'); if(m){ m.value=$('mbpPayMon').value; if(typeof renderPayHistory==='function') renderPayHistory(); } };
+    $('mbpPayPdf').onclick=function(){ if(typeof exportPayHistoryPDF==='function') exportPayHistoryPDF(); };
+
+    /* ── 6 ทะเบียนพนักงาน ── */
+    var reg=el('div','mbx','');
+    reg.id='mbpReg';
+    reg.innerHTML='<div class="mb-p-act"><button type="button" class="mb-p-btn" id="mbpRegAdd">'+S(J.plus,20)+'เพิ่มพนักงาน</button></div>'
+      + '<div id="mbpRegList"></div>'
+      + '<div class="mb-p-chip">แตะการ์ดเพื่อแก้ไข หรือ พักงาน</div>';
+    $('pr-reg').appendChild(reg);
+    $('mbpRegAdd').onclick=function(){ if(typeof openEmpModal==='function') openEmpModal(null); };
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     1 · บันทึกเวลาทำงาน
+  ══════════════════════════════════════════════════════════ */
+  function syncSeg(){
+    if(!built) return;
+    var t=(typeof attSelectedType!=='undefined')?attSelectedType:'full';
+    [].forEach.call($('mbpSeg').children, function(b){ b.classList.toggle('on', b.dataset.t===t); });
+    $('mbpHrsRow').hidden = t!=='hours';
+    $('mbpHrsRow').style.display = t==='hours' ? 'flex' : 'none';
+  }
+  function drawPick(){
+    if(!built) return;
+    var d=$('attDate')?$('attDate').value:'';
+    var box=$('mbpPick');
+    box.innerHTML=ACTIVE().map(function(e){
+      var done=d && ATT()[d+'_'+e.id];
+      var on=done?true:(typeof attSpChecked==='function'?attSpChecked(e.id):false);
+      var roles=e.specialRoles||[];
+      var chips=(!done && on && roles.length)?'<div class="mb-p-sp">'+roles.map(function(sr,i){
+          var sel=typeof attSpIsOn==='function'&&attSpIsOn(e.id,sr.name);
+          return '<button type="button" class="mb-p-spc'+(sel?' on':'')+'" data-emp="'+esc(e.id)+'" data-i="'+i+'"><span class="mb-p-spb">'+(sel?S(J.check,12):'')+'</span>'+esc(sr.name)+' +'+fb(sr.ratePerDay||0)+' ฿</button>';
+        }).join('')+'</div>':'';
+      return '<div class="mb-p-pr'+(on?' on':'')+(done?' done':'')+(chips?' nb':'')+'" data-id="'+esc(e.id)+'"><div class="mb-p-box">'+S(J.check,14)+'</div>'
+        + '<div class="mb-p-nm">'+esc(e.nickname)+'</div>'
+        + (done?'<span class="mb-p-tag">บันทึกแล้ว</span>':'')
+        + '<span class="mb-p-mut">'+rateTxt(e)+'</span></div>'+chips;
+    }).join('') || '<div class="mb-p-empty">ยังไม่มีพนักงานในระบบ</div>';
+    [].forEach.call(box.querySelectorAll('.mb-p-pr'), function(r){
+      r.onclick=function(){
+        if(r.classList.contains('done')){ if(typeof toast==='function') toast('บันทึกแล้ว — แตะชื่อในตารางลงงานด้านล่างเพื่อแก้ไข'); return; }
+        var id=r.dataset.id, cb=$('chk_'+id);
+        if(cb) cb.checked=!(typeof attSpChecked==='function'&&attSpChecked(id));
+        if(typeof attChkChanged==='function') attChkChanged(id);
+      };
+    });
+    [].forEach.call(box.querySelectorAll('.mb-p-spc'), function(b){
+      b.onclick=function(ev){ ev.stopPropagation(); if(typeof attSpToggle==='function') attSpToggle(b.dataset.emp, +b.dataset.i); };
+    });
+    countPick();
+  }
+  function countPick(){
+    if(!built) return;
+    var d=$('attDate')?$('attDate').value:'';
+    var n=ACTIVE().filter(function(e){ return !(d && ATT()[d+'_'+e.id]) && typeof attSpChecked==='function' && attSpChecked(e.id); }).length;
+    var b=$('mbpAdd').querySelector('span'); if(b) b.textContent='เพิ่มที่เลือก ('+n+' คน)';
+    var sm=$('mbpSpSum');
+    if(sm){ var L=(typeof attSpSummaryLines==='function')?attSpSummaryLines():[]; sm.innerHTML=L.map(function(t){ return '<div>'+esc(t)+'</div>'; }).join(''); sm.style.display=L.length?'block':'none'; }
+  }
+  function drawAtt(){
+    if(!built) return;
+    var d=$('attDate')?$('attDate').value:'';
+    if(d && $('mbpDate').value!==d) $('mbpDate').value=d;
+    $('mbpDateTxt').textContent = d?be(d):'เลือกวันที่';
+    $('mbpDateBox').classList.toggle('mut', !d);
+    syncSeg(); drawPick();
+    var rows=[];
+    if(d) ACTIVE().forEach(function(e){
+      var r=ATT()[d+'_'+e.id]; if(!r||!r.type) return;
+      rows.push({e:e,r:r,w:(typeof calcEarned==='function')?calcEarned(e,d):0});
+    });
+    $('mbpDaySub').textContent = (d?be(d):'') + (rows.length?(' · '+rows.length+' คน'):'');
+    var tb=$('mbpDayTbl');
+    if(!rows.length){ tb.innerHTML='<div class="mb-p-empty">ยังไม่มีพนักงานลงงานวันนี้</div>'; return; }
+    var tot=rows.reduce(function(s,x){ return s+x.w; },0);
+    tb.innerHTML='<table class="mb-p-t"><colgroup><col style="width:27%"><col style="width:31%"><col style="width:16%"><col style="width:26%"></colgroup>'
+      + '<thead><tr><th>ชื่อ</th><th>ประเภท</th><th class="r">ชม.</th><th class="r">ค่าแรง</th></tr></thead><tbody>'
+      + rows.map(function(x){
+          return '<tr class="tap" data-id="'+esc(x.e.id)+'"><td><b>'+esc(x.e.nickname)+'</b></td>'
+            + '<td class="mut">'+typeTxt(x.r)+(spTotal(x.r)>0?' +พิเศษ':'')+'</td>'
+            + '<td class="r">'+hoursOf(x.r)+'</td><td class="r">'+fb(x.w)+'</td></tr>';
+        }).join('')
+      + '<tr class="sum"><td colspan="3"><b>รวม</b></td><td class="r">'+fb(tot)+'</td></tr></tbody></table>';
+    [].forEach.call(tb.querySelectorAll('tr.tap'), function(tr){
+      tr.onclick=function(){ attSheet(tr.dataset.id, d); };
+    });
+  }
+  function attSheet(empId, date){
+    var e=empOf(empId), r=ATT()[date+'_'+empId]; if(!e||!r) return;
+    var sp=(r.specialWork||[]).map(function(x){ return x.name+' +'+fb(x.amount)+' ฿'; }).join(', ');
+    var w=(typeof calcEarned==='function')?calcEarned(e,date):0;
+    var sh=openSheet(
+      '<div class="mb-p-sh"><div class="mb-p-sht">'+esc(e.nickname)+'</div>'
+      + '<div class="mb-p-shs">'+be(date)+' · '+rateLong(e)+'</div>'
+      + '<div class="mb-p-kv"><span>ประเภท</span><b>'+typeTxt(r)+'</b></div>'
+      + '<div class="mb-p-kv"><span>ชั่วโมง</span><b>'+hoursOf(r)+'</b></div>'
+      + '<div class="mb-p-kv"><span>งานพิเศษ</span><b>'+(sp?esc(sp):'–')+'</b></div>'
+      + '<div class="mb-p-kv big last"><span>ค่าแรงวันนี้</span><b>'+fb(w)+' ฿</b></div></div>'
+      + '<button class="mb-shbtn pri" data-a="edit">แก้ไข</button>'
+      + '<button class="mb-shbtn red" data-a="del">ลบรายการนี้</button>'
+      + '<button class="mb-shbtn" data-a="close">ปิด</button>');
+    sh.querySelector('[data-a="edit"]').onclick=function(){ attEditSheet(empId,date); };
+    sh.querySelector('[data-a="del"]').onclick=function(){ attDelSheet(empId,date); };
+    sh.querySelector('[data-a="close"]').onclick=MB.close;
+  }
+  function attEditSheet(empId, date){
+    var e=empOf(empId), r=ATT()[date+'_'+empId]||{}; if(!e) return;
+    var cur=r.type||'full', curH=r.hours||8;
+    var sp=(e.specialRoles||[]).map(function(s,i){
+      var on=(r.specialWork||[]).some(function(x){ return x.name===s.name; });
+      return '<div class="mb-p-pr'+(on?' on':'')+'" data-s="'+i+'"><div class="mb-p-box">'+S(J.check,14)+'</div>'
+        + '<div class="mb-p-nm">'+esc(s.name)+'</div><span class="mb-p-mut">+'+fb(s.ratePerDay)+' ฿</span></div>';
+    }).join('');
+    var sh=openSheet(
+      '<div class="mb-p-sh"><div class="mb-p-sht">แก้ไขการลงงาน</div>'
+      + '<div class="mb-p-shs">'+esc(e.nickname)+' · '+be(date)+'</div>'
+      + '<div class="mb-p-seg" id="mbpESeg"><button type="button" data-t="full">เต็มวัน</button><button type="button" data-t="half">ครึ่งวัน</button><button type="button" data-t="hours">รายชั่วโมง</button></div>'
+      + '<div id="mbpEHrs" class="mb-p-hrs" style="display:none;"><span class="mb-p-lb0">ชั่วโมง</span>'
+      +   '<div class="mb-p-in mb-p-grow"><input class="sh" type="number" id="mbpEHrsIn" min="0.5" max="16" step="0.5" value="'+curH+'"></div></div>'
+      + (sp?'<div class="mb-p-shh">งานพิเศษ</div>'+sp:'')
+      + '</div>'
+      + '<button class="mb-shbtn pri" data-a="save">บันทึก</button>'
+      + '<button class="mb-shbtn" data-a="cancel">ยกเลิก</button>');
+    var t=cur;
+    function seg(){
+      [].forEach.call(sh.querySelector('#mbpESeg').children, function(b){ b.classList.toggle('on', b.dataset.t===t); });
+      sh.querySelector('#mbpEHrs').style.display = t==='hours'?'flex':'none';
+    }
+    [].forEach.call(sh.querySelector('#mbpESeg').children, function(b){ b.onclick=function(){ t=b.dataset.t; seg(); }; });
+    seg();
+    [].forEach.call(sh.querySelectorAll('.mb-p-pr[data-s]'), function(row){
+      row.onclick=function(){ row.classList.toggle('on'); };
+    });
+    sh.querySelector('[data-a="cancel"]').onclick=function(){ attSheet(empId,date); };
+    sh.querySelector('[data-a="save"]').onclick=function(){
+      var hrs = t==='hours' ? (parseFloat(sh.querySelector('#mbpEHrsIn').value)||8) : null;
+      var sw=[];
+      [].forEach.call(sh.querySelectorAll('.mb-p-pr[data-s].on'), function(row){
+        var s=(e.specialRoles||[])[+row.dataset.s]; if(s) sw.push({name:s.name, amount:s.ratePerDay});
+      });
+      MB.close();
+      if(typeof prSaveAttRecord==='function'){
+        prSaveAttRecord(empId,date,t,hrs,sw).then(function(){
+          if(typeof renderAttList==='function') renderAttList();
+          if(typeof renderEmpCheckList==='function') renderEmpCheckList();
+          drawAtt();
+          if(typeof toast==='function') toast('แก้ไขแล้ว');
+        }).catch(function(err){ if(typeof toast==='function') toast('บันทึกไม่สำเร็จ: '+err.message); });
+      }
+    };
+  }
+  function attDelSheet(empId, date){
+    var e=empOf(empId), r=ATT()[date+'_'+empId]; if(!e||!r) return;
+    var w=(typeof calcEarned==='function')?calcEarned(e,date):0;
+    var sh=openSheet(
+      '<div class="mb-p-sh"><span class="mb-p-new">ของใหม่ — เดิมลบทิ้งทันที ไม่ถาม</span>'
+      + '<div class="mb-p-shrow2 top">'
+      +   '<div class="mb-p-ico">'+S(I.warn,20)+'</div>'
+      +   '<div><div class="mb-p-sht">ลบรายการนี้?</div><div class="mb-p-shs" style="line-height:1.6;">'
+      +     esc(e.nickname)+' · '+be(date)+' · '+typeTxt(r)+'<br>ค่าแรง '+fb(w)+' ฿ จะหายจากยอดเดือนนี้</div></div>'
+      + '</div>'
+      + '<div class="mb-p-warn">ถ้าคนนี้เบิกเงินรอบนี้ไปแล้ว ยอดคงเหลือจะติดลบ</div></div>'
+      + '<button class="mb-shbtn solidred" data-a="yes">ลบเลย</button>'
+      + '<button class="mb-shbtn" data-a="no">ยกเลิก</button>');
+    sh.querySelector('[data-a="no"]').onclick=function(){ attSheet(empId,date); };
+    sh.querySelector('[data-a="yes"]').onclick=function(){
+      MB.close();
+      if(typeof removeAtt==='function') Promise.resolve(removeAtt(empId,date)).then(function(){ drawAtt(); if(typeof toast==='function') toast('ลบรายการแล้ว'); });
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     2 · บันทึกเบิกเงิน
+  ══════════════════════════════════════════════════════════ */
+  function drawWd(){
+    if(!built) return;
+    var per=$('wdPeriodSel')?$('wdPeriodSel').value:'1-15';
+    var ym=($('wdMonth')&&$('wdMonth').value)||ymNow();
+    $('mbpWdPer').value=per; $('mbpWdPerTxt').textContent = per==='1-15'?'รอบที่ 1 (1–15)':'รอบที่ 2 (16–สิ้นเดือน)';
+    $('mbpWdMon').value=ym; $('mbpWdMonTxt').textContent=ym;
+    if(typeof wdPeriodCheck==='function') wdPeriodCheck();
+
+    var box=$('mbpWdList');
+    box.innerHTML=ACTIVE().map(function(e){
+      var earned=(typeof calcPeriodEarned==='function')?calcPeriodEarned(e.id,ym,per):0;
+      var taken=(typeof totalWithdrawn==='function')?totalWithdrawn(e.id,ym,per):0;
+      var left=Math.max(0, earned-taken);
+      var cb=$('wdchk_'+e.id), on=cb?cb.checked:false;
+      return '<div class="mb-p-card" data-id="'+esc(e.id)+'" data-left="'+left+'">'
+        + '<div class="mb-p-pr'+(on?' on':'')+'" data-tick="1"><div class="mb-p-box">'+S(J.check,14)+'</div>'
+        +   '<div class="mb-p-nm">'+esc(e.nickname)+'</div><span class="mb-p-tag">ค่าแรงรอบนี้ '+fb(earned)+' ฿</span></div>'
+        + (taken>0?'<div class="mb-p-red">เบิกไปแล้ว '+fb(taken)+' ฿ · เบิกได้อีก '+fb(left)+' ฿</div>':'')
+        + '<div class="mb-p-amt">'
+        +   '<span class="mb-p-lb0">เบิก</span>'
+        +   '<div class="mb-p-in mb-p-grow"><input class="sh" type="number" min="0" placeholder="0.00" data-amt="1"><b class="mb-p-cur">฿</b></div>'
+        +   '<button type="button" class="mb-p-full" data-full="1">เต็มจำนวน</button>'
+        + '</div></div>';
+    }).join('') || '<div class="mb-p-empty">ยังไม่มีพนักงานในระบบ</div>';
+
+    [].forEach.call(box.children, function(card){
+      if(!card.dataset.id) return;
+      var id=card.dataset.id, left=+card.dataset.left;
+      var inp=card.querySelector('[data-amt]'), tick=card.querySelector('[data-tick]');
+      var dAmt=$('wdamt_'+id), dChk=$('wdchk_'+id);
+      if(dAmt) dAmt.value='';
+      inp.oninput=function(){ if(dAmt) dAmt.value=inp.value; wdNote(); if(typeof checkWdOverdraw==='function' && dAmt) checkWdOverdraw(id, left); };
+      tick.onclick=function(){
+        if(!dChk) return;
+        dChk.checked=!dChk.checked; tick.classList.toggle('on', dChk.checked);
+        if(!dChk.checked){ inp.value=''; if(dAmt) dAmt.value=''; }
+        wdNote();
+      };
+      card.querySelector('[data-full]').onclick=function(){
+        inp.value=left; if(dAmt) dAmt.value=left;
+        if(dChk && !dChk.checked){ dChk.checked=true; tick.classList.add('on'); }
+        wdNote();
+      };
+    });
+    wdHist(ym,per); wdNote();
+  }
+  function wdHist(ym,per){
+    var rows=WD().filter(function(w){ return w.month===ym && w.period===per; })
+      .sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+    $('mbpWdHistSub').textContent = rows.length? (rows.length+' ครั้ง') : '';
+    var tb=$('mbpWdHist');
+    if(!rows.length){ tb.innerHTML='<div class="mb-p-empty">ยังไม่มีรายการเบิกในรอบนี้</div>'; return; }
+    var tot=rows.reduce(function(s,w){ return s+(w.amount||0); },0);
+    tb.innerHTML='<table class="mb-p-t"><colgroup><col style="width:22%"><col style="width:30%"><col style="width:26%"><col style="width:22%"></colgroup>'
+      + '<thead><tr><th>วันที่</th><th>ชื่อ</th><th class="r">จำนวน</th><th>โดย</th></tr></thead><tbody>'
+      + rows.map(function(w){
+          var e=empOf(w.empId);
+          return '<tr><td>'+(w.date?w.date.slice(8,10)+'/'+w.date.slice(5,7):'–')+'</td>'
+            + '<td><b>'+esc(e?e.nickname:'–')+'</b></td><td class="r">'+fb(w.amount)+'</td>'
+            + '<td class="mut">'+esc(String(w.recordedBy||'').replace('@sand.local',''))+'</td></tr>';
+        }).join('')
+      + '<tr class="sum"><td colspan="2"><b>รวม</b></td><td class="r">'+fb(tot)+'</td><td></td></tr></tbody></table>';
+  }
+  function wdNote(){
+    if(!built) return;
+    var n=0, sum=0;
+    ACTIVE().forEach(function(e){
+      var cb=$('wdchk_'+e.id); if(cb&&cb.checked){ n++; sum+=parseFloat(($('wdamt_'+e.id)||{}).value)||0; }
+    });
+    $('mbpWdNote').innerHTML = n
+      ? 'ติ๊กไว้ <b>'+n+' คน</b> · รวมที่จะบันทึก <b>'+fb(sum)+' ฿</b><br>กดบันทึกแล้วยอดจะไปหักในสรุปตามงวดทันที'
+      : 'ยังไม่ได้ติ๊กใคร — ติ๊กชื่อแล้วใส่ยอดที่จะเบิก';
+    var b=$('mbpWdSave').querySelector('span'); if(b) b.textContent='บันทึกที่ติ๊ก'+(n?(' ('+n+' คน)'):'');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     3 · สรุปรายเดือน
+  ══════════════════════════════════════════════════════════ */
+  function sumStat(ym){
+    var gross=0, soc=0, taken=0;
+    ACTIVE().forEach(function(e){
+      var e1=calcPeriodEarned(e.id,ym,'1-15'), e2=calcPeriodEarned(e.id,ym,'16-end');
+      gross+=e1+e2;
+      soc+= e.socialSecurity?875:0;
+      taken+= totalWithdrawn(e.id,ym,'1-15')+totalWithdrawn(e.id,ym,'16-end');
+    });
+    gross=Math.round(gross*100)/100;
+    return {gross:gross, soc:soc, taken:Math.round(taken*100)/100, left:Math.round((gross-soc-taken)*100)/100, n:ACTIVE().length};
+  }
+  function drawSum(){
+    if(!built) return;
+    var ym=($('sumMonth')&&$('sumMonth').value)||ymNow();
+    $('mbpSumMon').value=ym; $('mbpSumMonTxt').textContent=ym;
+    var s=sumStat(ym);
+    $('mbpSumHero').innerHTML=
+      '<div class="mb-p-hero"><div class="mb-p-hb"><div class="mb-p-hs">รายจ่ายค่าแรงรวม</div>'
+      + '<div class="mb-p-hn">'+fb(s.gross)+'<i>฿</i></div></div>'
+      + '<div class="mb-p-hf"><div><div class="l">หักปกส</div><div class="v">'+fb(s.soc)+' ฿</div></div>'
+      +   '<div><div class="l">เบิกไปแล้ว</div><div class="v">'+fb(s.taken)+' ฿</div></div>'
+      +   '<div><div class="l">คงต้องจ่าย</div><div class="v">'+fb(s.left)+' ฿</div></div></div></div>';
+    transform('payrollSumContent');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     4 · สรุปเงินเดือน (ตามงวด)
+  ══════════════════════════════════════════════════════════ */
+  function drawCyc(){
+    if(!built) return;
+    var per=$('cycPeriodSel')?$('cycPeriodSel').value:'16-end';
+    var ym=($('cycMonth')&&$('cycMonth').value)||ymNow();
+    $('mbpCycPer').value=per;
+    $('mbpCycPerTxt').textContent = per==='1-15'?'รอบที่ 1 (1–15) — จ่ายกลางเดือน':'รอบที่ 2 (16–สิ้นเดือน) — จ่ายสิ้นเดือน';
+    $('mbpCycMon').value=ym; $('mbpCycMonTxt').textContent=ym;
+
+    var rows=(typeof cycleBuildRows==='function')?cycleBuildRows(ym,per):[];
+    var cash=rows.reduce(function(s,r){ return s+Math.max(0,r.pending); },0);
+    var neg=rows.filter(function(r){ return r.pending<0; }).length;
+    var settled=(typeof prSettlements!=='undefined'&&typeof cycleKey==='function')?prSettlements[cycleKey(ym,per)]:null;
+
+    $('mbpCycHero').innerHTML=
+      '<div class="mb-p-hero"><div class="mb-p-hb"><div class="mb-p-hs">'+(settled?'จ่ายปิดงวดแล้ว':'เงินสดต้องเตรียมจ่ายงวดนี้')+'</div>'
+      + '<div class="mb-p-hn">'+fb(settled?settled.total:cash)+'<i>฿</i></div></div>'
+      + '<div class="mb-p-hf"><div><div class="l">พนักงาน</div><div class="v">'+(settled?settled.count:rows.length)+' คน</div></div>'
+      +   '<div><div class="l">ยอดติดลบ</div><div class="v">'+neg+' คน</div></div></div></div>';
+    $('mbpCycNote').innerHTML='รอรับงวดนี้ = ค่าแรงงวด '+(per==='16-end'?'− ปกส ':'')+'− เบิกที่จ่ายไปแล้ว<br>'
+      + 'ยอดติดลบ (เบิกเกินค่าแรงงวดนี้) <b>ไม่นับรวม</b> ในเงินสดที่ต้องเตรียม';
+
+    var foot=$('mbpCycFoot');
+    if(!rows.length){ foot.innerHTML=''; transform('cycContent'); return; }
+    var stale=(typeof cycleSettleEntries==='function')?cycleSettleEntries(ym,per):[];
+    if(settled){
+      foot.innerHTML='<div class="mb-p-ok">ปิดงวดแล้ว — จ่ายยอดรอรับ '+fb(settled.total)+' ฿ ('+settled.count+' คน)'
+        +(settled.settledAt?(' เมื่อ '+be(String(settled.settledAt).slice(0,10))):'')+'</div>'
+        +'<div style="margin-top:12px;"><button type="button" class="mb-p-btn gh" data-a="unsettle">ยกเลิกปิดงวด</button></div>';
+    } else if(stale.length){
+      var st=stale.reduce(function(s,w){ return s+(Number(w.amount)||0); },0);
+      foot.innerHTML='<div class="mb-p-err">งวดนี้ไม่มีบันทึกปิดงวด แต่มีรายการ "จ่ายปิดงวด" ค้างอยู่ '+stale.length+' รายการ รวม '+fb(st)+' ฿<br>'
+        +'กด "ล้างรายการที่ค้าง" แล้วค่อยกดยืนยันจ่าย &amp; ปิดงวดใหม่ 1 ครั้ง (เงินสดจ่ายจริงไม่กระทบ)</div>'
+        +'<div style="margin-top:12px;"><button type="button" class="mb-p-btn dg" data-a="unsettle">ล้างรายการที่ค้าง</button></div>';
+    } else {
+      foot.innerHTML='<div class="mb-p-warn">จ่ายแล้วกด "ยืนยัน" ระบบจะบันทึกการจ่าย '+fb(cash)+' ฿ แล้วล็อกงวดนี้ · ยอดรอรับเป็น 0 กันจ่ายซ้ำ</div>'
+        +'<div style="margin-top:12px;"><button type="button" class="mb-p-btn" data-a="settle">'+S(J.check,19)+'ยืนยันจ่าย &amp; ปิดงวดนี้</button></div>';
+    }
+    var bs=foot.querySelector('[data-a="settle"]'); if(bs) bs.onclick=function(){ if(typeof settleCycle==='function') settleCycle(); };
+    var bu=foot.querySelector('[data-a="unsettle"]'); if(bu) bu.onclick=function(){ if(typeof unsettleCycle==='function') unsettleCycle(); };
+    transform('cycContent');
+  }
+
+  /* ── ชีตรายละเอียดรายคน (แตะแถวในตารางสรุป) ── */
+  function empSheet(empId, ym){
+    var e=empOf(empId); if(!e) return;
+    ym=ym||($('sumMonth')&&$('sumMonth').value)||ymNow();
+    function st(per){
+      var earned=calcPeriodEarned(empId,ym,per);
+      var days=(typeof cyclePeriodDays==='function')?cyclePeriodDays(empId,ym,per):0;
+      var hrs=0, rg=(typeof cyclePeriodRange==='function')?cyclePeriodRange(ym,per):[1,15];
+      for(var d=rg[0]; d<=rg[1]; d++){ hrs+=hoursOf(ATT()[ym+'-'+('0'+d).slice(-2)+'_'+empId]); }
+      return {earned:earned, days:days, hrs:Math.round(hrs*100)/100};
+    }
+    var s1=st('1-15'), s2=st('16-end');
+    var tot=Math.round((s1.earned+s2.earned)*100)/100;
+    var soc=e.socialSecurity?875:0;
+    var taken=totalWithdrawn(empId,ym,'1-15')+totalWithdrawn(empId,ym,'16-end');
+    var left=Math.round((tot-soc-taken)*100)/100;
+    var sh=openSheet(
+      '<div class="mb-p-sh"><div class="mb-p-shrow2">'
+      + '<div><div class="mb-p-sht">'+esc(e.nickname)+'</div><div class="mb-p-shs">'+(e.type==='daily'?'รายวัน ':'รายเดือน ')+fb(e.rate)+' ฿'
+      +   (e.socialSecurity?' · ขึ้นทะเบียน ปกส':'')+' · เดือน '+ym+'</div></div></div>'
+      + '<div class="mb-p-shh">รอบที่ 1 (1–15)</div>'
+      + '<div class="mb-p-kv"><span>วันทำงาน</span><b>'+s1.days+' วัน · '+s1.hrs+' ชม.</b></div>'
+      + '<div class="mb-p-kv"><span>ค่าแรง</span><b>'+fb(s1.earned)+' ฿</b></div>'
+      + '<div class="mb-p-shh">รอบที่ 2 (16–สิ้นเดือน)</div>'
+      + '<div class="mb-p-kv"><span>วันทำงาน</span><b>'+s2.days+' วัน · '+s2.hrs+' ชม.</b></div>'
+      + '<div class="mb-p-kv"><span>ค่าแรง</span><b>'+fb(s2.earned)+' ฿</b></div>'
+      + '<div class="mb-p-shh">รวมทั้งเดือน</div>'
+      + '<div class="mb-p-kv"><span>รวมค่าแรง</span><b>'+fb(tot)+' ฿</b></div>'
+      + '<div class="mb-p-kv'+(soc?' neg':'')+'"><span>หักปกส</span><b>'+(soc?('− '+fb(soc)+' ฿'):'–')+'</b></div>'
+      + '<div class="mb-p-kv"><span>เบิกไปแล้ว</span><b>'+fb(taken)+' ฿</b></div>'
+      + '<div class="mb-p-kv big last"><span class="mb-p-k">คงเหลือ</span><b'+(left<0?' style="color:var(--m-red)"':'')+'>'+fb(left)+' ฿</b></div></div>'
+      + '<button class="mb-shbtn" data-a="close">ปิด</button>');
+    sh.querySelector('[data-a="close"]').onclick=MB.close;
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     5 · ประวัติการจ่าย
+  ══════════════════════════════════════════════════════════ */
+  function drawPay(){
+    if(!built) return;
+    var ym=($('payHistMonth')&&$('payHistMonth').value)||ymNow();
+    $('mbpPayMon').value=ym; $('mbpPayMonTxt').textContent=ym;
+    var all=WD().filter(function(w){ return w.month===ym; });
+    var by={}; all.forEach(function(w){ var d=w.date||'ไม่ระบุ'; (by[d]=by[d]||[]).push(w); });
+    var dates=Object.keys(by).sort(function(a,b){ return b.localeCompare(a); });
+    var tot=all.reduce(function(s,w){ return s+(w.amount||0); },0);
+    $('mbpPayHero').innerHTML=
+      '<div class="mb-p-hero"><div class="mb-p-hb"><div class="mb-p-hs">ยอดเบิกรวมทั้งเดือน</div>'
+      + '<div class="mb-p-hn">'+fb(tot)+'<i>฿</i></div></div>'
+      + '<div class="mb-p-hf"><div><div class="l">รายการ</div><div class="v">'+all.length+' รายการ</div></div>'
+      +   '<div><div class="l">จ่าย</div><div class="v">'+dates.length+' ครั้ง</div></div></div></div>';
+    var box=$('mbpPayList');
+    if(!dates.length){ box.innerHTML='<div class="mb-p-empty">ไม่มีรายการเบิกในเดือนนี้</div>'; return; }
+    box.innerHTML=dates.map(function(d,k){
+      var rows=by[d], dt=rows.reduce(function(s,w){ return s+(w.amount||0); },0);
+      var ppl={}; rows.forEach(function(w){ ppl[w.empId]=true; });
+      return '<div class="mb-p-day'+(k===0?' open':'')+'">'
+        + '<div class="mb-p-dayh"><div><div class="d">'+be(d)+'</div><div class="c">'+Object.keys(ppl).length+' คน</div></div>'
+        +   '<div class="mb-p-dayr"><span class="a">'+fb(dt)+' ฿</span>'+S(I.chev,19)+'</div></div>'
+        + '<div class="mb-p-dayb"><table class="mb-p-t mb-p-t2">'
+        +   '<colgroup><col style="width:46%"><col style="width:30%"><col style="width:24%"></colgroup><tbody>'
+        +   rows.map(function(w){
+              var e=empOf(w.empId);
+              return '<tr><td><b>'+esc(e?e.nickname:'–')+'</b> <span class="mut mb-p-lite">'+(w.period==='1-15'?'รอบ 1':'รอบ 2')+'</span></td>'
+                + '<td class="r">'+fb(w.amount)+'</td><td class="mut">'+esc(String(w.recordedBy||'').replace('@sand.local',''))+'</td></tr>';
+            }).join('')
+        +   '</tbody></table></div></div>';
+    }).join('');
+    [].forEach.call(box.querySelectorAll('.mb-p-day'), function(c){
+      c.querySelector('.mb-p-dayh').onclick=function(){ c.classList.toggle('open'); };
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     6 · ทะเบียนพนักงาน
+  ══════════════════════════════════════════════════════════ */
+  function drawReg(){
+    if(!built) return;
+    var box=$('mbpRegList');
+    box.innerHTML=EMPS().map(function(e){
+      return '<div class="mb-p-emp'+(e.active?'':' off')+'" data-id="'+esc(e.id)+'">'
+        + '<div><div><span class="n">'+esc(e.nickname)+'</span>'
+        +   (e.fullName?'<span class="f">'+esc(e.fullName)+'</span>':'')
+        +   (e.active?'':'<span class="mb-p-pause">พักงาน</span>')+'</div>'
+        + '<div class="s">'+(e.type==='daily'?'รายวัน':'รายเดือน')+' · '+fb(e.rate)+' ฿'
+        +   (e.socialSecurity?'<span class="mb-p-tag mb-p-ml">ปกส</span>':'')+'</div></div>'
+        + S(I.chev,20)+'</div>';
+    }).join('') || '<div class="mb-p-empty">ยังไม่มีพนักงานในระบบ</div>';
+    [].forEach.call(box.querySelectorAll('.mb-p-emp'), function(c){
+      c.onclick=function(){ regSheet(c.dataset.id); };
+    });
+  }
+  function regSheet(id){
+    var e=empOf(id); if(!e) return;
+    var sp=(e.specialRoles||[]).map(function(s){ return s.name+' +'+fb(s.ratePerDay)+' ฿'; }).join(', ');
+    var sh=openSheet(
+      '<div class="mb-p-sh"><div class="mb-p-sht">'+esc(e.nickname)+'</div>'
+      + (e.fullName?'<div class="mb-p-shs">'+esc(e.fullName)+'</div>':'')
+      + '<div class="mb-p-kv"><span>ประเภทค่าแรง</span><b>'+(e.type==='daily'?'รายวัน':'รายเดือน')+'</b></div>'
+      + '<div class="mb-p-kv"><span>อัตรา</span><b>'+rateLong(e)+'</b></div>'
+      + '<div class="mb-p-kv"><span>ขึ้นทะเบียน ปกส</span><b>'+(e.socialSecurity?'ใช่ · หัก 875 ฿/เดือน':'ไม่')+'</b></div>'
+      + (sp?'<div class="mb-p-kv"><span>งานพิเศษ</span><b>'+esc(sp)+'</b></div>':'')
+      + (e.startDate?'<div class="mb-p-kv"><span>เริ่มงาน</span><b>'+be(e.startDate)+'</b></div>':'')
+      + '<div class="mb-p-kv last"><span>สถานะ</span><b>'+(e.active?'ทำงานอยู่':'พักงาน')+'</b></div></div>'
+      + '<button class="mb-shbtn pri" data-a="edit">แก้ไขข้อมูล</button>'
+      + '<button class="mb-shbtn'+(e.active?' red':'')+'" data-a="toggle">'+(e.active?'พักงาน (ไม่ขึ้นในรายชื่อลงงาน)':'เปิดกลับมาทำงาน')+'</button>'
+      + '<button class="mb-shbtn" data-a="close">ปิดหน้าต่าง</button>');
+    sh.querySelector('[data-a="edit"]').onclick=function(){ MB.close(); if(typeof openEmpModal==='function') openEmpModal(id); };
+    sh.querySelector('[data-a="toggle"]').onclick=function(){
+      MB.close();
+      if(typeof toggleEmpActive==='function') Promise.resolve(toggleEmpActive(id)).then(function(){ drawReg(); });
+    };
+    sh.querySelector('[data-a="close"]').onclick=MB.close;
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     เข้า/ออกโหมดมือถือ
+  ══════════════════════════════════════════════════════════ */
+  function drawCur(){
+    var s=curSub();
+    if(s==='att') drawAtt();
+    else if(s==='wd') drawWd();
+    else if(s==='sum') drawSum();
+    else if(s==='cyc') drawCyc();
+    else if(s==='pay') drawPay();
+    else if(s==='reg') drawReg();
+  }
+  /* อิโมจิในหน้าต่างเพิ่ม/แก้ไขพนักงาน: ล้างตอนมือถือ แล้วคืนของเดิมตอนกลับจอคอม */
+  function modalText(on){
+    var q='#empModalOverlay h3, #empModalOverlay .btn, #empModalOverlay .form-label';
+    [].forEach.call(document.querySelectorAll(q), function(e){
+      var n=null;
+      for(var i=0;i<e.childNodes.length;i++){ if(e.childNodes[i].nodeType===3 && e.childNodes[i].nodeValue.trim()){ n=e.childNodes[i]; break; } }
+      if(!n) return;
+      if(on){ if(e.dataset.mbp!=null) return; e.dataset.mbp=n.nodeValue; n.nodeValue=clean(n.nodeValue); }
+      else if(e.dataset.mbp!=null){ n.nodeValue=e.dataset.mbp; delete e.dataset.mbp; }
+    });
+  }
+
+  function enter(){ build(); modalText(true); drawCur(); }
+  function leave(){
+    modalText(false);
+    untransform();
+    try{
+      if($('pr-sum') && $('pr-sum').classList.contains('active') && typeof renderPayrollSummary==='function') renderPayrollSummary();
+      if($('pr-cyc') && $('pr-cyc').classList.contains('active') && typeof renderCycleSummary==='function') renderCycleSummary();
+    }catch(e){}
+  }
+  MB.onChange(function(on){ if(on) enter(); else leave(); });
+
+  function wrap(name, after){
+    var f=window[name]; if(typeof f!=='function') return;
+    window[name]=function(){
+      var r=f.apply(this, arguments);
+      try{ if(MB.on()) after.apply(this, arguments); }catch(e){ console.warn('mbp',name,e); }
+      if(r && typeof r.then==='function'){ r.then(function(){ try{ if(MB.on()) after(); }catch(e){ console.warn('mbp',name,e); } }); }
+      return r;
+    };
+  }
+  wrap('initPayrollTab', function(){ enter(); });
+  wrap('prSwitch',       function(){ build(); drawCur(); });
+  wrap('renderAttList',  function(){ build(); drawAtt(); });
+  wrap('renderEmpCheckList', function(){ build(); drawPick(); });
+  wrap('renderWdPanel',  function(){ build(); drawWd(); });
+  wrap('renderPayrollSummary', function(){ build(); drawSum(); });
+  wrap('renderCycleSummary',   function(){ build(); drawCyc(); });
+  wrap('renderPayHistory',     function(){ build(); drawPay(); });
+  wrap('renderEmpRegistry',    function(){ build(); drawReg(); });
+  wrap('openEmpModal',         function(){ modalText(true); });
+  wrap('addSpecialRoleField',  function(){ modalText(true); });
+  wrap('setEmpType',           function(){ modalText(true); });
+
+  var rs=null;
+  window.addEventListener('resize', function(){
+    if(!MB.on()) return;
+    clearTimeout(rs); rs=setTimeout(function(){
+      Object.keys(CFG).forEach(function(k){ var c=$(k); if(c && c.classList.contains('mbt') && c.offsetParent) fit(k); });
+    },150);
+  });
+  if(MB.on()) enter();
+})();
+</script>
+<style id="ux26-css">
+/* ── 26 ก.ย.69 · งานพิเศษรายวันตอนลงเวลา (จอคอม/แท็บเล็ต) ── */
+.att-sp-row{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 10px 39px}
+.att-sp-chip{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border-radius:9px;border:1.5px dashed #c6cdd3;background:#fff;color:#5f6b76;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.att-sp-chip .att-sp-bx{width:16px;height:16px;border-radius:4px;border:2px solid #c6cdd3;display:inline-flex;align-items:center;justify-content:center;font-size:11px;line-height:1;color:#fff}
+.att-sp-chip.on{border:1.5px solid #0f7b3f;background:#e8f5ee;color:#0f7b3f}
+.att-sp-chip.on .att-sp-bx{background:#0f7b3f;border-color:#0f7b3f}
+.att-sp-sum{margin-bottom:8px;padding:7px 10px;border-radius:8px;background:#e8f5ee;border:1px solid #cfe7d9;color:#0f7b3f;font-size:12.5px;line-height:1.5}
+/* มือถือ */
+html.mb .mb-p-pr.nb{border-bottom:0}
+html.mb .mb-p-pr.done{cursor:default}
+html.mb .mb-p-sp{display:flex;flex-wrap:wrap;gap:8px;padding:0 2px 11px 35px;margin-top:-4px;border-bottom:1px solid #f0f2f4}
+html.mb .mb-p-spc{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 12px;border-radius:10px;font-size:14px;font-weight:600;border:1.5px dashed #c6cdd3;color:#5f6b76;background:#fff;font-family:inherit}
+html.mb .mb-p-spb{width:18px;height:18px;border-radius:5px;border:2px solid #c6cdd3;display:inline-flex;align-items:center;justify-content:center;color:#fff}
+html.mb .mb-p-spc.on{border:1.5px solid #0f7b3f;background:#e8f5ee;color:#0f7b3f}
+html.mb .mb-p-spc.on .mb-p-spb{background:#0f7b3f;border-color:#0f7b3f}
+html.mb .mb-p-spsum{font-size:12.5px;color:#0f7b3f;text-align:center;margin-bottom:6px;background:#fff;border-radius:9px;padding:5px 8px;border:1px solid #cfe7d9;line-height:1.5}
+.wd-per-hint{font-size:12.5px;color:#0f7b3f;margin:-8px 0 12px}
+.wd-per-hint.off{color:#8a5a12;background:#fdf3e7;border:1px solid #f3ddbc;border-radius:10px;padding:9px 12px;margin:-6px 0 14px;font-size:13.5px}
+select.wd-off,input.wd-off{border-color:#e0a458!important;background:#fffaf3!important}
+html.mb .mb-p-wdhint{font-size:12px;color:#0f7b3f;margin:-4px 0 12px}
+html.mb .mb-p-wdhint.off{color:#8a5a12;background:#fdf3e7;border:1px solid #f3ddbc;border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.55;margin:-2px 0 12px}
+html.mb .mb-p-in.wd-off{border-color:#e0a458;background:#fffaf3}
+.veh-filter{display:flex;gap:4px;background:#eef1f3;border-radius:10px;padding:3px;margin:0 0 8px;width:max-content}
+.veh-filter button{border:0;background:none;padding:7px 16px;border-radius:8px;font-family:inherit;font-size:13px;color:#5f6b76;cursor:pointer}
+.veh-filter button.on{background:#fff;color:#0f7b3f;font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.veh-sel{padding:6px 8px;background:var(--bg3,#fff);border:1px solid var(--border);border-radius:6px;font-size:12.5px;font-family:inherit;color:var(--text,#1a1d1f)}
+.veh-chk{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+tr.veh-ours td:first-child{box-shadow:inset 3px 0 0 #0f7b3f}
+</style>
+<style id="fx-css">
+/* ── เบิกน้ำมันจากถัง แบบหลายคัน (26 ก.ย.69) ── จอคอม/แท็บเล็ต */
+.fx-card{padding:16px 18px!important}
+.fx-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.fx-title{font-size:17px;font-weight:700;color:var(--text-primary,#1a1d1f)}
+.fx-histlink{color:#0f7b3f;font-size:14px;font-weight:600;text-decoration:none}
+.fx-top{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px}
+.fx-lb{display:block;font-size:13px;color:#5f6b76;margin:0 0 4px}
+.fx-in{height:46px;border:1px solid #cfd6dc;border-radius:10px;padding:0 12px;font-size:16px;background:#fff;color:#1a1d1f;box-sizing:border-box;width:100%;font-family:inherit;outline:none}
+.fx-in:focus{border:2px solid #0f7b3f;box-shadow:0 0 0 3px #d6eee0;padding:0 11px}
+.fx-datebox{width:200px}
+.fx-sum{margin-left:auto;display:flex;gap:10px}
+.fx-kp{background:#f3f6f8;border-radius:10px;padding:6px 14px;font-size:12px;color:#5f6b76}
+.fx-kp b{display:block;font-size:18px;color:#1a1d1f}
+.fx-kp-tank b{color:#0f7b3f}
+.fx-head{display:grid;grid-template-columns:96px minmax(220px,1fr) 180px 190px 44px;gap:12px;padding:0 10px;font-size:12.5px;color:#6b7680;font-weight:600;margin-bottom:6px}
+.fx-head i{font-style:normal;font-weight:400}
+.fx-row{display:grid;grid-template-columns:96px minmax(220px,1fr) 180px 190px 44px;gap:12px;align-items:center;background:#fafbfc;border:1px solid #e6e9ec;border-radius:12px;padding:8px 10px;margin-bottom:8px}
+.fx-row.warn{background:#fffaf3;border-color:#f0d3a8}
+.fx-ph{width:96px;height:72px;border-radius:10px;border:1.5px dashed #e0a458;background:#fff;color:#b5751d;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:700;cursor:pointer;padding:0;overflow:hidden;font-family:inherit}
+.fx-ph.has{border:1px solid #cfd6dc;background:#1c2226}
+.fx-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.fx-veh{height:46px;width:100%;border:1px solid #cfd6dc;border-radius:10px;padding:0 12px;display:flex;align-items:center;gap:8px;font-size:16px;background:#fff;cursor:pointer;font-family:inherit;color:#1a1d1f;text-align:left}
+.fx-veh:focus{outline:none;border:2px solid #0f7b3f;box-shadow:0 0 0 3px #d6eee0}
+.fx-veh b{font-weight:700}.fx-veh small{color:#8b959e;font-size:12px}
+.fx-veh.ph{color:#9aa4ad}
+.fx-vi{color:#0f7b3f;display:flex}
+.fx-cv{margin-left:auto;color:#8b959e;display:flex}
+.fx-rc{font-size:11px;color:#7a4fb5;background:#f3edfb;border-radius:6px;padding:2px 7px;font-weight:700}
+.fx-inwrap{position:relative}
+.fx-inwrap .fx-in{padding-right:46px}
+.fx-unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#8b959e;font-size:13px;pointer-events:none}
+.fx-nometer{color:#b0b8bf;font-size:13px;padding-left:4px}
+.fx-x{width:40px;height:40px;border-radius:10px;border:1px solid #e6e9ec;background:#fff;color:#9aa4ad;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.fx-x:hover{color:#c0392b;border-color:#f0c4be}
+.fx-dup{grid-column:1/-1;color:#c0392b;font-size:13px;font-weight:600}
+.fx-add{width:100%;height:48px;border:1.5px dashed #9fcfb2;border-radius:12px;color:#0f7b3f;font-weight:700;font-size:15px;background:#f6fbf8;cursor:pointer;font-family:inherit}
+.fx-kbd{font-size:12px;color:#6b7680;margin-top:8px;line-height:1.7}
+.fx-kbd kbd{background:#f1f3f5;border:1px solid #d7dde2;border-bottom-width:2px;border-radius:5px;padding:1px 6px;font-family:inherit;font-size:11.5px}
+.fx-foot{display:flex;align-items:flex-end;gap:12px;margin-top:12px}
+.fx-warnbox{flex:1;background:#fdf3e7;border:1px solid #f3ddbc;border-radius:10px;padding:10px 12px;color:#8a5a12;font-size:13.5px;line-height:1.6}
+.fx-wsub{font-size:12px;opacity:.85}
+.fx-save{margin-left:auto;height:50px;padding:0 24px;border-radius:12px;background:#0f7b3f;color:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;border:0;cursor:pointer;font-family:inherit;white-space:nowrap}
+.fx-save.dis{background:#9bbfa9}
+/* popover / sheet */
+.fx-mask{display:none;position:fixed;inset:0;z-index:4000;background:transparent}
+.fx-mask.open{display:block}
+.fx-pop{display:none;position:fixed;z-index:4001;width:350px;max-height:420px;overflow:auto;background:#fff;border:1px solid #d7dde2;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px;box-sizing:border-box;font-family:var(--font,inherit)}
+.fx-pop.open{display:block}
+.fx-grab{display:none}
+.fx-pt{font-weight:800;font-size:15px;margin:2px 4px 8px}
+.fx-srch{display:flex;align-items:center;gap:8px;height:42px;border-radius:10px;background:#f1f3f5;padding:0 10px;color:#8b959e;margin-bottom:8px}
+.fx-srch input{flex:1;border:0;background:none;font-size:16px;outline:none;font-family:inherit;color:#1a1d1f;min-width:0}
+.fx-tabs{display:flex;gap:4px;background:#eef1f3;border-radius:10px;padding:3px;margin-bottom:8px}
+.fx-tabs button{flex:1;border:0;background:none;padding:8px 0;border-radius:8px;font-size:13.5px;color:#5f6b76;cursor:pointer;font-family:inherit}
+.fx-tabs button.on{background:#fff;color:#0f7b3f;font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.fx-opts{display:flex;flex-direction:column;gap:2px}
+.fx-opt{display:grid;grid-template-columns:30px 1fr;grid-template-rows:auto auto;column-gap:8px;align-items:center;text-align:left;padding:9px 8px;border-radius:10px;border:0;background:none;cursor:pointer;font-family:inherit;color:#1a1d1f}
+.fx-opt .fx-oi{grid-row:1/3;width:30px;height:30px;border-radius:8px;background:#e8f5ee;color:#0f7b3f;display:flex;align-items:center;justify-content:center}
+.fx-opt b{font-size:15px}.fx-opt small{color:#8b959e;font-size:12px}
+.fx-opt:hover,.fx-opt.on{background:#e8f5ee}
+.fx-opt.used{opacity:.45;cursor:not-allowed}
+.fx-empty{color:#8b959e;font-size:13px;padding:12px 8px;line-height:1.6}
+.fx-newv{width:100%;border:0;border-top:1px solid #eef1f3;margin-top:6px;padding:12px 8px 6px;color:#0f7b3f;font-weight:700;font-size:14px;background:none;text-align:left;cursor:pointer;font-family:inherit}
+.fx-mut{color:#8b959e;font-weight:400}
+.fx-chkrow{display:flex;align-items:center;gap:8px;font-size:14px;margin:12px 2px}
+.fx-msg{color:#c0392b;font-size:13px;min-height:18px;margin-bottom:6px}
+.fx-two{display:grid;grid-template-columns:1fr 1.4fr;gap:8px}
+.fx-btn{height:46px;border-radius:12px;border:0;background:#0f7b3f;color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit;padding:0 14px}
+.fx-btn.gh{background:#fff;border:1px solid #dde2e6;color:#3d4852}
+.fx-view{display:none;position:fixed;inset:0;z-index:4100;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:16px}
+.fx-view.open{display:flex}
+.fx-vbox{background:#fff;border-radius:16px;padding:14px;max-width:560px;width:100%;box-sizing:border-box}
+.fx-vt{font-weight:700;margin-bottom:10px}
+.fx-vimg{min-height:120px;display:flex;align-items:center;justify-content:center;color:#6b7680;font-size:14px;margin-bottom:10px;text-align:center}
+.fx-vimg img{max-width:100%;max-height:70vh;border-radius:10px}
+.fx-vbox .fx-btn{width:100%}
+.fx-vbtn{border:1px solid #cfe7d9;background:#e8f5ee;color:#0f7b3f;border-radius:7px;padding:3px 9px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+@media(max-width:1100px){ .fx-head,.fx-row{grid-template-columns:88px minmax(150px,1fr) 140px 150px 40px;gap:10px} .fx-ph{width:88px;height:66px} }
+@media(max-width:900px){ .fx-head,.fx-row{grid-template-columns:76px minmax(120px,1fr) 110px 110px 36px;gap:8px} .fx-ph{width:76px;height:60px} .fx-veh small,.fx-veh .fx-rc{display:none} .fx-x{width:36px;height:36px} }
+
+/* ── มือถือ / แบ่งจอ (≤700px) — แบบ B1 ── */
+html.mb .fx-card{padding:12px!important;border-radius:16px}
+html.mb .fx-title{font-size:16px}
+html.mb .fx-histlink{display:none}
+html.mb .fx-top{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+html.mb .fx-datebox{width:auto}
+html.mb .fx-sum{margin:0}
+html.mb .fx-kp.fx-kp-tank{display:none}
+html.mb .fx-kp{width:100%;box-sizing:border-box;min-height:46px;display:flex;flex-direction:column;justify-content:center}
+html.mb .fx-sum{display:block}
+html.mb .fx-kp b{font-size:15px;color:#0f7b3f}
+html.mb .fx-head{display:none}
+html.mb .fx-row{grid-template-columns:78px 1fr 34px;grid-template-rows:auto auto auto;gap:7px 10px;align-items:start;background:#fff;border-radius:14px;padding:10px}
+html.mb .fx-ph{width:78px;height:78px;grid-row:1/4;grid-column:1}
+html.mb .fx-c-veh{grid-column:2;grid-row:1}
+html.mb .fx-c-lit{grid-column:2/4;grid-row:2}
+html.mb .fx-c-mtr{grid-column:2/4;grid-row:3}
+html.mb .fx-x{grid-column:3;grid-row:1;width:34px;height:34px;border:0;background:none}
+html.mb .fx-veh{height:44px;font-size:15px;padding:0 10px}
+html.mb .fx-in{height:44px}
+html.mb .fx-nometer{display:none}
+html.mb .fx-dup{grid-column:1/-1;grid-row:auto}
+html.mb .fx-kbd{display:none}
+html.mb .fx-foot{flex-direction:column;align-items:stretch}
+html.mb .fx-save{width:100%;justify-content:center;margin:0}
+html.mb .fx-pop{left:0!important;right:0;bottom:0;top:auto!important;width:auto;max-height:78vh!important;border-radius:20px 20px 0 0;padding:10px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -6px 26px rgba(0,0,0,.2)}
+html.mb .fx-mask.open{background:rgba(0,0,0,.45)}
+html.mb .fx-grab{display:block;width:42px;height:4px;background:#d7dde2;border-radius:3px;margin:0 auto 12px}
+html.mb .fx-opt{padding:11px 8px}
+</style>
+<script id="fx-js">
+/* ============================================================
+   เบิกน้ำมันจากถัง แบบหลายคัน + รูปหัวจ่าย (26 ก.ย. 2569)
+   - เลือกเครื่อง/ทะเบียนจาก vehicles ที่ติ๊ก "รถเรา" · เพิ่มใหม่ได้จากหน้านี้
+   - รูปบังคับทุกคัน · ย่อ 900px JPEG 0.6 · เก็บ fuel_photos (ลบอัตโนมัติ > 6 เดือน)
+   - กันรูปซ้ำ: ลายนิ้วมือไฟล์ต้นฉบับ (SHA-256) + รูปหลังย่อ เทียบในชุด + fuel_out ทั้งหมด
+   - บันทึกเป็น batch ก้อนเดียว (fuel_out + fuel_photos) — พังครึ่งทางไม่ได้
+   ============================================================ */
+(function(){
+  var ROWS=[], seq=0, pickRow=null, fileRow=null, cleaned=false;
+  var KIND={truck:'รถบรรทุก',boat:'เรือ',excavator:'แม็กโคร'};
+  var PHOTO_KEEP_DAYS=183;
+  function $(id){ return document.getElementById(id); }
+  function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function n0(v){ return (+v||0).toLocaleString('th-TH',{maximumFractionDigits:2}); }
+  var IC={
+    cam:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.5h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.4"/></svg>',
+    truck:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="12" height="9" rx="1.5"/><path d="M14 10h4l3 3.2V16h-7z"/><circle cx="7" cy="18.5" r="1.7"/><circle cx="17" cy="18.5" r="1.7"/></svg>',
+    boat:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15h18l-2.5 4h-13zM6 15V9h8l3 6M10 9V5"/></svg>',
+    excavator:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="14" width="11" height="4" rx="2"/><path d="M5 14v-3h6v3M11 11l5-5 4 3-3 4"/></svg>',
+    x:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>',
+    chev:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 10 5 5 5-5"/></svg>',
+    srch:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>'
+  };
+  function veh(){ return (typeof vehData!=='undefined'&&vehData)?vehData:{}; }
+  function ours(){ var V=veh(); return Object.keys(V).filter(function(p){ return V[p]&&V[p].ours&&V[p].active!==false; }); }
+  function kindOf(p){ var v=veh()[p]; return (v&&v.kind)||'truck'; }
+  function meterOf(p){ var v=veh()[p]; return (v&&v.meter)||''; }
+  function lastFill(p){ var D=(typeof fuelOutData!=='undefined')?fuelOutData:[]; for(var i=0;i<D.length;i++){ if(D[i].machine_id===p) return D[i]; } return null; }
+  function newRow(){ return {k:++seq, plate:'', liters:'', meter:'', img:'', fp:'', fpRaw:'', dup:''}; }
+  function isMb(){ return document.documentElement.classList.contains('mb'); }
+
+  window.fxInit=function(){
+    if(typeof listenVeh==='function') listenVeh();
+    if(!ROWS.length) ROWS.push(newRow());
+    fxRender();
+    fxCleanupPhotos();
+  };
+  window.fxOnVehChange=function(){ if($('fxRows')) fxRender(); if($('fxPick')&&$('fxPick').classList.contains('open')) drawPick(); };
+
+  function rowIssues(r){ var a=[]; if(!r.plate) a.push('ทะเบียน'); if(!(parseFloat(r.liters)>0)) a.push('ลิตร'); if(!r.img) a.push('รูปหัวจ่าย'); if(r.dup) a.push('รูปซ้ำ'); return a; }
+  function isEmpty(r){ return !r.plate && !r.liters && !r.img && !r.meter; }
+
+  window.fxRender=function(){
+    var box=$('fxRows'); if(!box) return;
+    box.innerHTML=ROWS.map(function(r,i){
+      var iss=rowIssues(r), bad=iss.length && !(ROWS.length===1 && isEmpty(r));
+      var k=r.plate?kindOf(r.plate):'';
+      var ph=r.img
+        ? '<button type="button" class="fx-ph has" data-k="'+r.k+'" onclick="fxPickPhoto('+r.k+')" title="แตะเพื่อเปลี่ยนรูป"><img src="'+r.img+'" alt=""></button>'
+        : '<button type="button" class="fx-ph" data-k="'+r.k+'" onclick="fxPickPhoto('+r.k+')">'+IC.cam+'<span>แนบรูป</span></button>';
+      var vs=r.plate
+        ? '<button type="button" class="fx-veh" id="fxV'+r.k+'" onclick="fxOpenPick('+r.k+')"><span class="fx-vi">'+(IC[k]||IC.truck)+'</span><b>'+esc(r.plate)+'</b><small>'+(KIND[k]||'')+'</small>'+(veh()[r.plate]&&veh()[r.plate].rungchai?'<span class="fx-rc">รุ่งชัย</span>':'')+'<span class="fx-cv">'+IC.chev+'</span></button>'
+        : '<button type="button" class="fx-veh ph" id="fxV'+r.k+'" onclick="fxOpenPick('+r.k+')"><span>แตะเพื่อเลือก</span><span class="fx-cv">'+IC.chev+'</span></button>';
+      var mt=meterOf(r.plate);
+      var meter=mt
+        ? '<div class="fx-inwrap"><input type="number" inputmode="decimal" class="fx-in" id="fxM'+r.k+'" value="'+esc(r.meter)+'" placeholder="'+(mt==='hr'?'ชม.':'กม.')+'" oninput="fxSet('+r.k+',\'meter\',this.value)"><span class="fx-unit">'+(mt==='hr'?'ชม.':'กม.')+'</span></div>'
+        : '<div class="fx-nometer">'+(r.plate?'— ไม่มีมิเตอร์':'')+'</div>';
+      return '<div class="fx-row'+(bad?' warn':'')+'" data-k="'+r.k+'">'
+        + ph
+        + '<div class="fx-c fx-c-veh">'+vs+'</div>'
+        + '<div class="fx-c fx-c-lit"><div class="fx-inwrap"><input type="number" inputmode="decimal" min="0" class="fx-in" id="fxL'+r.k+'" value="'+esc(r.liters)+'" placeholder="ลิตร" oninput="fxSet('+r.k+',\'liters\',this.value)" onkeydown="fxLitKey(event,'+r.k+')"><span class="fx-unit">ลิตร</span></div></div>'
+        + '<div class="fx-c fx-c-mtr">'+meter+'</div>'
+        + '<button type="button" class="fx-x" title="ลบแถวนี้" onclick="fxDelRow('+r.k+')">'+IC.x+'</button>'
+        + (r.dup?'<div class="fx-dup">รูปนี้ซ้ำกับ '+esc(r.dup)+' — ใช้รูปเดิมซ้ำไม่ได้</div>':'')
+        + '</div>';
+    }).join('');
+    fxSummary();
+  };
+  function fxSummary(){
+    var tot=0,n=0; ROWS.forEach(function(r){ var l=parseFloat(r.liters)||0; if(r.plate||l){ n++; tot+=l; } });
+    if($('fxBatch')) $('fxBatch').textContent=n0(tot)+' ลิตร · '+n+' คัน';
+    try{ var s=calcFuelStock(); if($('fxTank')) $('fxTank').textContent=n0(Math.round(s.remaining||0))+' ลิตร'; }catch(e){}
+    var msgs=[];
+    ROWS.forEach(function(r,i){ if(ROWS.length===1&&isEmpty(r)) return; var iss=rowIssues(r); if(iss.length) msgs.push('แถวที่ '+(i+1)+(r.plate?' ('+r.plate+')':'')+' ยังขาด <b>'+iss.join(' · ')+'</b>'); });
+    var w=$('fxWarn'); if(w){ w.innerHTML=msgs.length?msgs.join('<br>')+'<div class="fx-wsub">บันทึกไม่ได้จนกว่าจะครบ</div>':''; w.style.display=msgs.length?'block':'none'; }
+    var ok=n>0&&!msgs.length;
+    var b=$('fxSaveBtn'); if(b) b.classList.toggle('dis',!ok);
+    if($('fxSaveTxt')) $('fxSaveTxt').textContent='บันทึกทั้งหมด ('+n+' คัน)';
+  }
+  window.fxSet=function(k,f,v){ var r=ROWS.find(function(x){ return x.k===k; }); if(!r) return; r[f]=v; var row=document.querySelector('.fx-row[data-k="'+k+'"]'); if(row) row.classList.toggle('warn', rowIssues(r).length>0 && !(ROWS.length===1&&isEmpty(r))); fxSummary(); };
+  window.fxAddRow=function(open){ var r=newRow(); ROWS.push(r); fxRender(); if(open) setTimeout(function(){ fxOpenPick(r.k); },30); return r; };
+  window.fxDelRow=function(k){
+    var r=ROWS.find(function(x){ return x.k===k; });
+    if(r && (r.img||r.liters) && !confirm('ลบแถว '+(r.plate||'นี้')+' ?')) return;
+    ROWS=ROWS.filter(function(x){ return x.k!==k; }); if(!ROWS.length) ROWS.push(newRow());
+    recheckDups(); fxRender();
+  };
+  window.fxLitKey=function(e,k){
+    if(e.key!=='Enter') return;
+    e.preventDefault();
+    var last=ROWS[ROWS.length-1];
+    if(last && last.k===k){ fxAddRow(true); }
+    else { var i=ROWS.findIndex(function(x){ return x.k===k; }); var nx=ROWS[i+1]; if(nx){ var el=$('fxL'+nx.k); if(el) el.focus(); } }
+  };
+
+  // ── เลือกเครื่อง/ทะเบียน ──
+  var pickKind='truck', pickQ='';
+  function ensurePick(){
+    if($('fxPick')) return;
+    var m=document.createElement('div'); m.id='fxPickMask'; m.className='fx-mask'; m.onclick=fxClosePick; document.body.appendChild(m);
+    var d=document.createElement('div'); d.id='fxPick'; d.className='fx-pop'; document.body.appendChild(d);
+  }
+  window.fxOpenPick=function(k){
+    ensurePick(); pickRow=k; pickQ='';
+    var r=ROWS.find(function(x){ return x.k===k; });
+    pickKind=(r&&r.plate)?kindOf(r.plate):(pickKind||'truck');
+    drawPick();
+    var p=$('fxPick'); p.classList.add('open'); $('fxPickMask').classList.add('open');
+    if(!isMb()){
+      var a=$('fxV'+k); if(a){ var b=a.getBoundingClientRect(); var top=b.bottom+6; var h=Math.min(420,window.innerHeight-24);
+        if(top+h>window.innerHeight-12) top=Math.max(12,b.top-h-6);
+        p.style.left=Math.min(b.left, window.innerWidth-360)+'px'; p.style.top=top+'px'; p.style.maxHeight=h+'px'; }
+    } else { p.style.left=''; p.style.top=''; p.style.maxHeight=''; }
+    setTimeout(function(){ var s=$('fxPickQ'); if(s && !isMb()) s.focus(); },30);
+  };
+  window.fxClosePick=function(){ var p=$('fxPick'); if(p) p.classList.remove('open'); var m=$('fxPickMask'); if(m) m.classList.remove('open'); };
+  function drawPick(){
+    var p=$('fxPick'); if(!p) return;
+    var list=ours(), used={}; ROWS.forEach(function(r){ if(r.plate && r.k!==pickRow) used[r.plate]=1; });
+    var cnt={truck:0,boat:0,excavator:0}; list.forEach(function(pl){ cnt[kindOf(pl)]=(cnt[kindOf(pl)]||0)+1; });
+    var q=pickQ.trim().toLowerCase().replace(/[\s-]/g,'');
+    var items=list.filter(function(pl){ return q ? pl.toLowerCase().replace(/[\s-]/g,'').indexOf(q)>=0 : kindOf(pl)===pickKind; }).sort();
+    var cur=(ROWS.find(function(x){ return x.k===pickRow; })||{}).plate;
+    p.innerHTML='<div class="fx-grab"></div><div class="fx-pt">เลือกเครื่อง / ทะเบียน</div>'
+      +'<div class="fx-srch">'+IC.srch+'<input id="fxPickQ" placeholder="ค้นหาทะเบียน / ชื่อ" value="'+esc(pickQ)+'" oninput="fxPickSearch(this.value)" onkeydown="fxPickKey(event)"></div>'
+      +(q?'':'<div class="fx-tabs">'+['truck','boat','excavator'].map(function(kd){ return '<button type="button" class="'+(kd===pickKind?'on':'')+'" onclick="fxPickKind(\''+kd+'\')">'+({truck:'รถ',boat:'เรือ',excavator:'แม็กโคร'}[kd])+' ('+(cnt[kd]||0)+')</button>'; }).join('')+'</div>')
+      +'<div class="fx-opts">'+(items.length?items.map(function(pl){
+          var lf=lastFill(pl), v=veh()[pl]||{};
+          return '<button type="button" class="fx-opt'+(pl===cur?' on':'')+(used[pl]?' used':'')+'" '+(used[pl]?'disabled':'')+' data-pl="'+esc(pl)+'" onclick="fxPickSet(this.dataset.pl)"><span class="fx-oi">'+(IC[kindOf(pl)]||IC.truck)+'</span><b>'+esc(pl)+(v.rungchai?' <span class="fx-rc">รุ่งชัย</span>':'')+'</b><small>'+(used[pl]?'อยู่ในชุดนี้แล้ว':(lf?'เติมล่าสุด '+(typeof isoToBE_fuel==='function'?isoToBE_fuel(lf.date):lf.date)+' · '+n0(lf.liters)+' ล.':'—'))+'</small></button>';
+        }).join(''):'<div class="fx-empty">'+(list.length?'ไม่พบ':'ยังไม่มี "รถเรา" — กดเพิ่มด้านล่าง หรือไปติ๊กที่ ค่าเที่ยวรถร่วม → จัดการทะเบียนรถ')+'</div>')+'</div>'
+      +'<button type="button" class="fx-newv" onclick="fxNewVeh()">＋ เพิ่มทะเบียน / เครื่องใหม่</button>';
+  }
+  window.fxPickSearch=function(v){ pickQ=v; drawPick(); var s=$('fxPickQ'); if(s){ s.focus(); s.setSelectionRange(v.length,v.length); } };
+  window.fxPickKind=function(kd){ pickKind=kd; drawPick(); };
+  window.fxPickKey=function(e){ if(e.key==='Escape'){ fxClosePick(); } if(e.key==='Enter'){ var b=document.querySelector('#fxPick .fx-opt:not([disabled])'); if(b){ e.preventDefault(); b.click(); } } };
+  window.fxPickSet=function(pl){
+    var r=ROWS.find(function(x){ return x.k===pickRow; }); fxClosePick(); if(!r) return;
+    r.plate=pl; if(!meterOf(pl)) r.meter='';
+    fxRender(); var el=$('fxL'+r.k); if(el && !isMb()) el.focus();
+  };
+
+  // ── เพิ่มเครื่องใหม่ ──
+  window.fxNewVeh=function(){
+    var p=$('fxPick'); if(!p) return;
+    var q=(pickQ||'').trim();
+    p.innerHTML='<div class="fx-grab"></div><div class="fx-pt">เพิ่มเครื่อง / ทะเบียนใหม่</div>'
+      +'<label class="fx-lb">ประเภท</label><div class="fx-tabs" id="fxNvK">'+['truck','boat','excavator'].map(function(kd){ return '<button type="button" data-v="'+kd+'" class="'+(kd===pickKind?'on':'')+'" onclick="fxSeg(\'fxNvK\',this)">'+{truck:'รถ',boat:'เรือ',excavator:'แม็กโคร'}[kd]+'</button>'; }).join('')+'</div>'
+      +'<label class="fx-lb">ทะเบียน / ชื่อเรียก</label><input class="fx-in" id="fxNvP" value="'+esc(q)+'" placeholder="เช่น 85-1056 / เรือภาวัช / แม็กโคร 1">'
+      +'<label class="fx-lb" style="margin-top:10px">มิเตอร์ <span class="fx-mut">(เผื่อไว้ ไม่ต้องกรอกก็ได้)</span></label><div class="fx-tabs" id="fxNvM"><button type="button" data-v="" class="on" onclick="fxSeg(\'fxNvM\',this)">ไม่มี</button><button type="button" data-v="km" onclick="fxSeg(\'fxNvM\',this)">เลขไมล์ กม.</button><button type="button" data-v="hr" onclick="fxSeg(\'fxNvM\',this)">ชั่วโมงเครื่อง</button></div>'
+      +'<label class="fx-chkrow"><input type="checkbox" id="fxNvR"> ใช้โปรแกรมค่าเที่ยวรุ่งชัย</label>'
+      +'<div class="fx-msg" id="fxNvMsg"></div>'
+      +'<div class="fx-two"><button type="button" class="fx-btn gh" onclick="drawPickBack()">ยกเลิก</button><button type="button" class="fx-btn" onclick="fxNewVehSave()">บันทึก + เลือกคันนี้</button></div>';
+    setTimeout(function(){ var e=$('fxNvP'); if(e) e.focus(); },30);
+  };
+  window.drawPickBack=function(){ drawPick(); };
+  window.fxSeg=function(id,b){ [].forEach.call($(id).querySelectorAll('button'),function(x){ x.classList.toggle('on',x===b); }); };
+  function segVal(id){ var b=$(id)&&$(id).querySelector('button.on'); return b?b.dataset.v:''; }
+  window.fxNewVehSave=function(){
+    var pl=($('fxNvP').value||'').trim(); var kd=segVal('fxNvK')||'truck';
+    if(kd==='truck') pl=pl.toUpperCase();
+    if(!pl){ $('fxNvMsg').textContent='กรอกทะเบียน / ชื่อก่อน'; return; }
+    if(/[\/\.#\[\]]/.test(pl)){ $('fxNvMsg').textContent='ห้ามมีเครื่องหมาย / . # [ ]'; return; }
+    var V=veh(), ex=V[pl];
+    var rec={ours:true, kind:kd, meter:segVal('fxNvM'), rungchai:!!$('fxNvR').checked, active:true};
+    if(!ex){ rec.ownerName='รถบริษัท'; rec.canonical='รถบริษัท'; }
+    $('fxNvMsg').textContent='กำลังบันทึก…';
+    db.collection('vehicles').doc(pl).set(rec,{merge:true}).then(function(){
+      V[pl]=Object.assign({},ex||{},rec);
+      var r=ROWS.find(function(x){ return x.k===pickRow; }); fxClosePick();
+      if(r){ r.plate=pl; } fxRender();
+      toast(ex?('ตั้ง '+pl+' เป็นรถเราแล้ว'):('เพิ่ม '+pl+' แล้ว'));
+    }).catch(function(e){ $('fxNvMsg').textContent='บันทึกไม่สำเร็จ: '+e.message; });
+  };
+
+  // ── รูปหัวจ่าย ──
+  window.fxPickPhoto=function(k){ fileRow=k; var f=$('fxFile'); if(f){ f.value=''; f.click(); } };
+  function sha256(buf){ try{ if(window.crypto&&crypto.subtle) return crypto.subtle.digest('SHA-256',buf).then(function(h){ return Array.from(new Uint8Array(h)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join(''); }); }catch(e){} return Promise.resolve(''); }
+  function fpImg(str){ str=str||''; var h1=5381,h2=52711; for(var k=0;k<str.length;k++){ var c=str.charCodeAt(k); h1=((h1*33)^c)>>>0; h2=((h2*31)+c)>>>0; } return str.length+'_'+h1.toString(16)+h2.toString(16); }
+  function shrink(dataUrl){ return new Promise(function(res){ var img=new Image(); img.onload=function(){ var max=900,w=img.width,h=img.height; if(w>max||h>max){ if(w>h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } } var c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); res(c.toDataURL('image/jpeg',0.6)); }; img.onerror=function(){ res(''); }; img.src=dataUrl; }); }
+  function dupOf(r){
+    var me=ROWS.indexOf(r);
+    for(var i=0;i<me;i++){ var o=ROWS[i]; if(!o.img) continue; if((r.fpRaw&&o.fpRaw===r.fpRaw)||(r.fp&&o.fp===r.fp)) return 'แถวที่ '+(i+1)+(o.plate?' ('+o.plate+')':'')+' ในชุดนี้'; }
+    var D=(typeof fuelOutData!=='undefined')?fuelOutData:[];
+    for(var j=0;j<D.length;j++){ var d=D[j]; if((r.fpRaw&&d.fpRaw===r.fpRaw)||(r.fp&&d.fp===r.fp)) return 'รายการเบิก '+(typeof isoToBE_fuel==='function'?isoToBE_fuel(d.date):d.date)+' · '+(d.machine_id||'')+' · '+n0(d.liters)+' ลิตร'; }
+    return '';
+  }
+  function recheckDups(){ ROWS.forEach(function(r){ r.dup=r.img?dupOf(r):''; }); }
+  window.fxFilePicked=function(inp){
+    var f=inp.files&&inp.files[0]; if(!f) return;
+    var r=ROWS.find(function(x){ return x.k===fileRow; }); if(!r) return;
+    if(!/^image\//.test(f.type||'image/')){ toast('เลือกไฟล์รูปเท่านั้น'); return; }
+    toast('กำลังย่อรูป…');
+    var br=new FileReader();
+    br.onload=function(){
+      sha256(br.result).then(function(hx){
+        var dr=new FileReader();
+        dr.onload=function(){ shrink(dr.result).then(function(small){
+          if(!small){ toast('เปิดรูปนี้ไม่ได้ ลองรูปอื่น'); return; }
+          r.img=small; r.fpRaw=hx; r.fp=fpImg(small); recheckDups(); fxRender();
+          if(r.dup) toast('รูปนี้ซ้ำ! ('+r.dup+')'); else toast('แนบรูปแล้ว ('+Math.round(small.length*0.75/1024)+' KB)');
+          var el=$('fxL'+r.k); if(el && !r.liters && !isMb()) el.focus();
+        }); };
+        dr.readAsDataURL(f);
+      });
+    };
+    br.readAsArrayBuffer(f);
+  };
+
+  // ── บันทึก ──
+  window.fxSave=async function(){
+    var date=$('fOutDate')?$('fOutDate').value:'';
+    if(!date){ toast('⚠️ เลือกวันที่เบิก'); return; }
+    var rows=ROWS.filter(function(r){ return !isEmpty(r); });
+    if(!rows.length){ toast('⚠️ ยังไม่มีรายการ'); return; }
+    recheckDups();
+    var bad=rows.filter(function(r){ return rowIssues(r).length; });
+    if(bad.length){ fxRender(); toast('⚠️ ยังกรอกไม่ครบ — ดูกล่องสีส้ม'); var w=$('fxWarn'); if(w) w.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    var total=rows.reduce(function(a,r){ return a+(parseFloat(r.liters)||0); },0);
+    var stock=calcFuelStock();
+    if(total>(stock.remaining||0)){ if(!confirm('⚠️ รวมที่เบิก ('+n0(total)+' ลิตร) มากกว่าน้ำมันคงเหลือในถัง ('+n0(Math.round(stock.remaining||0))+' ลิตร) ยืนยันบันทึกต่อไหม?')) return; }
+    var btn=$('fxSaveBtn'); if(btn){ if(btn.dataset.busy) return; btn.dataset.busy='1'; }
+    toast('⏳ กำลังบันทึก '+rows.length+' คัน…');
+    try{
+      var batch=prDb().batch(), bid='fb_'+Date.now().toString(36), now=new Date().toISOString(), by=(typeof curEmail!=='undefined'&&curEmail)||'';
+      rows.forEach(function(r){
+        var outRef=prDb().collection('fuel_out').doc(), phRef=prDb().collection('fuel_photos').doc();
+        var mt=meterOf(r.plate), mv=parseFloat(String(r.meter).replace(/,/g,''));
+        batch.set(phRef,{date:date, machine_id:r.plate, outId:outRef.id, img:r.img, fp:r.fp, fpRaw:r.fpRaw, by:by, createdAt:now});
+        batch.set(outRef,{date:date, type:kindOf(r.plate), machine_id:r.plate, liters:parseFloat(r.liters)||0, note:'',
+          meter:(mt&&!isNaN(mv))?mv:null, meterUnit:mt||'', photoId:phRef.id, fp:r.fp, fpRaw:r.fpRaw, batch:bid,
+          by:by, created_at:firebase.firestore.FieldValue.serverTimestamp()});
+      });
+      await batch.commit();
+      toast('✅ บันทึกเบิกน้ำมัน '+rows.length+' คัน รวม '+n0(total)+' ลิตร แล้ว');
+      var after=(stock.remaining||0)-total;
+      if(after<1000 && typeof tgNotify==='function') tgNotify('⚠️ <b>น้ำมันใกล้หมด</b>\nคงเหลือโดยประมาณ '+Math.max(0,Math.round(after)).toLocaleString()+' ลิตร (หลังเบิก '+n0(total)+' ลิตร)');
+      ROWS=[newRow()]; fxRender();
+    }catch(e){
+      var m=String(e&&e.message||e);
+      if(/permission/i.test(m)) m='ยังไม่ได้เปิดสิทธิ์บันทึกรูป (fuel_photos) ใน Firestore rules — ไม่มีรายการไหนถูกบันทึก ลองใหม่หลังเปิดสิทธิ์';
+      toast('❌ บันทึกไม่สำเร็จ: '+m);
+    }finally{ if(btn) delete btn.dataset.busy; }
+  };
+
+  // ── ดูรูป ──
+  window.fxViewPhoto=function(outId){
+    var D=(typeof fuelOutData!=='undefined')?fuelOutData:[]; var r=D.find(function(x){ return x._id===outId; }); if(!r||!r.photoId) return;
+    var v=$('fxView'); if(!v){ v=document.createElement('div'); v.id='fxView'; v.className='fx-view'; v.onclick=function(e){ if(e.target===v) v.classList.remove('open'); }; document.body.appendChild(v); }
+    v.innerHTML='<div class="fx-vbox"><div class="fx-vt">'+esc(r.machine_id||'')+' · '+n0(r.liters)+' ลิตร · '+(typeof isoToBE_fuel==='function'?isoToBE_fuel(r.date):r.date)+'</div><div class="fx-vimg">กำลังโหลดรูป…</div><button type="button" class="fx-btn gh" onclick="document.getElementById(\'fxView\').classList.remove(\'open\')">ปิด</button></div>';
+    v.classList.add('open');
+    prDb().collection('fuel_photos').doc(r.photoId).get().then(function(d){
+      var box=v.querySelector('.fx-vimg'); if(!box) return;
+      box.innerHTML=(d.exists&&d.data().img)?'<img src="'+d.data().img+'" alt="">':'รูปถูกลบอัตโนมัติแล้ว (เก็บไว้ '+Math.round(PHOTO_KEEP_DAYS/30.5)+' เดือน) — ข้อมูลลิตรยังอยู่ครบ';
+    }).catch(function(e){ var box=v.querySelector('.fx-vimg'); if(box) box.textContent='เปิดรูปไม่ได้: '+e.message; });
+  };
+
+  // ── ลบรูปเก่า > 6 เดือน (เจ้าของเปิดหน้าน้ำมัน วันละครั้ง) ──
+  window.fxCleanupPhotos=function(){
+    if(cleaned || typeof curRole==='undefined' || curRole!=='admin') return; cleaned=true;
+    var cut=new Date(Date.now()-PHOTO_KEEP_DAYS*864e5).toISOString().slice(0,10);
+    prDb().collection('fuel_photos').where('date','<',cut).limit(200).get().then(function(s){
+      if(!s.docs.length) return; var b=prDb().batch(); s.docs.forEach(function(d){ b.delete(d.ref); }); return b.commit();
+    }).catch(function(){});
+  };
+
+  // ลบรายการเบิก = ลบรูปที่ผูกไว้ด้วย
+  if(typeof window.delFuelDoc==='function'){
+    var _del=window.delFuelDoc;
+    window.delFuelDoc=async function(col,id){
+      var r=(col==='fuel_out'&&typeof fuelOutData!=='undefined')?fuelOutData.find(function(x){ return x._id===id; }):null;
+      if(r && r.photoId){
+        if(!confirm('ลบรายการเบิกนี้ (พร้อมรูปหัวจ่าย)?')) return;
+        try{ var b=prDb().batch(); b.delete(prDb().collection('fuel_out').doc(id)); b.delete(prDb().collection('fuel_photos').doc(r.photoId)); await b.commit(); toast('🗑️ ลบแล้ว'); }
+        catch(e){ toast('❌ '+e.message); }
+        return;
+      }
+      return _del(col,id);
+    };
+  }
+  // เริ่มเมื่อเปิดแท็บน้ำมัน + อัปเดตยอดถังเมื่อข้อมูลเปลี่ยน
+  function wrap(name, after){ var f=window[name]; if(typeof f!=='function') return; window[name]=function(){ var r=f.apply(this,arguments); try{ after.apply(this,arguments); }catch(e){} return r; }; }
+  wrap('initFuelTab', function(){ fxInit(); });
+  wrap('fuelSubTab', function(n){ if(n===1) fxInit(); });
+  wrap('updateFuelStockDisplay', function(){ fxSummary(); });
+  wrap('drawFuelOutList', function(){
+    if(document.documentElement.classList.contains('mb')){
+      var trs=document.querySelectorAll('#fuelOutList tbody tr'), D=(typeof fuelOutData!=='undefined')?fuelOutData:[];
+      [].forEach.call(trs,function(tr,i){ var r=D[i]; if(!r||!r.photoId||tr.querySelector('.fx-mbv')) return; var td=tr.lastElementChild; if(!td) return;
+        var b=document.createElement('button'); b.type='button'; b.className='fx-mbv'; b.style.display='none'; b.textContent='ดูรูปหัวจ่าย'; b.onclick=function(){ fxViewPhoto(r._id); }; td.appendChild(b); });
+    }
+    if(ROWS.some(function(r){ return r.img; })){ var before=ROWS.map(function(r){ return r.dup; }).join('|'); recheckDups(); if(before!==ROWS.map(function(r){ return r.dup; }).join('|')) fxRender(); } });
+})();
+</script>
+<style id="mb-css-nav">
+@media(max-width:700px){
+html.mb #mbNav{grid-template-columns:repeat(4,1fr)!important;}
+html.mb #mbHome .mb-sec{display:none;}                 /* เมนู 8 ช่องเดิมในหน้าใบชั่ง → ย้ายไปหน้า "เมนู" */
+html.mb #mbMenuPage{display:none;position:fixed;left:0;right:0;top:var(--mb-top,60px);bottom:calc(var(--m-navh) + env(safe-area-inset-bottom));
+  z-index:45;background:#fff;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px 28px;box-sizing:border-box;}
+html.mb.mb-menu #mbMenuPage{display:block;}
+html.mb #mbMenuPage .mb-hero{margin:0 0 4px;}
+html.mb .mbm-card{background:#fff;border:1px solid var(--m-line,#e6e9ec);border-radius:16px;padding:4px 14px 12px;margin-top:12px;}
+html.mb .mbm-note{font-size:11.5px;color:var(--m-muted,#8b959e);margin:10px 0 0;}
+html.mb .mbm-cat{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;margin:16px 0 4px;color:var(--m-green,#0f7b3f);}
+html.mb .mbm-cat .d{width:28px;height:28px;border-radius:8px;background:var(--m-green,#0f7b3f);color:#fff;display:flex;align-items:center;justify-content:center;}
+html.mb .mbm-grp{font-size:12px;color:var(--m-muted,#8b959e);font-weight:700;margin:10px 0 6px 2px;}
+html.mb .mbm-pills{display:flex;flex-wrap:wrap;gap:7px;}
+html.mb .mbm-pill{border:1px solid #dde2e6;border-radius:10px;padding:9px 12px;font-size:14px;background:#fff;color:var(--m-text,#1a1d1f);font-family:var(--font);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+html.mb .mbm-pill.pg{border-style:dashed;}
+html.mb .mbm-pill.on{border-color:var(--m-green,#0f7b3f);background:#e8f5ee;color:var(--m-green,#0f7b3f);font-weight:700;}
+html.mb .mbm-pill .ow{font-size:10.5px;color:#b08a2e;margin-left:4px;}
+html.mb #tp11{padding:0!important;overflow:hidden!important;}
+html.mb #tp11 #soFrame{display:block;flex:none!important;height:calc(100dvh - var(--mb-top,60px) - var(--m-navh) - env(safe-area-inset-bottom));min-height:0!important;}
+html.mb .mbm-out{margin-top:16px;width:100%;min-height:46px;border-radius:12px;border:1px solid #f0c4be;background:#fff;color:#c0392b;font-weight:700;font-size:15px;font-family:var(--font);}
+}
+</style>
+<script id="mb-js-nav">
+/* ============================================================
+   เมนูมือถือใหม่ (26 ก.ย. 2569) — เมนูล่าง: ขาย · เงินเดือน · น้ำมัน · เมนู
+   หน้า "เมนู" = สรุปวันนี้ + หมวด/กลุ่ม/ชื่อ เดียวกับเมนูซ้ายจอคอม (อ่านจาก SB_TREE)
+   มีผลเฉพาะจอ ≤700px (html.mb) · จอคอมไม่เปลี่ยน
+   ============================================================ */
+(function(){
+  var MB=window.MB; if(!MB) return;
+  var $=MB.$, S=MB.S, I=MB.I, pageOpen=false, landed=false;
+  function isAdm(){ return typeof curRole!=='undefined' && curRole==='admin'; }
+  function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function clean(t){ return String(t).replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,'').trim(); }
+  function idxOf(go){ var L=window.sbItems||[]; for(var i=0;i<L.length;i++) if(L[i].go===go) return i; return -1; }
+  var CAT_IC={0:'up',1:'down',2:'chart'};
+  function curIdx(){ var tp=document.querySelector('.tab-pane.active'); return tp?+tp.id.replace('tp',''):0; }
+  function pill(label,go,adm,group){
+    if(adm && !isAdm()) return '';
+    var i=idxOf(go); if(i<0) return '';
+    return '<button type="button" class="mbm-pill'+(group?' pg':'')+'" data-i="'+i+'">'+esc(label)+(adm?'<span class="ow">· เจ้าของ</span>':'')+'</button>';
+  }
+  function renderGroup(n,depth){
+    // เรียงตามลำดับเดิมของเมนูซ้าย: รายการติดกัน = แถวเดียว · กลุ่มย่อย = หัวข้อเล็ก
+    var out='', buf=[];
+    function flush(){ var h=buf.filter(Boolean).join(''); if(h) out+='<div class="mbm-pills">'+h+'</div>'; buf=[]; }
+    if(n.go) buf.push(pill('สรุป'+clean(n.g),n.go,!!(n.adm||n.goAdm),true));
+    n.kids.forEach(function(k){
+      if(Array.isArray(k)) buf.push(pill(k[0],k[1],!!k[2]));
+      else { flush(); out+=renderGroup(k,depth+1); }
+    });
+    flush();
+    if(!out) return '';
+    var head=depth>1?'<div class="mbm-grp">'+esc(clean(n.g))+(n.hint&&depth===2?' · '+esc(n.hint):'')+'</div>':'';
+    return head+out;
+  }
+  function render(){
+    var box=$('mbmTree'); if(!box) return;
+    var T=window.SB_TREE||[];
+    box.innerHTML='<div class="mbm-note">ชื่อและลำดับเดียวกับเมนูซ้ายบนจอคอม</div>'+T.map(function(c,ci){
+      if(c.adm && !isAdm()) return '';
+      var body=renderGroup({g:c.g,kids:c.kids},1); if(!body) return '';
+      return '<div class="mbm-cat"><div class="d">'+S(I[CAT_IC[ci]]||I.menu,16)+'</div>'+esc(clean(c.g))+'</div>'+body;
+    }).join('');
+  }
+  function build(){
+    if($('mbMenuPage')) return;
+    var pg=document.createElement('div'); pg.id='mbMenuPage'; pg.className='mbx';
+    pg.innerHTML='<div id="mbmHero"></div><div class="mbm-card" id="mbmTree"></div><button type="button" class="mbm-out" onclick="mbMenuClose();mbOpen(\'mbShAcct\')">บัญชีผู้ใช้ / ออกจากระบบ</button>';
+    document.body.appendChild(pg);
+    pg.addEventListener('click',function(e){
+      var b=e.target.closest('.mbm-pill'); if(!b) return;
+      mbMenuClose();
+      if(typeof sbRunIdx==='function') sbRunIdx(+b.dataset.i);
+    });
+  }
+  function moveHero(){
+    var h=document.querySelector('#mbHome .mb-hero, #mbmHero .mb-hero');
+    var dst=$('mbmHero'); if(h && dst && h.parentNode!==dst) dst.appendChild(h);
+  }
+  function topH(){ var t=$('mbTop'); if(t) document.documentElement.style.setProperty('--mb-top', t.getBoundingClientRect().bottom+'px'); }
+  window.mbMenuOpen=function(){
+    if(!MB.on()) { if(typeof mbOpen==='function') mbOpen('mbShMore'); return; }
+    build(); moveHero(); render(); topH();
+    pageOpen=true; document.documentElement.classList.add('mb-menu');
+    var t=$('mbTitle'); if(t) t.textContent='เมนู';
+    [].forEach.call(document.querySelectorAll('#mbNav button'),function(b){ b.classList.toggle('on', b.dataset.t==='more'); });
+    if(typeof mbClose==='function') try{ mbClose(); }catch(e){}
+    $('mbMenuPage').scrollTop=0;
+  };
+  window.mbMenuClose=function(){
+    if(!pageOpen) return; pageOpen=false; document.documentElement.classList.remove('mb-menu');
+    var n=curIdx(); if(typeof goTab==='function' && n){ /* คืนหัว/ไฮไลต์ของแท็บปัจจุบัน */
+      var TT={1:'ใบชั่ง ท่าทรายสังคม',2:'หักน้ำหนัก',3:'ใบแจ้งหนี้ลูกค้า',4:'สรุปผู้บริหาร',5:'ค่าเที่ยวรถร่วม',6:'เงินเดือน',7:'น้ำมัน',8:'รายจ่าย',9:'ลูกค้า',10:'ทรายแหล่งอื่น',11:'ขาย'};
+      var t=$('mbTitle'); if(t) t.textContent=TT[n]||'ท่าทราย ธนเศรษฐ์ศิริ';
+      [].forEach.call(document.querySelectorAll('#mbNav button'),function(b){ b.classList.toggle('on', b.dataset.t===String(n)); });
+    }
+  };
+  // แตะปุ่มเมนูล่างอื่น → ปิดหน้าเมนู
+  document.addEventListener('click',function(e){ var b=e.target.closest && e.target.closest('#mbNav button'); if(b && b.dataset.t!=='more') mbMenuClose(); },true);
+  // เปลี่ยนแท็บจากที่ไหนก็ตาม → ปิดหน้าเมนู
+  var _g=window.goTab; if(typeof _g==='function') window.goTab=function(n){ var r=_g.apply(this,arguments); if(pageOpen){ pageOpen=false; document.documentElement.classList.remove('mb-menu'); } return r; };
+  // ออกจากโหมดมือถือ → ปิดหน้าเมนู · เข้าโหมดมือถือ → วัดความสูงแถบบนใหม่
+  MB.onChange(function(on){ if(!on){ pageOpen=false; document.documentElement.classList.remove('mb-menu'); } else topH(); });
+  window.addEventListener('resize', function(){ if(pageOpen) topH(); });
+  // สิทธิ์เปลี่ยน → วาดเมนูใหม่
+  var _ar=window.applyRole; if(typeof _ar==='function') window.applyRole=function(){ var r=_ar.apply(this,arguments); if(pageOpen) render(); return r; };
+  // เปิดแอปบนมือถือ → เริ่มที่หน้า "ขาย"
+  function land(){ topH(); if(landed || !MB.on()) return; landed=true; try{ goTab(11); }catch(e){} }
+  var _sa=window.showApp; if(typeof _sa==='function') window.showApp=function(){ var r=_sa.apply(this,arguments); land(); return r; };
+  var ap=$('appScreen'); if(ap && ap.style.display==='flex') land();   // ล็อกอินค้างไว้ → แอปเปิดก่อนสคริปต์นี้โหลด
 })();
 </script>
 </body>
