@@ -12193,6 +12193,7 @@ html.mb .fx-opt{padding:11px 8px}
 })();
 </script>
 <style id="mb-css-nav">
+#mbMenuPage{display:none;}
 @media(max-width:700px){
 html.mb #mbNav{grid-template-columns:repeat(4,1fr)!important;}
 html.mb #mbHome .mb-sec{display:none;}                 /* เมนู 8 ช่องเดิมในหน้าใบชั่ง → ย้ายไปหน้า "เมนู" */
@@ -12260,7 +12261,7 @@ html.mb .mbm-out{margin-top:16px;width:100%;min-height:46px;border-radius:12px;b
   }
   function build(){
     if($('mbMenuPage')) return;
-    var pg=document.createElement('div'); pg.id='mbMenuPage'; pg.className='mbx';
+    var pg=document.createElement('div'); pg.id='mbMenuPage';   // ไม่ใช้ .mbx (html.mb .mbx บังคับแสดงตลอด)
     pg.innerHTML='<div id="mbmHero"></div><div class="mbm-card" id="mbmTree"></div><button type="button" class="mbm-out" onclick="mbMenuClose();mbOpen(\'mbShAcct\')">บัญชีผู้ใช้ / ออกจากระบบ</button>';
     document.body.appendChild(pg);
     pg.addEventListener('click',function(e){
@@ -12296,14 +12297,294 @@ html.mb .mbm-out{margin-top:16px;width:100%;min-height:46px;border-radius:12px;b
   // เปลี่ยนแท็บจากที่ไหนก็ตาม → ปิดหน้าเมนู
   var _g=window.goTab; if(typeof _g==='function') window.goTab=function(n){ var r=_g.apply(this,arguments); if(pageOpen){ pageOpen=false; document.documentElement.classList.remove('mb-menu'); } return r; };
   // ออกจากโหมดมือถือ → ปิดหน้าเมนู · เข้าโหมดมือถือ → วัดความสูงแถบบนใหม่
-  MB.onChange(function(on){ if(!on){ pageOpen=false; document.documentElement.classList.remove('mb-menu'); } else topH(); });
+  MB.onChange(function(on){ if(!on){ pageOpen=false; document.documentElement.classList.remove('mb-menu'); } else { topH(); buildNav(); } });
   window.addEventListener('resize', function(){ if(pageOpen) topH(); });
   // สิทธิ์เปลี่ยน → วาดเมนูใหม่
-  var _ar=window.applyRole; if(typeof _ar==='function') window.applyRole=function(){ var r=_ar.apply(this,arguments); if(pageOpen) render(); return r; };
+  var _ar=window.applyRole; if(typeof _ar==='function') window.applyRole=function(){ var r=_ar.apply(this,arguments); if(MB.on()) buildNav(); if(pageOpen) render(); return r; };
   // เปิดแอปบนมือถือ → เริ่มที่หน้า "ขาย"
-  function land(){ topH(); if(landed || !MB.on()) return; landed=true; try{ goTab(11); }catch(e){} }
+  // เมนูล่างตามสิทธิ์: เจ้าของ = สรุป·ขาย·เงินเดือน·เมนู · แอดมิน = ขาย·เงินเดือน·น้ำมัน·เมนู (เคาะ 26 ก.ย.69)
+  function navFor(){ return isAdm() ? [[4,'chart','สรุป'],[11,'box','ขาย'],[6,'pay','เงินเดือน']] : [[11,'box','ขาย'],[6,'pay','เงินเดือน'],[7,'fuel','น้ำมัน']]; }
+  var navSig='';
+  function buildNav(){
+    var nav=$('mbNav'); if(!nav) return;
+    var L=navFor(), sig=L.map(function(n){ return n[0]; }).join(',');
+    if(sig===navSig && nav.children.length===4) return; navSig=sig;
+    nav.innerHTML=L.map(function(n){ return '<button data-t="'+n[0]+'" onclick="goTab('+n[0]+')">'+S(I[n[1]],22)+'<span class="nl">'+n[2]+'</span></button>'; }).join('')
+      +'<button data-t="more" onclick="mbMenuOpen()">'+S(I.menu,22)+'<span class="nl">เมนู</span></button>';
+    var n=curIdx(); [].forEach.call(nav.querySelectorAll('button'),function(b){ b.classList.toggle('on', pageOpen ? b.dataset.t==='more' : b.dataset.t===String(n)); });
+  }
+  window.mbBuildNav=buildNav;
+  function land(){ topH(); buildNav(); if(landed || !MB.on()) return; landed=true; try{ goTab(isAdm()?4:11); }catch(e){} }
   var _sa=window.showApp; if(typeof _sa==='function') window.showApp=function(){ var r=_sa.apply(this,arguments); land(); return r; };
   var ap=$('appScreen'); if(ap && ap.style.display==='flex') land();   // ล็อกอินค้างไว้ → แอปเปิดก่อนสคริปต์นี้โหลด
+})();
+</script>
+
+<style id="mb-css-own">
+#mbOwn{display:none;}
+@media(max-width:700px){
+html.mb #tp4.active #mbOwn{display:block;}
+html.mb #tp4:not(.own-full) > :not(#mbOwn){display:none!important;}
+html.mb #mbOwn{padding:2px 0 8px;font-variant-numeric:tabular-nums;}
+html.mb .mo-d{font-size:13px;color:var(--m-muted,#8fa0ae);margin:4px 2px 8px;}
+html.mb .mo-b3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+html.mb .mo-b3 > div{background:#fff;border:1px solid var(--m-line,#e6ebee);border-radius:14px;padding:10px;font-size:11.5px;color:var(--m-text2,#48596a);min-width:0;}
+html.mb .mo-b3 b{display:block;font-size:19px;color:var(--m-text,#152029);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html.mb .mo-b3 small{font-size:10.5px;color:var(--m-muted,#8fa0ae);}
+html.mb .mo-b3 .cr b{color:#b5751d;}
+html.mb .mo-h{font-weight:800;font-size:15px;margin:4px 2px 8px;color:var(--m-text,#152029);}
+html.mb .mo-h small{font-weight:400;color:var(--m-muted,#8fa0ae);font-size:12px;margin-left:5px;}
+html.mb .mo-al{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--m-line,#e6ebee);border-left:4px solid #e0a458;border-radius:12px;padding:11px 12px;margin-bottom:8px;font-size:14px;line-height:1.4;color:var(--m-text,#152029);font-family:var(--font);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+html.mb .mo-al.rd{border-left-color:#c0392b;}
+html.mb .mo-al.gr{border-left-color:var(--m-green,#1a8a4a);}
+html.mb .mo-al .t{flex:1;min-width:0;}
+html.mb .mo-al small{display:block;color:var(--m-muted,#8fa0ae);font-size:11.5px;}
+html.mb .mo-al .go{color:var(--m-green,#1a8a4a);font-size:12.5px;font-weight:700;white-space:nowrap;}
+html.mb .mo-none{background:#fff;border:1px dashed var(--m-line,#e6ebee);border-radius:12px;padding:12px;font-size:13.5px;color:var(--m-green,#1a8a4a);margin-bottom:8px;}
+html.mb .mo-mon{background:#fff;border:1px solid var(--m-line,#e6ebee);border-radius:14px;padding:11px 12px;margin:12px 0 8px;font-size:13px;color:var(--m-text2,#48596a);}
+html.mb .mo-mon .r2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;}
+html.mb .mo-mon b{display:block;font-size:17px;color:var(--m-text,#152029);}
+html.mb .mo-mon .neg{color:#c0392b;} html.mb .mo-mon .pos{color:var(--m-green,#1a8a4a);}
+html.mb .mo-be{border:1px dashed #cfd6db;border-radius:14px;padding:10px 12px;font-size:12.5px;line-height:1.55;color:var(--m-text2,#48596a);background:#fafbfc;margin-bottom:10px;}
+html.mb .mo-be b{color:var(--m-text,#152029);}
+html.mb .mo-full{width:100%;min-height:44px;border-radius:12px;border:1px solid #dde2e6;background:#fff;color:var(--m-text2,#48596a);font-weight:700;font-size:14px;font-family:var(--font);}
+html.mb #tp4.own-full #mbOwn{margin-bottom:14px;}
+}
+</style>
+<script id="mb-js-own">
+/* ============================================================
+   หน้าสรุปเจ้าของบนมือถือ (26 ก.ย. 2569 · แบบ C + การ์ดพ้นทุนของ A ไว้ล่าง)
+   วันนี้ 3 ตัวเลข + "ต้องจัดการ" (แตะแล้วไปหน้านั้น) + เดือนนี้ย่อ
+   มีผลเฉพาะจอ ≤700px (html.mb) · จอคอมเห็นหน้าสรุปเดิมทุกอย่าง
+   ============================================================ */
+(function(){
+  var MB=window.MB; if(!MB) return;
+  var TM=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  var TD=['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
+  var pay={key:'',at:0,v:null,busy:false}, inv={at:0,v:null,busy:false}, tmr=null;
+  function $(id){ return document.getElementById(id); }
+  function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function n0(v){ return Math.round(v||0).toLocaleString('th-TH'); }
+  function n1(v){ return (Math.round((v||0)*10)/10).toLocaleString('th-TH',{maximumFractionDigits:1}); }
+  function today(){ return (typeof thaiTodayYMD==='function')?thaiTodayYMD():((typeof todayYMD==='function')?todayYMD():new Date().toISOString().slice(0,10)); }
+  function addDays(ymd,k){ var d=new Date(ymd+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+k); return d.toISOString().slice(0,10); }
+  function dim(ym){ var p=ym.split('-'); return new Date(Date.UTC(+p[0],+p[1],0)).getUTCDate(); }
+  function thDate(ymd,wd){ var d=new Date(ymd+'T00:00:00Z'); return (wd?TD[d.getUTCDay()]+' ':'')+d.getUTCDate()+' '+TM[d.getUTCMonth()+1]; }
+  function daysBetween(a,b){ return Math.round((new Date(b+'T00:00:00Z')-new Date(a+'T00:00:00Z'))/864e5); }
+  function db_(){ return (typeof prDb==='function')?prDb():db; }
+  function visible(){ var tp=$('tp4'); return MB.on() && tp && tp.classList.contains('active'); }
+
+  /* ── วันนี้: คิว/เที่ยว/เงินเข้า/ลงบัญชี ── */
+  function todayNums(T){
+    var trips=0, cubic=0, recv=0, credit=0;
+    (typeof wData!=='undefined'?wData:[]).forEach(function(r){
+      if(r.date!==T) return; trips++;
+      cubic+=Math.max(0,(r.kg/KPC)-((typeof dData!=='undefined'&&dData[r._id])?dData[r._id]:0));
+      var a=(typeof sandRevOf==='function')?sandRevOf(r):0;
+      if(r.pay_method==='ลงบัญชี') credit+=a; else recv+=a;
+    });
+    (typeof osBills!=='undefined'?osBills:[]).forEach(function(b){
+      if(!b||b.status==='cancelled'||b.date!==T) return; var a=b.grandTotal||0;
+      if(b.pay==='credit') credit+=a; else recv+=a;
+    });
+    return {trips:trips,cubic:cubic,recv:recv,credit:credit};
+  }
+
+  /* ── ใบชั่ง 7 วันล่าสุดที่ยังไม่มีราคา ── */
+  function unpriced(T){
+    var from=addDays(T,-6), n=0, days={};
+    (typeof wData!=='undefined'?wData:[]).forEach(function(r){
+      var d=r.date||''; if(d<from||d>T) return;
+      if(r.sale_unit==='เหมา'){ if(!(r.sale_amount>0)){ n++; days[d]=1; } return; }
+      if(r.sale_unit==='ตัก' && !(r.scoop>0)){ n++; days[d]=1; return; }
+      if(!(r.price>0)){ n++; days[d]=1; }
+    });
+    return {n:n,days:Object.keys(days).length};
+  }
+
+  /* ── น้ำมันในถัง (ใช้ข้อมูลหน้าน้ำมัน) ── */
+  function tank(T){
+    if(typeof fuelInData==='undefined'||typeof calcFuelStock!=='function') return null;
+    if(typeof fuelUnIn!=='undefined' && !fuelUnIn && typeof initFuelTab==='function'){ try{ initFuelTab(); }catch(e){} return null; }
+    if(!fuelInData.length) return null;
+    var rem=calcFuelStock().remaining||0, from=addDays(T,-7), used=0;
+    (typeof fuelOutData!=='undefined'?fuelOutData:[]).forEach(function(r){ if(r.date>=from && r.date<T) used+=(r.liters||0); });
+    var perDay=used/7;
+    return {rem:rem, perDay:perDay, days:perDay>0?rem/perDay:null};
+  }
+
+  /* ── วันจ่ายเงินเดือน (15 / สิ้นเดือน) ภายใน 3 วัน → ยอดต้องเตรียม (สูตรเดียวกับตัวเตือน Telegram) ── */
+  function nextPayday(T){
+    var ym=T.slice(0,7), d=+T.slice(8,10), last=dim(ym);
+    if(d<=15) return {date:ym+'-15', ym:ym, period:'1-15', start:1, end:15};
+    return {date:ym+'-'+last, ym:ym, period:'16-end', start:16, end:last};
+  }
+  function loadPay(P){
+    var key=P.ym+'|'+P.period;
+    if(pay.busy || (pay.key===key && Date.now()-pay.at<5*60e3)) return;
+    pay.busy=true;
+    var empP=(typeof prEmployees!=='undefined' && prEmployees && prEmployees.length)?Promise.resolve(prEmployees)
+      : db_().collection('employees').get().then(function(s){ return s.docs.map(function(d){ return Object.assign({id:d.id},d.data()); }); });
+    Promise.all([empP, db_().collection('attendance').where('month','==',P.ym).get(), db_().collection('withdrawals').where('month','==',P.ym).get()])
+    .then(function(R){
+      var att={}; R[1].forEach(function(dc){ var x=dc.data(); att[x.date+'_'+x.empId]=x; });
+      var wds=R[2].docs.map(function(d){ return d.data(); }), days=dim(P.ym), cash=0, people=0, filled=false;
+      R[1].forEach(function(dc){ var x=dc.data(); if(x.date && +x.date.slice(8,10)>=P.start && +x.date.slice(8,10)<=P.end) filled=true; });
+      (R[0]||[]).forEach(function(e){
+        if(!e.active) return; var earned=0, unit=(e.type==='daily')?(e.rate||0):((e.rate||0)/days);
+        for(var d=P.start; d<=P.end; d++){
+          var r=att[P.ym+'-'+String(d).padStart(2,'0')+'_'+e.id]; if(!r||!r.type||r.type==='absent') continue;
+          var base=r.type==='full'?unit:r.type==='half'?unit/2:r.type==='hours'?unit*((r.hours||0)/8):0, sp=0;
+          (r.specialWork||[]).forEach(function(s){ sp+=s.amount||0; });
+          earned+=Math.round((base+sp)*100)/100;
+        }
+        var taken=0; wds.forEach(function(w){ if(w.empId===e.id && w.period===P.period) taken+=w.amount||0; });
+        var social=(P.period==='16-end' && e.socialSecurity===true)?875:0, pend=earned-social-taken;
+        if(earned<=0 && taken<=0) return;
+        if(pend>0){ cash+=pend; people++; }
+      });
+      pay.v={cash:cash,people:people,filled:filled}; pay.key=key; pay.at=Date.now();
+    }).catch(function(e){ console.warn('mbOwn pay',e); pay.v={err:true}; pay.key=key; pay.at=Date.now(); })
+    .then(function(){ pay.busy=false; sched(); });
+  }
+
+  /* ── ใบแจ้งหนี้ที่ยัง "รอวางบิล" ── */
+  function loadInv(){
+    if(inv.busy || Date.now()-inv.at<5*60e3) return;
+    inv.busy=true;
+    db_().collection('invoices').where('status','==','pending').get().then(function(s){
+      var n=0, tot=0, oldest='';
+      s.forEach(function(d){ var v=d.data(); n++; tot+=v.grandTotal||0; var c=String(v.createdAt||'').slice(0,10); if(c && (!oldest||c<oldest)) oldest=c; });
+      inv.v={n:n,tot:tot,oldest:oldest};
+    }).catch(function(e){ console.warn('mbOwn inv',e); inv.v=null; })
+    .then(function(){ inv.at=Date.now(); inv.busy=false; sched(); });
+  }
+
+  function alertHtml(cls,title,sub,go,tab){
+    return '<button type="button" class="mo-al '+cls+'" data-tab="'+tab+'"><span class="t">'+title+'<small>'+sub+'</small></span><span class="go">'+go+' ›</span></button>';
+  }
+
+  function render(){
+    tmr=null;
+    var box=$('mbOwn'); if(!box || !visible()) return;
+    var T=today(), N=todayNums(T), A=[];
+    // 1) ใบชั่งไม่มีราคา
+    var U=unpriced(T);
+    if(U.n) A.push({w:2,h:alertHtml('','ใบชั่งยังไม่ใส่ราคา '+U.n+' ใบ','7 วันล่าสุด ('+U.days+' วัน) · ยอดขายยังเป็นค่าประมาณ','ดู',1)});
+    // 2) น้ำมัน
+    var K=tank(T);
+    if(K){
+      var dl=K.days, low=K.rem<1000||(dl!==null&&dl<=1), mid=K.rem<2000||(dl!==null&&dl<=3);
+      A.push({w:low?3:mid?2:0,h:alertHtml(low?'rd':mid?'':'gr','น้ำมันในถังเหลือ '+n0(K.rem)+' ลิตร',
+        K.perDay>0?('ใช้เฉลี่ยวันละ ~'+n0(K.perDay)+' ลิตร (7 วัน) → พอ ~'+n1(dl)+' วัน'):'7 วันที่ผ่านมาไม่มีเบิก','ดู',7)});
+    }
+    // 3) วันจ่ายเงินเดือน (เหลือ ≤3 วัน)
+    var P=nextPayday(T), left=daysBetween(T,P.date);
+    if(left<=3){
+      loadPay(P);
+      var lbl=(left===0?'วันนี้':thDate(P.date))+' จ่ายเงินเดือน งวด '+(P.period==='1-15'?'1–15':'16–'+P.end);
+      var v=(pay.key===P.ym+'|'+P.period)?pay.v:null, sub='กำลังคำนวณ…';
+      if(v && v.err) sub='คำนวณยอดไม่สำเร็จ — ดูที่หน้าเงินเดือน';
+      else if(v) sub='ต้องเตรียมเงินสด ~'+n0(v.cash)+' ฿ · '+v.people+' คน'+(v.filled?'':' · ยังไม่มีใบลงเวลางวดนี้');
+      A.push({w:left===0?2:1,h:alertHtml(left===0?'':'gr',lbl,sub,'ดู',6)});
+    }
+    // 4) ใบแจ้งหนี้รอวางบิล
+    loadInv();
+    if(inv.v && inv.v.n){
+      var age=inv.v.oldest?daysBetween(inv.v.oldest,T):0;
+      A.push({w:age>=7?2:1,h:alertHtml(age>=7?'':'gr','ใบแจ้งหนี้รอวางบิล '+inv.v.n+' ใบ','รวม '+n0(inv.v.tot)+' ฿'+(inv.v.oldest?' · เก่าสุด '+age+' วัน':''),'ดู',3)});
+    }
+    A.sort(function(a,b){ return b.w-a.w; });
+    var urgent=A.filter(function(a){ return a.w>=2; }).length;
+
+    // เดือนนี้ (อ่านจากการ์ด KPI ของหน้าสรุปเดิม ให้ตัวเลขตรงกันเสมอ)
+    var tx=function(id){ var e=$(id); return e?e.textContent.trim():'–'; };
+    var pf=tx('k4profit'), neg=/^[−-]/.test(pf);
+    var m=+T.slice(5,7), full=$('tp4').classList.contains('own-full');
+
+    box.innerHTML=
+      '<div class="mo-d">วันนี้ '+thDate(T,true)+' · อัปเดต '+new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})+'</div>'
+     +'<div class="mo-b3"><div>ทรายออก<b>'+n1(N.cubic)+'</b><small>คิว · '+N.trips+' เที่ยว</small></div>'
+     +'<div>เงินเข้า<b>'+n0(N.recv)+'</b><small>สด+โอน</small></div>'
+     +'<div class="cr">ลงบัญชี<b>'+n0(N.credit)+'</b><small>ยังไม่ได้เงิน</small></div></div>'
+     +'<div class="mo-h">ต้องจัดการ <small>'+(urgent?urgent+' เรื่อง':'')+'</small></div>'
+     +(A.length?A.map(function(a){ return a.h; }).join(''):'<div class="mo-none">✓ ไม่มีเรื่องต้องจัดการ</div>')
+     +'<div class="mo-mon">เดือนนี้ ('+TM[m]+')<div class="r2"><div>รายได้<b>'+esc(tx('k4rev'))+'</b></div>'
+     +'<div>กำไร/ขาดทุน<b class="'+(neg?'neg':'pos')+'">'+esc(pf)+'</b></div></div></div>'
+     +'<div class="mo-be"><b>จุดคุ้มทุนรายเดือน</b> — จะเปิดเมื่อกรอกรายจ่ายประจำครบ: ดอกเบี้ย/เงินกู้ · ค่างวดรถ · ค่าสัมปทาน</div>'
+     +'<button type="button" class="mo-full" onclick="mbOwnFull()">'+(full?'ซ่อนสรุปแบบเต็ม':'ดูสรุปแบบเต็ม (กราฟ/ตาราง)')+'</button>';
+  }
+  function sched(){ if(!tmr) tmr=setTimeout(render,250); }
+
+  function build(){
+    var tp=$('tp4'); if(!tp || $('mbOwn')) return;
+    var d=document.createElement('div'); d.id='mbOwn'; tp.insertBefore(d,tp.firstChild);
+    d.addEventListener('click',function(e){
+      var b=e.target.closest('.mo-al'); if(!b) return;
+      var n=+b.dataset.tab; if(typeof goTab==='function') goTab(n);
+      window.scrollTo(0,0);
+    });
+  }
+  window.mbOwnFull=function(){ var tp=$('tp4'); if(!tp) return; tp.classList.toggle('own-full'); render();
+    if(tp.classList.contains('own-full') && typeof draw4==='function'){ try{ draw4(); }catch(e){} } };
+
+  build();
+  var _g=window.goTab; if(typeof _g==='function') window.goTab=function(n){ var r=_g.apply(this,arguments); if(n===4){ build(); pay.at=0; inv.at=0; sched(); } return r; };
+  /* มือถือเปิดแอปมาที่หน้าสรุปก่อนข้อมูลใบชั่งมาถึง → วาดหน้าสรุปเดิมใหม่ 1 ครั้งเมื่อข้อมูลมาครบ */
+  var hadW=false, _k=window.kpi;
+  if(typeof _k==='function') window.kpi=function(){ var r=_k.apply(this,arguments);
+    if(!hadW && typeof wData!=='undefined' && wData.length){ hadW=true; if(visible() && typeof draw4==='function'){ try{ draw4(); }catch(e){} } }
+    return r; };
+  ['kpi','draw4Dirt','updateFuelStockDisplay'].forEach(function(fn){
+    var f=window[fn]; if(typeof f!=='function') return;
+    window[fn]=function(){ var r=f.apply(this,arguments); if(visible()) sched(); return r; };
+  });
+  /* ตัวเลขเดือนนี้ในการ์ด KPI เดิมอัปเดตแบบ async → เฝ้าดูแล้ววาดใหม่ */
+  ['k4rev','k4profit'].forEach(function(id){ var e=$(id); if(e && window.MutationObserver) new MutationObserver(function(){ if(visible()) sched(); }).observe(e,{childList:true,characterData:true,subtree:true}); });
+  MB.onChange(function(on){ if(on) sched(); });
+  setInterval(function(){ if(visible() && !document.hidden) sched(); }, 60e3);
+})();
+</script>
+
+<script id="ux26-lock">
+/* ============================================================
+   ล็อกเมื่อไม่ได้ใช้นานเกินไป (เคาะ 26 ก.ย.69 ทางเลือก ข) — เจ้าของ 30 นาที · แอดมิน 1 ชม. · ทุกขนาดจอ
+   - เปิดแอปใหม่หลังทิ้งไว้เกิน 30 นาที → ถามรหัสใหม่
+   - เปิดค้างไว้แต่ไม่แตะ/ไม่พิมพ์เกิน 30 นาที → ถามรหัสใหม่
+   ============================================================ */
+(function(){
+  // เจ้าของ 30 นาที · แอดมิน/พนักงาน 1 ชั่วโมง (เคาะ 26 ก.ย.69)
+  var KEY='thn_lastActive', last=Date.now(), locked=false;
+  function idleMs(){ var e=(typeof curEmail!=='undefined'&&curEmail)||''; return e==='admin@sand.local' ? 30*60*1000 : 60*60*1000; }
+  function rd(){ try{ var v=+localStorage.getItem(KEY); return v>0?v:0; }catch(e){ return 0; } }
+  function wr(t){ try{ localStorage.setItem(KEY,String(t)); }catch(e){} }
+  function appOn(){ var a=document.getElementById('appScreen'); return a && a.style.display==='flex'; }
+  function lock(){
+    if(locked) return; locked=true;
+    try{ if(typeof mbClose==='function') mbClose(); }catch(e){}
+    try{ if(typeof mbMenuClose==='function') mbMenuClose(); }catch(e){}
+    try{ if(typeof doLogout==='function') doLogout(); else firebase.auth().signOut(); }catch(e){}
+    // ล้างข้อมูลบนจอทั้งหมด → เริ่มที่หน้าใส่รหัส (รีโหลดครั้งเดียว กันวนถ้าออกจากระบบไม่สำเร็จ)
+    var once=false; try{ once=sessionStorage.getItem('thn_lockReload')==='1'; }catch(e){}
+    if(!once){ try{ sessionStorage.setItem('thn_lockReload','1'); }catch(e){} setTimeout(function(){ try{ location.reload(); }catch(e){} }, 400); }
+    else { try{ document.getElementById('appScreen').style.display='none'; if(typeof showPin==='function') showPin(); }catch(e){} }
+  }
+  function touch(){ var t=Date.now(); if(t-last>15000){ last=t; wr(t); } else last=t; }
+  ['pointerdown','keydown','touchstart','wheel'].forEach(function(ev){ document.addEventListener(ev, touch, {passive:true, capture:true}); });
+  // เปิดแอปมาแล้วเจอว่าล็อกอินค้างไว้ แต่ห่างจากการใช้ครั้งล่าสุดเกิน 30 นาที → ไม่เข้าแอป ให้ใส่รหัสใหม่
+  var _sa=window.showApp;
+  if(typeof _sa==='function') window.showApp=function(){
+    var prev=rd();
+    if(prev && Date.now()-prev>idleMs() && !window.__justPinned){ lock(); return; }
+    window.__justPinned=false; last=Date.now(); wr(last); try{ sessionStorage.removeItem('thn_lockReload'); }catch(e){}
+    return _sa.apply(this,arguments);
+  };
+  // ใส่รหัสถูก → ไม่ต้องเช็กเวลาเก่า
+  var _tp=window.tryPin;
+  if(typeof _tp==='function') window.tryPin=function(){ window.__justPinned=true; wr(Date.now()); return _tp.apply(this,arguments); };
+  // กลับมาดูแอปหลังสลับไปแอปอื่น / เปิดค้างไว้
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && appOn() && Date.now()-Math.max(last,rd())>idleMs()) lock(); });
+  setInterval(function(){ if(appOn() && Date.now()-Math.max(last,rd())>idleMs()) lock(); }, 60000);
 })();
 </script>
 </body>

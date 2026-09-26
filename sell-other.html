@@ -1508,5 +1508,10 @@ html.smb .billrow .acts button{padding:7px 10px;font-size:13px;}
   apply();
 })();
 </script>
+<script id="ux26-active">
+/* บอกหน้าหลักว่ายังใช้งานอยู่ (กันล็อกอัตโนมัติ 30 นาทีขณะออกบิลในกรอบ) */
+(function(){ var t0=0; function f(){ var t=Date.now(); if(t-t0>15000){ t0=t; try{ localStorage.setItem('thn_lastActive',String(t)); }catch(e){} } }
+  ['pointerdown','keydown','touchstart'].forEach(function(ev){ document.addEventListener(ev,f,{passive:true,capture:true}); }); })();
+</script>
 </body>
 </html>
