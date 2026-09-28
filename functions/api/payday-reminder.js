@@ -9,6 +9,7 @@
 //   นับเฉพาะคนที่ยอดเป็นบวก (คนติดลบไม่นับ)
 // 26 ก.ย. 2569: เพิ่มรายชื่อ + ยอดที่ต้องรับรายคน และรายชื่อคนติดลบ (กลุ่มมีแต่เจ้าของ)
 // ?force=1 บังคับส่ง (ไว้ทดสอบ) · ?debug=1 ไม่ส่ง คืน JSON ให้ดู · ?date=YYYY-MM-DD ย้อนวัน
+// 28 ก.ย. 2569: สามตัวนี้ต้องแนบ &key=<รหัสแอดมิน> ไม่งั้นตอบ 401
 // ============================================================
 
 const GROUP_CHAT_ID = '-5450363615';
@@ -31,6 +32,10 @@ async function handle(context) {
   const force = url.searchParams.get('force') === '1';
   const debug = url.searchParams.get('debug') === '1';
   const dateQ = url.searchParams.get('date');
+  // 28 ก.ย. 2569: โหมดทดสอบ/บังคับ/ย้อนวัน ต้องมีรหัสแอดมิน (กันคนนอกดูชื่อ-ยอดเงิน หรือสั่งยิงซ้ำ)
+  if ((force || debug || url.searchParams.has('date')) && !(await adminOk(request, url))) {
+    return json({ ok: false, error: 'unauthorized' }, 401);
+  }
   try {
     const token = env.TELEGRAM_BOT_TOKEN;
     if (!token && !debug) return json({ ok: false, error: 'no token' }, 500);
@@ -64,7 +69,7 @@ async function handle(context) {
     await setDoc(idToken, 'app_meta', 'notify_payday', {
       lastSent: { stringValue: today }, sentAt: { stringValue: new Date().toISOString() }
     }).catch(function () {});
-    return json({ ok: true, sent: today, period, cash: out.cash, people: out.people, negative: out.negative, errors: ERRS });
+    return json({ ok: true, sent: today, period, errors: ERRS.length });   // 28 ก.ย.: ไม่คืนยอดเงิน/จำนวนคนให้คนนอกเห็น
   } catch (e) {
     return json({ ok: false, error: String((e && e.message) || e), errors: ERRS }, 500);
   }
@@ -213,6 +218,20 @@ async function tgSend(token, chatId, text) {
   });
   let j = null; try { j = await r.json(); } catch (e) {}
   if (!r.ok || !j || !j.ok) throw new Error('telegram send fail ' + r.status + ' ' + ((j && j.description) || ''));   // ไม่บันทึกว่าส่งแล้ว → รอบ 15:00 ลองใหม่
+}
+
+// ---------- รหัสแอดมิน (28 ก.ย. 2569) ----------
+// ?debug=1 / ?force=1 / ?date=... ใช้ได้เฉพาะคนที่แนบรหัส: ?key=<รหัส> หรือหัว x-admin-key
+// repo นี้เป็นสาธารณะ จึงเก็บแค่ sha256 ของรหัส (รหัสจริงเจ้าของเก็บเอง) ถ้าจะเปลี่ยนรหัส: สร้างใหม่แล้วเอา sha256 มาแทน
+const ADMIN_KEY_SHA256 = '6c168459ac88af2c58dd57a45d0d19501fefe96db75600e1b8d957a926109203';
+async function adminOk(request, url) {
+  const k = request.headers.get('x-admin-key') || url.searchParams.get('key') || '';
+  if (k.length < 32) return false;
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(k));
+  const hex = Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  let diff = hex.length ^ ADMIN_KEY_SHA256.length;
+  for (let i = 0; i < hex.length && i < ADMIN_KEY_SHA256.length; i++) diff |= hex.charCodeAt(i) ^ ADMIN_KEY_SHA256.charCodeAt(i);
+  return diff === 0;
 }
 
 // ---------- helpers ----------
