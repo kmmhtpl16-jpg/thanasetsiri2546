@@ -75,6 +75,12 @@ async function runQuery(idToken, structuredQuery) {
     const msg = (arr && arr.error && ((arr.error.status || '') + ' ' + (arr.error.message || ''))) || ('HTTP ' + r.status);
     throw new Error(msg.trim());
   }
+  // 30 ก.ย. 2569: Firestore ส่ง error มาในรูป array [{error:{...}}] ได้ (HTTP ไม่ 200) — เดิมถูกนับเป็น 0 แถวเงียบ ๆ
+  const bad = arr.find(function (x) { return x && x.error; });
+  if (bad || !r.ok) {
+    const e = (bad && bad.error) || {};
+    throw new Error(((e.status || ('HTTP ' + r.status)) + ' ' + (e.message || '')).trim());
+  }
   return arr.filter(function (x) { return x.document; }).map(function (x) { return x.document; });
 }
 
@@ -216,14 +222,23 @@ async function buildSummary(idToken, today) {
 
   // ⬇️ กันเคส "ศูนย์เงียบ"
   const emptyAll = (weigh.length === 0 && obills.length === 0 && exN === 0 && wdN === 0 && feN === 0 && fin.length === 0);
+  let out_latest = null;
+  if (emptyAll && !ERRS.length) {
+    try {
+      const last = await runQuery(idToken, { from: [{ collectionId: 'weighings' }], orderBy: [{ field: { fieldPath: 'date' }, direction: 'DESCENDING' }], limit: 1 });
+      out_latest = last.length ? fval(last[0], 'date') : null;
+    } catch (e) { /* ไม่สำคัญ ข้ามได้ */ }
+  }
   if (ERRS.length) {
     L.push('');
     L.push('⚠️ <b>อ่านข้อมูลไม่สำเร็จ — ตัวเลขข้างบนไม่ครบ</b>');
     ERRS.slice(0, 6).forEach(function (e) { L.push('   • ' + e); });
   } else if (emptyAll) {
     L.push('');
-    L.push('⚠️ <b>วันนี้ไม่พบข้อมูลเลยสักหมวด</b>');
-    L.push('   ถ้าในแอปมีรายการอยู่ แปลว่าบัญชีบอท (admin@sand.local) อ่าน Firestore ไม่ได้ → ตรวจ security rules');
+    // 30 ก.ย. 2569: เดิมโทษ security rules ซึ่งผิด — อ่านได้ปกติแต่ไม่มีรายการของวันนี้บน server
+    L.push('⚠️ <b>วันนี้ยังไม่มีรายการขาย/รายจ่าย/น้ำมันขึ้นระบบ</b>');
+    L.push('   (บอทอ่านข้อมูลได้ปกติ ไม่มี error) ถ้าบันทึกแล้วแต่ไม่ขึ้น ให้เปิดแอปบนเครื่องที่บันทึกตอนมีเน็ตเพื่อ sync');
+    if (out_latest) L.push('   เที่ยวชั่งล่าสุดในระบบ: ' + beDate(out_latest) + ' — ถ้าเก่า แปลว่ายังไม่ได้นำเข้าไฟล์ตาชั่ง');
   }
 
   return {

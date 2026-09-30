@@ -154,6 +154,7 @@ async function buildMessage(idToken, ym, period, day, last) {
   }
   L.push('');
   L.push('เปิดแอป → เงินเดือน → สรุปเงินเดือน (ตามงวด)');
+  L.push('🔗 https://thanasetsiri2546.pages.dev');   // 30 ก.ย. 2569: แนบลิงก์แอป
   if (ERRS.length) {
     L.push('');
     L.push('⚠️ <b>อ่านข้อมูลไม่ครบ — ตัวเลขอาจไม่ตรง</b>');
