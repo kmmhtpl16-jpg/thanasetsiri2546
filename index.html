@@ -1323,6 +1323,7 @@ select{color-scheme:light;}
         <div class="filter-row" style="margin-bottom:20px;">
           <label>เดือน</label>
           <input type="month" id="sumMonth" class="filter-input" oninput="renderPayrollSummary()">
+          <button class="btn btn-ghost" onclick="exportPayrollPDF()" style="margin-left:auto;padding:6px 14px">🖨️ พิมพ์ / PDF</button>
         </div>
         <div id="payrollSumContent"></div>
       </div>
@@ -3193,56 +3194,96 @@ async function renderPayrollSummary() {
     </div>`;
 }
 
-function exportPayrollPDF() {
+async function exportPayrollPDF() {
+  // เปิดหน้าต่างก่อน (กันเบราว์เซอร์บล็อก popup) แล้วค่อยโหลดข้อมูล
+  const w = window.open('', '_blank');
+  if (!w) { alert('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ — กรุณาอนุญาต popup ของเว็บนี้'); return; }
+  w.document.write('<p style="font-family:sans-serif;padding:24px">กำลังเตรียมเอกสาร...</p>');
+
   const ym = document.getElementById('sumMonth').value || currentYM();
+  await prLoadAttendance(ym);
+  await prLoadWithdrawals(ym);
+
   const [y, m] = ym.split('-');
   const thaiMonths = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   const monthName = thaiMonths[parseInt(m)] + ' ' + (parseInt(y) + 543);
+  const f = n => (n||0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dash = (n, cls) => n ? `<td class="r ${cls||''}">${f(n)}</td>` : '<td class="c">–</td>';
+
   const active = prEmployees.filter(e => e.active);
-  let rows = '', totalAll = 0;
-  active.forEach(emp => {
+  const T = { e1:0, e2:0, sp:0, gross:0, soc:0, wd:0, left:0, net:0 };
+  let rows = '';
+  active.forEach((emp, i) => {
     const e1 = calcPeriodEarned(emp.id, ym, '1-15');
     const e2 = calcPeriodEarned(emp.id, ym, '16-end');
-    const total = e1 + e2;
-    const social = emp.socialSecurity ? 875 : 0;
-    const net = total - social;
-    totalAll += net;
-    const wDays = (() => {
-      const days = daysInMonth(ym); let count = 0;
-      for (let d = 1; d <= days; d++) {
-        const r = prAttendance[ym + '-' + String(d).padStart(2,'0') + '_' + emp.id];
-        if (r && r.type && r.type !== 'absent') count++;
-      }
-      return count;
-    })();
-    let specialTotal = 0;
-    (emp.specialRoles||[]).forEach(() => {});
-    rows += `<tr><td>${emp.nickname}</td><td style="text-align:center">${wDays}</td>
-      <td style="text-align:right">${total.toLocaleString('th-TH')}</td>
-      <td style="text-align:right;color:#8b5cf6">${specialTotal > 0 ? specialTotal.toLocaleString('th-TH') : '–'}</td>
-      <td style="text-align:right;color:#ef4444">${social > 0 ? '875' : '–'}</td>
-      <td style="text-align:right;font-weight:700">${net.toLocaleString('th-TH')}</td></tr>`;
+    const gross = e1 + e2;
+    const wd = totalWithdrawn(emp.id, ym, '1-15') + totalWithdrawn(emp.id, ym, '16-end');
+    const soc = emp.socialSecurity ? 875 : 0;
+    const left = gross - soc - wd;
+    let sp = 0, wDays = 0;
+    const days = daysInMonth(ym);
+    for (let d = 1; d <= days; d++) {
+      const r = prAttendance[ym + '-' + String(d).padStart(2,'0') + '_' + emp.id];
+      if (r && r.type && r.type !== 'absent') wDays++;
+      if (emp.specialRoles && emp.specialRoles.length && r && r.specialWork) r.specialWork.forEach(sw => { sp += sw.amount || 0; });
+    }
+    T.e1+=e1; T.e2+=e2; T.sp+=sp; T.gross+=gross; T.soc+=soc; T.wd+=wd; T.left+=left; T.net+=gross-soc;
+    rows += `<tr><td class="c">${i+1}</td><td>${emp.nickname}</td><td class="c">${wDays}</td>
+      <td class="r">${f(e1)}</td><td class="r">${f(e2)}</td>${dash(sp)}
+      <td class="r b">${f(gross)}</td>${dash(soc,'red')}<td class="r">${f(wd)}</td>
+      <td class="r b ${left<0?'red':''}">${f(left)}</td></tr>`;
   });
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>เงินเดือน ${monthName}</title>
-    <style>body{font-family:Sarabun,sans-serif;padding:24px;font-size:13px}table{width:100%;border-collapse:collapse}
-    th{background:#1e2235;color:#e8ecf4;padding:8px;text-align:left}td{padding:7px 8px;border-bottom:1px solid #eee}
-    @media print{button{display:none}}</style>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
-    </head><body>
-    <h2>สรุปเงินเดือนพนักงาน — ${monthName}</h2>
-    <p style="color:#666">หจก.ธนเศรษฐ์ศิริ 2546</p>
-    <table><thead><tr><th>ชื่อ</th><th>วันทำงาน</th><th style="text-align:right">ค่าแรง (฿)</th>
-      <th style="text-align:right">งานพิเศษ</th><th style="text-align:right">หักปกส</th>
-      <th style="text-align:right">รับสุทธิ (฿)</th></tr></thead>
-    <tbody>${rows}</tbody>
-    <tfoot><tr><td colspan="5" style="font-weight:700">รวมรายจ่ายบริษัท</td>
-      <td style="text-align:right;font-weight:700;color:#137a3a">${totalAll.toLocaleString('th-TH')}</td></tr></tfoot>
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>สรุปเงินเดือน ${monthName}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      @page{size:A4 portrait;margin:12mm}
+      body{font-family:Sarabun,sans-serif;font-size:11pt;color:#222;margin:0;padding:16px}
+      .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #6c63b6;padding-bottom:8px;margin-bottom:14px}
+      .hd h1{font-size:16pt;margin:0;color:#6c63b6}.hd .co{font-size:10pt;color:#555;line-height:1.5}
+      table{width:100%;border-collapse:collapse;font-size:10pt}
+      th{background:#6c63b6;color:#fff;padding:6px 5px;font-weight:600;border:1px solid #6c63b6}
+      td{padding:5px;border:1px solid #ddd}
+      tbody tr:nth-child(even) td{background:#f7f6fc}
+      tfoot td{font-weight:700;background:#eeecf8;border-top:2px solid #6c63b6}
+      .r{text-align:right;font-variant-numeric:tabular-nums}.c{text-align:center}.b{font-weight:700}.red{color:#c62828}
+      .sum{display:flex;gap:10px;margin:14px 0 0}
+      .sum>div{flex:1;border:1px solid #ddd;border-radius:6px;padding:6px 10px}
+      .sum .l{font-size:9pt;color:#666}.sum .v{font-size:12pt;font-weight:700}
+      .sign{display:flex;justify-content:space-around;margin-top:48px;text-align:center;font-size:10pt}
+      .sign span{display:block;border-bottom:1px dotted #888;width:170px;margin:0 auto 4px;height:28px}
+      .ft{margin-top:20px;color:#999;font-size:8pt}
+      .bar{margin-bottom:12px}
+      .bar button{padding:7px 18px;background:#6c63b6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:11pt}
+      @media print{.bar{display:none}body{padding:0}tr{page-break-inside:avoid}}
+    </style></head><body>
+    <div class="bar"><button onclick="window.print()">🖨️ พิมพ์ / บันทึก PDF</button></div>
+    <div class="hd">
+      <div><h1>สรุปเงินเดือนพนักงาน</h1><div class="co">ประจำเดือน ${monthName} · ${active.length} คน</div></div>
+      <div class="co" style="text-align:right">ห้างหุ้นส่วนจำกัด ธนเศรษฐ์ศิริ 2546</div>
+    </div>
+    <table>
+      <thead><tr><th>ที่</th><th>พนักงาน</th><th>วันทำงาน</th><th>ค่าแรงรอบ 1</th><th>ค่าแรงรอบ 2</th>
+        <th>งานพิเศษ</th><th>รวมค่าแรง</th><th>หักปกส</th><th>เบิกไปแล้ว</th><th>คงเหลือ</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="3" class="c">รวม</td><td class="r">${f(T.e1)}</td><td class="r">${f(T.e2)}</td>
+        <td class="r">${T.sp?f(T.sp):'–'}</td><td class="r">${f(T.gross)}</td><td class="r">${T.soc?f(T.soc):'–'}</td>
+        <td class="r">${f(T.wd)}</td><td class="r">${f(T.left)}</td></tr></tfoot>
     </table>
-    <p style="margin-top:16px;color:#999;font-size:11px">พิมพ์เมื่อ ${new Date().toLocaleString('th-TH')}</p>
-    <button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#6c63b6;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ พิมพ์</button>
+    <div class="sum">
+      <div><div class="l">รวมค่าแรง</div><div class="v">${f(T.gross)} ฿</div></div>
+      <div><div class="l">หักประกันสังคม</div><div class="v">${f(T.soc)} ฿</div></div>
+      <div><div class="l">รายจ่ายค่าแรงสุทธิ (บริษัท)</div><div class="v" style="color:#6c63b6">${f(T.net)} ฿</div></div>
+      <div><div class="l">เบิกไปแล้ว / คงเหลือต้องจ่าย</div><div class="v">${f(T.wd)} / ${f(T.left)} ฿</div></div>
+    </div>
+    <div class="sign">
+      <div><span></span>ผู้จัดทำ<br>วันที่ ......../......../........</div>
+      <div><span></span>ผู้ตรวจสอบ<br>วันที่ ......../......../........</div>
+      <div><span></span>ผู้อนุมัติ<br>วันที่ ......../......../........</div>
+    </div>
+    <div class="ft">พิมพ์เมื่อ ${new Date().toLocaleString('th-TH')}</div>
     </body></html>`;
-  const w = window.open('', '_blank'); w.document.write(html); w.document.close();
-  setTimeout(() => w.print(), 500);
+  w.document.open(); w.document.write(html); w.document.close();
 }
 
 // ══════════════════════════════════════════════════════════
