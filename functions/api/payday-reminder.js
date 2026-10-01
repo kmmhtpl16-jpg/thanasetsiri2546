@@ -99,14 +99,15 @@ async function buildMessage(idToken, ym, period, day, last) {
   emps.forEach(function (e) {
     if (!fval(e, 'active')) return;             // ตรงกับแอป (active ต้องเป็นจริง)
     const id = docId(e);
-    const type = fval(e, 'type'), rate = fval(e, 'rate') || 0;
+    const type = fval(e, 'type'), rate = fval(e, 'rate') || 0, hist = rateHist(e);
 
     let earned = 0;
     for (let d = start; d <= end; d++) {
       const r = att[ym + '-' + pad(d) + '_' + id];
       if (!r || !r.type || r.type === 'absent') continue;
       let base = 0;
-      const unit = (type === 'daily') ? rate : (rate / days);
+      const rt = rateOn(rate, hist, ym + '-' + pad(d));
+      const unit = (type === 'daily') ? rt : (rt / days);
       if (r.type === 'full') base = unit;
       else if (r.type === 'half') base = unit / 2;
       else if (r.type === 'hours') base = unit * ((r.hours || 0) / 8);
@@ -257,6 +258,18 @@ function sumSpecial(doc) {   // specialWork: [{name, amount}]
     else if ('integerValue' in f) s += Number(f.integerValue);
   });
   return s;
+}
+// ปรับเงินเดือนแบบมีผลตั้งแต่วันที่ (mirror empRateOn ใน index.html)
+function rateHist(doc) {
+  const v = doc.fields && doc.fields.rateHistory;
+  if (!v || !v.arrayValue || !v.arrayValue.values) return [];
+  return v.arrayValue.values.map(it => { const f = (it.mapValue && it.mapValue.fields) || {};
+    return { from: (f.from && f.from.stringValue) || '', rate: f.rate ? Number(f.rate.doubleValue ?? f.rate.integerValue) : 0 }; })
+    .sort((a, b) => a.from.localeCompare(b.from));
+}
+function rateOn(rate, hist, date) {
+  if (!hist.length) return rate;
+  let r = hist[0].rate; hist.forEach(x => { if (x.from <= date) r = x.rate; }); return r || 0;
 }
 function docId(doc) { const p = doc.name.split('/'); return p[p.length - 1]; }
 function bkkDate() { return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10); }

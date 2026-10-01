@@ -134,6 +134,18 @@ function fval(doc, f) {  // อ่านค่า field แปลง type
   if ('booleanValue' in v) return v.booleanValue;
   return undefined;
 }
+// rateHistory (array of {from, rate}) — ปรับเงินเดือนแบบมีผลตั้งแต่วันที่ (mirror empRateOn ใน index.html)
+function rateHist(doc) {
+  const v = doc.fields && doc.fields.rateHistory;
+  if (!v || !v.arrayValue || !v.arrayValue.values) return [];
+  return v.arrayValue.values.map(it => { const f = (it.mapValue && it.mapValue.fields) || {};
+    return { from: (f.from && f.from.stringValue) || '', rate: f.rate ? Number(f.rate.doubleValue ?? f.rate.integerValue) : 0 }; })
+    .sort((a, b) => a.from.localeCompare(b.from));
+}
+function rateOn(emp, date) {
+  if (!emp.hist || !emp.hist.length) return emp.rate;
+  let r = emp.hist[0].rate; emp.hist.forEach(x => { if (x.from <= date) r = x.rate; }); return r || 0;
+}
 function docId(doc) { const p = doc.name.split('/'); return p[p.length - 1]; }
 
 // ---------- ยอดน้ำมันคงเหลือ ----------
@@ -178,7 +190,7 @@ async function payrollPeriod(ym, period) {
   const idToken = await login();
   // 1) พนักงาน (เฉพาะ active)
   const emps = (await runQuery(idToken, { from: [{ collectionId: 'employees' }] }))
-    .map(d => ({ id: docId(d), nickname: fval(d, 'nickname') || docId(d), type: fval(d, 'type'), rate: fval(d, 'rate') || 0, sso: fval(d, 'socialSecurity') === true, active: fval(d, 'active') }))
+    .map(d => ({ id: docId(d), nickname: fval(d, 'nickname') || docId(d), type: fval(d, 'type'), rate: fval(d, 'rate') || 0, hist: rateHist(d), sso: fval(d, 'socialSecurity') === true, active: fval(d, 'active') }))
     .filter(e => e.active !== false);
   // 2) ลงเวลาของเดือนนั้น → map[empId][date]
   const att = await runQuery(idToken, { from: [{ collectionId: 'attendance' }],
@@ -203,14 +215,15 @@ async function payrollPeriod(ym, period) {
       const rec = byDate[ym + '-' + String(d).padStart(2, '0')];
       if (!rec || !rec.type || rec.type === 'absent') continue;
       let base = 0;
+      const rt = rateOn(emp, ym + '-' + String(d).padStart(2, '0'));
       if (emp.type === 'daily') {
-        if (rec.type === 'full') base = emp.rate;
-        else if (rec.type === 'half') base = emp.rate / 2;
-        else if (rec.type === 'hours') base = emp.rate * ((rec.hours || 0) / 8);
+        if (rec.type === 'full') base = rt;
+        else if (rec.type === 'half') base = rt / 2;
+        else if (rec.type === 'hours') base = rt * ((rec.hours || 0) / 8);
       } else {
-        if (rec.type === 'full') base = emp.rate / totalDays;
-        else if (rec.type === 'half') base = emp.rate / totalDays / 2;
-        else if (rec.type === 'hours') base = (emp.rate / totalDays) * ((rec.hours || 0) / 8);
+        if (rec.type === 'full') base = rt / totalDays;
+        else if (rec.type === 'half') base = rt / totalDays / 2;
+        else if (rec.type === 'hours') base = (rt / totalDays) * ((rec.hours || 0) / 8);
       }
       earned += Math.round((base + (rec.special || 0)) * 100) / 100;
     }
