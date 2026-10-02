@@ -2403,7 +2403,7 @@ function empRateOn(emp, dateYMD) {
   return r || 0;
 }
 
-function calcEarned(emp, dateYMD) {
+function calcEarned(emp, dateYMD, raw) {   // raw=true → ไม่ปัดเศษ (ใช้ตอนรวมทั้งงวด)
   const rec = prAttendance[dateYMD + '_' + emp.id];
   if (!rec || rec.type === 'absent' || !rec.type) return 0;
   let base = 0;
@@ -2420,7 +2420,7 @@ function calcEarned(emp, dateYMD) {
   }
   let special = 0;
   if (rec.specialWork) rec.specialWork.forEach(sw => { special += sw.amount || 0; });
-  return Math.round((base + special) * 100) / 100;
+  return raw ? (base + special) : Math.round((base + special) * 100) / 100;
 }
 
 function calcPeriodEarned(empId, ym, period) {
@@ -2433,7 +2433,7 @@ function calcPeriodEarned(empId, ym, period) {
   let sum = 0;
   for (let d = start; d <= end; d++) {
     const dateStr = ym + '-' + String(d).padStart(2, '0');
-    sum += calcEarned(emp, dateStr);
+    sum += calcEarned(emp, dateStr, true);   // รวมแบบไม่ปัดรายวัน แล้วปัดครั้งเดียวท้ายงวด (25,000/30×15 = 12,500 พอดี)
   }
   return Math.round(sum * 100) / 100;
 }
@@ -2469,7 +2469,7 @@ async function computeMonthLabor(ym){
       }
       var special=0;
       if(rec.specialWork) rec.specialWork.forEach(function(sw){ special+=sw.amount||0; });
-      total += Math.round((base+special)*100)/100;
+      total += (base+special);
     }
   });
   return Math.round(total*100)/100;
@@ -12533,8 +12533,9 @@ html.mb #tp4.own-full #mbOwn{margin-bottom:14px;}
           var unit=(e.type==='daily')?rt:(rt/days);
           var base=r.type==='full'?unit:r.type==='half'?unit/2:r.type==='hours'?unit*((r.hours||0)/8):0, sp=0;
           (r.specialWork||[]).forEach(function(s){ sp+=s.amount||0; });
-          earned+=Math.round((base+sp)*100)/100;
+          earned+=(base+sp);
         }
+        earned=Math.round(earned*100)/100;
         var taken=0; wds.forEach(function(w){ if(w.empId===e.id && w.period===P.period) taken+=w.amount||0; });
         var social=(P.period==='16-end' && e.socialSecurity===true)?875:0, pend=earned-social-taken;
         if(earned<=0 && taken<=0) return;
