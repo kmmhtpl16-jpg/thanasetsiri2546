@@ -111,7 +111,7 @@ async function buildMessage(idToken, ym, period, day, last) {
       if (r.type === 'full') base = unit;
       else if (r.type === 'half') base = unit / 2;
       else if (r.type === 'hours') base = unit * ((r.hours || 0) / 8);
-      earned += Math.round((base + (r.special || 0)) * 100) / 100;
+      earned += base + (r.special || 0);   // ปัดครั้งเดียวท้ายงวด (ตรงกับแอป)
     }
     earned = Math.round(earned * 100) / 100;
 

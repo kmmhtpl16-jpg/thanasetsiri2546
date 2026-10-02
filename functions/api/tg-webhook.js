@@ -204,7 +204,7 @@ async function payrollPeriod(ym, period) {
       { fieldFilter: { field: { fieldPath: 'period' }, op: 'EQUAL', value: { stringValue: period } } }
     ] } } });
   const wMap = {}; wd.forEach(d => { const e = fval(d, 'empId'); wMap[e] = (wMap[e] || 0) + (fval(d, 'amount') || 0); });
-  // 4) คำนวณรายคน (mirror calcEarned: ปัดเศษรายวันก่อนรวม)
+  // 4) คำนวณรายคน (mirror calcPeriodEarned: รวมรายวันแบบไม่ปัด แล้วปัดครั้งเดียวท้ายงวด)
   const totalDays = daysInYM(ym);
   const start = period === '1-15' ? 1 : 16;
   const end = period === '1-15' ? 15 : totalDays;
@@ -225,7 +225,7 @@ async function payrollPeriod(ym, period) {
         else if (rec.type === 'half') base = rt / totalDays / 2;
         else if (rec.type === 'hours') base = (rt / totalDays) * ((rec.hours || 0) / 8);
       }
-      earned += Math.round((base + (rec.special || 0)) * 100) / 100;
+      earned += base + (rec.special || 0);   // ปัดครั้งเดียวท้ายงวด (ตรงกับแอป)
     }
     earned = Math.round(earned * 100) / 100;
     const social = (emp.sso && period === '16-end') ? SSO : 0;
