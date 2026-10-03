@@ -1105,24 +1105,66 @@ select{color-scheme:light;}
 
       <!-- ── ส่วน C: จัดการทะเบียนรถ ── -->
       <div id="fr-vehicles-panel" style="display:none">
-        <div class="card">
-          <div class="card-title">⚙️ จัดการทะเบียน — เจ้าของรถ</div>
-          <p style="font-size:12px;color:var(--muted);margin-bottom:12px">ยืนยันชื่อ canonical (ชื่อหลักที่ใช้สรุปยอด) สำหรับแต่ละทะเบียน ชื่อที่คล้ายกันจะถูกแจ้งเตือน</p>
-          <div class="brow" style="margin-bottom:10px">
-            <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px">เพิ่มทะเบียนใหม่</label>
-            <input type="text" id="veh-plate-in" placeholder="ทะเบียน เช่น 81-5080" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:140px">
-            <input type="text" id="veh-owner-in" placeholder="ชื่อเจ้าของรถ" style="padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);width:140px">
-            <select id="veh-kind-in" class="veh-sel"><option value="truck">รถบรรทุก</option><option value="boat">เรือ</option><option value="excavator">แม็กโคร</option></select>
-            <label class="veh-chk"><input type="checkbox" id="veh-ours-in" onchange="var o=document.getElementById('veh-owner-in'); if(this.checked&&!o.value) o.value='รถบริษัท';"> รถเรา</label>
-            <button class="btn btn-gold" onclick="vehAdd()">➕ เพิ่ม</button>
+        <div class="card vr-card vr-unk" id="vr-unk">
+          <div class="vr-head"><div>
+            <div class="vr-title" id="vr-unk-title">⚠️ ทะเบียนที่ยังไม่มีเจ้าของ</div>
+            <div class="vr-sub">ดึงจากใบชั่งทรายและบิลเที่ยวดิน — ติ๊กหลายคันพร้อมกัน แล้วเลือกเจ้าของทีเดียว</div>
+          </div><button type="button" class="vr-rb" id="vr-unk-hid" onclick="vrUnkToggleHidden()"></button></div>
+          <div id="vr-unk-body"></div>
+        </div>
+
+        <div class="card vr-card" id="vr-add">
+          <div class="vr-head"><div>
+            <div class="vr-title">เพิ่มทะเบียน / เพิ่มเจ้าของรถ</div>
+            <div class="vr-sub">ใส่ทะเบียน แล้วเลือกเจ้าของจากรายชื่อ — ถ้าไม่มีชื่อ กด “+ เพิ่มเจ้าของใหม่”</div>
+          </div></div>
+          <div class="vr-seg vr-who" id="vr-who">
+            <button type="button" data-v="partner" class="on" onclick="vrWho('partner')"><b>🚛 รถร่วม</b><small>รถคนนอก มีเจ้าของ</small></button>
+            <button type="button" data-v="ours" onclick="vrWho('ours')"><b>🏠 รถเรา</b><small>รถบริษัท / เรือ / แม็กโคร</small></button>
           </div>
-          <div id="veh-add-msg" class="smsg" style="margin-bottom:8px"></div>
-          <div id="veh-filter" class="veh-filter"><button data-f="ours" onclick="vehSetFilter('ours')">รถเรา</button><button data-f="partner" onclick="vehSetFilter('partner')">รถร่วม</button><button data-f="all" class="on" onclick="vehSetFilter('all')">ทั้งหมด</button></div>
-          <p style="font-size:12px;color:var(--muted);margin:0 0 10px">ติ๊ก <b>รถเรา</b> = ขึ้นให้เลือกในหน้าเบิกน้ำมัน · เรือ/แม็กโครเพิ่มที่นี่ได้ (ช่องเจ้าของใส่ "รถบริษัท") · <b>มิเตอร์</b> = ให้ช่องเลขไมล์/ชั่วโมงโผล่ตอนเบิกน้ำมัน · <b>รุ่งชัย</b> = คนขับบันทึกในโปรแกรมค่าเที่ยวรุ่งชัยด้วย</p>
-          <div class="table-wrap">
-            <table>
+          <div class="vr-ours-only" id="vr-kind-row">
+            <label class="vr-lb">ประเภท</label>
+            <div class="vr-seg vr-sm" id="vr-kind"><button type="button" data-v="truck" class="on" onclick="vrSeg('vr-kind',this)">รถบรรทุก</button><button type="button" data-v="boat" onclick="vrSeg('vr-kind',this)">เรือ</button><button type="button" data-v="excavator" onclick="vrSeg('vr-kind',this)">แม็กโคร</button></div>
+          </div>
+          <div class="vr-grid">
+            <div class="vr-f">
+              <label class="vr-lb" for="veh-plate-in" id="vr-plate-lb">ทะเบียนรถ</label>
+              <input type="text" id="veh-plate-in" class="vr-in" placeholder="เช่น 81-5080" autocomplete="off" autocapitalize="characters" oninput="vrPlateCheck()" onkeydown="vrKey(event)">
+              <div class="vr-tip">หลายคันของเจ้าของเดียวกัน ใส่ทีเดียวได้ คั่นด้วย <b>,</b> เช่น 81-5080, 81-5081</div>
+              <div class="vr-hint" id="vr-plate-hint"></div>
+            </div>
+            <div class="vr-f vr-partner-only">
+              <label class="vr-lb" for="veh-owner-in">เจ้าของรถ <span class="vr-mut">เลือกจากรายการ หรือพิมพ์ค้นหา</span></label>
+              <div id="vr-owner-combo"></div>
+              <div class="vr-hint" id="vr-owner-hint"></div>
+            </div>
+            <div class="vr-f vr-ours-only">
+              <label class="vr-lb">มิเตอร์ <span class="vr-mut">(ให้ช่องเลขไมล์/ชั่วโมงขึ้นตอนเบิกน้ำมัน)</span></label>
+              <div class="vr-seg vr-sm" id="vr-meter"><button type="button" data-v="" class="on" onclick="vrSeg('vr-meter',this)">ไม่มี</button><button type="button" data-v="km" onclick="vrSeg('vr-meter',this)">เลขไมล์ กม.</button><button type="button" data-v="hr" onclick="vrSeg('vr-meter',this)">ชั่วโมงเครื่อง</button></div>
+              <label class="vr-chkrow"><input type="checkbox" id="vr-rungchai"> ใช้โปรแกรมค่าเที่ยวรุ่งชัย</label>
+            </div>
+          </div>
+          <div class="vr-chg" id="vr-chg" style="display:none">
+            <label class="vr-lb" for="vr-chg-date">🔁 เปลี่ยนเจ้าของ — เริ่มเป็นของเจ้าของใหม่ตั้งแต่วันที่</label>
+            <div class="vr-chg-row"><input type="date" class="vr-in" id="vr-chg-date" oninput="vrChgInfo()"><span class="vr-chg-ex" id="vr-chg-ex"></span></div>
+          </div>
+          <div class="vr-actions">
+            <button type="button" class="vr-save" id="vr-save" onclick="vehAdd()">💾 บันทึก</button>
+            <div id="veh-add-msg" class="smsg vr-msg"></div>
+          </div>
+        </div>
+
+        <div class="card vr-card">
+          <div class="vr-head">
+            <div class="vr-title">📋 ทะเบียนทั้งหมด</div>
+            <div class="vr-srch"><span>🔍</span><input type="text" id="vr-q" placeholder="ค้นหาทะเบียน / เจ้าของ" autocomplete="off" oninput="vrSearch(this.value)"></div>
+          </div>
+          <div id="veh-filter" class="veh-filter"><button data-f="partner" onclick="vehSetFilter('partner')">รถร่วม</button><button data-f="ours" onclick="vehSetFilter('ours')">รถเรา</button><button data-f="all" class="on" onclick="vehSetFilter('all')">ทั้งหมด</button></div>
+          <p class="vr-note">แก้ประเภท / มิเตอร์ / สวิตช์ ในตารางได้เลย บันทึกให้อัตโนมัติ · รถขายต่อ กด <b>🔁 เปลี่ยนเจ้าของ</b> แล้วใส่วันที่เริ่ม · <b>รถเรา</b> = ขึ้นให้เลือกในหน้าเบิกน้ำมัน · <b>รุ่งชัย</b> = คนขับบันทึกในโปรแกรมค่าเที่ยวรุ่งชัยด้วย</p>
+          <div class="table-wrap vr-tw">
+            <table class="vr-t">
               <thead><tr>
-                <th>ทะเบียน / ชื่อ</th><th>ประเภท</th><th>รถเรา</th><th>มิเตอร์</th><th>โปรแกรมรุ่งชัย</th><th>ชื่อที่กรอก</th><th>Canonical (ยืนยันแล้ว)</th><th></th>
+                <th>ทะเบียน / ชื่อ</th><th>เจ้าของ (ปัจจุบัน)</th><th>ประเภท</th><th>มิเตอร์</th><th style="text-align:center">รถเรา</th><th style="text-align:center">รุ่งชัย</th><th></th>
               </tr></thead>
               <tbody id="veh-tbody"></tbody>
             </table>
@@ -1152,7 +1194,7 @@ select{color-scheme:light;}
           </div>
           <div id="plate-resolve-newbox">
             <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">หรือกรอกชื่อเจ้าของใหม่:</label>
-            <input type="text" id="plate-resolve-new" placeholder="ชื่อเจ้าของรถ" style="width:100%;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;font-family:var(--font);margin-bottom:12px">
+            <input type="text" id="plate-resolve-new" list="vr-owner-dl" autocomplete="off" placeholder="ชื่อเจ้าของรถ" style="width:100%;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;font-family:var(--font);margin-bottom:12px">
             <div class="brow" style="gap:8px">
               <button class="btn btn-gold" style="flex:1;justify-content:center" onclick="plateResolveNew()">💾 บันทึกชื่อใหม่</button>
               <button class="btn btn-ghost" onclick="plateResolveSkip()">⏭️ ข้ามคันนี้</button>
@@ -2195,6 +2237,7 @@ function listenFS() {
       if(typeof exDraw4==='function') exDraw4();
     }
   }, function(e){ console.warn('os_bills',e); });
+  if(typeof vrUnkListen==='function') vrUnkListen();
   unCustVeh = db.collection('os_config').doc('os_customer_vehicle').onSnapshot(function(d){
     custVeh = (d.exists && d.data().map) || {};
   }, function(e){ console.warn('custVeh',e); });
@@ -5571,6 +5614,11 @@ function lookupVeh(plate){
   for(var i=0;i<keys.length;i++){
     if(normPlate(keys[i])===np) return vehData[keys[i]];
   }
+  // ไม่สนขีด - (81-7777 = 817777)
+  var nd=np.replace(/-/g,'');
+  if(nd) for(var j=0;j<keys.length;j++){
+    if(normPlate(keys[j]).replace(/-/g,'')===nd) return vehData[keys[j]];
+  }
   return null;
 }
 
@@ -5942,7 +5990,8 @@ function frReportRun(){
   var v=lookupVeh(plateIn);
   var ownerFromBill='';
   dirtTrips.forEach(function(t){ if(!ownerFromBill&&t.owner) ownerFromBill=t.owner; });
-  var owner=(v&&v.canonical)||ownerFromBill||'❓ ไม่ทราบเจ้าของ';
+  var _ows=[]; trips.forEach(function(t){ var o=vehOwnerAt(v,t.date); if(o&&_ows.indexOf(o)<0) _ows.push(o); });
+  var owner=(_ows.length?_ows.join(' → '):'')||ownerFromBill||'❓ ไม่ทราบเจ้าของ';
   var sumKiu=trips.reduce(function(s,t){return s+t.kiu;},0);
   var sumDed=trips.reduce(function(s,t){return s+t.ded;},0);
   var sumNet=trips.reduce(function(s,t){return s+t.net;},0);
@@ -6346,85 +6395,449 @@ function listenVeh(){
 }
 var vehFilter='all';
 var VEH_KIND={truck:'รถ',boat:'เรือ',excavator:'แม็กโคร'};
+var VEH_ICON={truck:'🚛',boat:'🚤',excavator:'🚜'};
+var vrState={who:'partner', q:'', changeOf:null, openRow:null};
+var vrOwnerCb=null, vrRowCb=null;
 function vehKindOf(v){ return (v&&v.kind)||'truck'; }
+function vrEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function vrEl(id){ return document.getElementById(id); }
+function vrToday(){ var d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+function vrBE(iso){ if(!iso) return ''; var p=String(iso).split('-'); return p[2]+'/'+p[1]+'/'+(+p[0]+543); }
+function vrDayBefore(iso){ var d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
+function vrSegVal(id){ var b=vrEl(id)&&vrEl(id).querySelector('button.on'); return b?b.dataset.v:''; }
+function vrSeg(id,b){ [].forEach.call(vrEl(id).querySelectorAll('button'),function(x){ x.classList.toggle('on',x===b); }); if(id==='vr-kind') vrWho(vrState.who); }
+
+/* ══ เจ้าของตามวันที่ ══
+   vehicles/{plate}: canonical = เจ้าของปัจจุบัน, ownerFrom = วันที่เริ่ม (ว่าง = ตั้งแต่แรก)
+   ownerHist = [{canonical, ownerName, from}] เจ้าของคนก่อน ๆ เรียงเก่า→ใหม่ */
+function vehOwnerAt(v,date){
+  if(!v) return '';
+  if(!date || !v.ownerFrom || date>=v.ownerFrom) return v.canonical||'';
+  var h=v.ownerHist||[];
+  for(var i=h.length-1;i>=0;i--){ if(!h[i].from || date>=h[i].from) return h[i].canonical||''; }
+  return h.length?(h[0].canonical||''):(v.canonical||'');
+}
+function lookupOwnerAt(plate,date){ return vehOwnerAt(lookupVeh(plate),date); }
+
+/* รายชื่อเจ้าของรถร่วมทั้งหมด (รวมเจ้าของเก่า) + จำนวนคันปัจจุบัน */
+function vrOwners(){
+  var c={};
+  Object.keys(vehData).forEach(function(p){ var v=vehData[p]||{}; if(v.ours) return;
+    var n=(v.canonical||v.ownerName||'').trim(); if(n) c[n]=(c[n]||0)+1;
+    (v.ownerHist||[]).forEach(function(h){ var m=(h.canonical||'').trim(); if(m&&!(m in c)) c[m]=0; });
+  });
+  return Object.keys(c).map(function(n){ return {name:n,n:c[n]}; });
+}
+function vrOwnerCount(n){ var o=vrOwners().filter(function(x){ return x.name===n; })[0]; return o?o.n:0; }
+function vrScore(q,name){
+  q=q.toLowerCase().replace(/\s/g,''); var n=name.toLowerCase().replace(/\s/g,'');
+  if(!q) return 0; if(n===q) return 2; if(n.indexOf(q)===0) return 1.6; if(n.indexOf(q)>=0) return 1.3;
+  return similarity(q,n);
+}
+
+/* ══ ช่องเลือกเจ้าของ: dropdown + พิมพ์ค้นได้ + ชื่อใกล้เคียงขึ้นก่อน + ปุ่ม + เพิ่มเจ้าของใหม่ ══ */
+function vrCombo(host,id,onPick){
+  host.innerHTML='<div class="vr-cb"><input class="vr-in" id="'+id+'" placeholder="แตะเพื่อเลือก หรือพิมพ์ชื่อ" autocomplete="off" role="combobox" aria-expanded="false"><button type="button" class="vr-cb-tg" tabindex="-1" aria-label="เปิดรายชื่อ">▾</button><div class="vr-cb-list" style="display:none"></div></div>';
+  var inp=host.querySelector('input'), list=host.querySelector('.vr-cb-list'), tg=host.querySelector('.vr-cb-tg');
+  var hi=0, items=[], self={value:'',isNew:false,input:inp};
+  function build(){
+    var q=inp.value.trim(), all=vrOwners(), exact=all.some(function(x){ return x.name===q; });
+    all.forEach(function(x){ x.s=vrScore(q,x.name); });
+    var near=q?all.filter(function(x){ return x.s>=0.5; }).sort(function(a,b){ return b.s-a.s; }):[];
+    var rest=all.filter(function(x){ return near.indexOf(x)<0; }).sort(function(a,b){ return b.n-a.n||a.name.localeCompare(b.name,'th'); });
+    items=[]; var h='';
+    function opt(x,near){ items.push({t:'o',v:x.name});
+      return '<button type="button" class="vr-cb-opt" data-i="'+(items.length-1)+'"><span>'+vrEsc(x.name)+(near&&x.s<1.3?' <em>คล้าย</em>':'')+'</span><small>'+(x.n?x.n+' คัน':'เจ้าของเก่า')+'</small></button>'; }
+    if(near.length) h+='<div class="vr-cb-sec">ชื่อใกล้เคียง</div>'+near.map(function(x){ return opt(x,1); }).join('');
+    else if(q) h+='<div class="vr-cb-none">ไม่พบชื่อ “'+vrEsc(q)+'” ในรายชื่อเจ้าของ</div>';
+    if(rest.length) h+='<div class="vr-cb-sec">'+(q?'เจ้าของคนอื่น':'เจ้าของทั้งหมด')+'</div>'+rest.map(function(x){ return opt(x,0); }).join('');
+    if(q&&!exact){ items.push({t:'n',v:q}); h+='<button type="button" class="vr-cb-new" data-i="'+(items.length-1)+'">＋ เพิ่มเจ้าของใหม่ “'+vrEsc(q)+'”</button>'; }
+    else if(!q){ items.push({t:'n',v:''}); h+='<button type="button" class="vr-cb-new" data-i="'+(items.length-1)+'">＋ เพิ่มเจ้าของใหม่</button>'; }
+    list.innerHTML=h; hi=0; mark();
+  }
+  function mark(){ [].forEach.call(list.querySelectorAll('[data-i]'),function(b){ b.classList.toggle('hi',+b.dataset.i===hi); }); var e=list.querySelector('.hi'); if(e&&e.scrollIntoView) e.scrollIntoView({block:'nearest'}); }
+  function open(){ build(); list.style.display='block'; inp.setAttribute('aria-expanded','true'); }
+  function close(){ list.style.display='none'; inp.setAttribute('aria-expanded','false'); }
+  function isOpen(){ return list.style.display!=='none'; }
+  function pick(it){
+    if(it.t==='n'&&!it.v){ inp.value=''; inp.placeholder='พิมพ์ชื่อเจ้าของใหม่'; inp.focus(); build(); return; }
+    self.value=it.v; self.isNew=it.t==='n'; inp.value=it.v; close(); onPick(self);
+  }
+  inp.addEventListener('focus',open);
+  inp.addEventListener('input',function(){ self.value=''; self.isNew=false; onPick(self); open(); });
+  inp.addEventListener('keydown',function(e){
+    if(!isOpen()&&e.key==='ArrowDown'){ open(); return; }
+    if(e.key==='ArrowDown'){ hi=Math.min(items.length-1,hi+1); mark(); e.preventDefault(); }
+    else if(e.key==='ArrowUp'){ hi=Math.max(0,hi-1); mark(); e.preventDefault(); }
+    else if(e.key==='Enter'){ e.preventDefault(); if(isOpen()&&items[hi]) pick(items[hi]); else if(self.onEnter) self.onEnter(); }
+    else if(e.key==='Escape') close();
+  });
+  list.addEventListener('mousedown',function(e){ e.preventDefault(); });
+  list.addEventListener('click',function(e){ var b=e.target.closest('[data-i]'); if(b) pick(items[+b.dataset.i]); });
+  tg.addEventListener('mousedown',function(e){ e.preventDefault(); });
+  tg.addEventListener('click',function(){ if(isOpen()) close(); else { inp.focus(); open(); } });
+  inp.addEventListener('blur',function(){ setTimeout(close,150); });
+  self.set=function(v){ self.value=v; self.isNew=false; inp.value=v; };
+  return self;
+}
+function vrEnsureCombo(){
+  var host=vrEl('vr-owner-combo'); if(!host||vrOwnerCb) return;
+  vrOwnerCb=vrCombo(host,'veh-owner-in',function(c){
+    var h=vrEl('vr-owner-hint');
+    if(h) h.innerHTML=c.value?(c.isNew?'<div class="vr-warn"><span class="vr-pill">เจ้าของใหม่</span> จะเพิ่ม “'+vrEsc(c.value)+'” เข้ารายชื่อเจ้าของ</div>':'<div class="vr-okn">✓ เจ้าของเดิม — มี '+vrOwnerCount(c.value)+' คัน</div>'):'';
+    vrChgInfo();
+  });
+  vrOwnerCb.onEnter=function(){ vehAdd(); };
+}
+function vrWho(w){
+  vrState.who=w; vrEnsureCombo();
+  var box=vrEl('fr-vehicles-panel'); if(box) box.classList.toggle('vr-is-ours',w==='ours');
+  var s=vrEl('vr-who'); if(s) [].forEach.call(s.querySelectorAll('button'),function(b){ b.classList.toggle('on',b.dataset.v===w); });
+  var k=vrSegVal('vr-kind')||'truck', lb=vrEl('vr-plate-lb'), pi=vrEl('veh-plate-in');
+  if(lb) lb.textContent=(w==='ours'&&k!=='truck')?'ชื่อเรียก':'ทะเบียนรถ';
+  if(pi) pi.placeholder=(w==='ours'&&k==='boat')?'เช่น เรือภาวัช':(w==='ours'&&k==='excavator')?'เช่น แม็กโคร 1':'เช่น 81-5080';
+  vrPlateCheck();
+}
+function vrPlates(){
+  var raw=(vrEl('veh-plate-in')&&vrEl('veh-plate-in').value)||'';
+  var truck=vrState.who!=='ours'||(vrSegVal('vr-kind')||'truck')==='truck', out=[];
+  raw.split(/[,\n]+/).forEach(function(s){ s=truck?normPlate(s).toUpperCase():s.trim().replace(/\s+/g,' '); if(s&&out.indexOf(s)<0) out.push(s); });
+  return out;
+}
+function vrFind(pl){
+  var np=normPlate(pl).toUpperCase().replace(/-/g,''), keys=Object.keys(vehData), i;
+  for(i=0;i<keys.length;i++) if(normPlate(keys[i]).toUpperCase().replace(/-/g,'')===np) return {same:true,plate:keys[i],v:vehData[keys[i]]};
+  var d=np.replace(/\D/g,'');
+  if(d.length>=4) for(i=0;i<keys.length;i++) if(normPlate(keys[i]).replace(/\D/g,'')===d) return {same:false,plate:keys[i],v:vehData[keys[i]]};
+  return null;
+}
+function vrOwnerLabel(v){ return v.ours?'รถเรา':(v.canonical||v.ownerName||'-'); }
+function vrPlateCheck(){
+  var h=vrEl('vr-plate-hint'); if(!h) return;
+  var msgs=[], ps=vrPlates(); vrState.changeOf=null;
+  ps.forEach(function(pl){
+    if(/[\/#\[\]]/.test(pl)){ msgs.push('<div class="vr-bad">✕ '+vrEsc(pl)+' — ห้ามมีเครื่องหมาย / # [ ]</div>'); return; }
+    var f=vrFind(pl); if(!f) return;
+    if(f.same){
+      if(vrState.who==='partner'&&ps.length===1&&!f.v.ours){
+        vrState.changeOf=f.plate;
+        msgs.push('<div class="vr-warn">⚠️ <b>'+vrEsc(f.plate)+'</b> มีอยู่แล้ว เป็นของ <b>'+vrEsc(f.v.canonical||'-')+'</b><br>ถ้ารถคันนี้ขายต่อ/เปลี่ยนเจ้าของ ให้เลือกเจ้าของใหม่ แล้วใส่วันที่เริ่มด้านล่าง</div>');
+      } else msgs.push('<div class="vr-bad">⚠️ <b>'+vrEsc(f.plate)+'</b> มีอยู่แล้ว ('+vrEsc(vrOwnerLabel(f.v))+') — จะข้ามคันนี้</div>');
+    } else msgs.push('<div class="vr-warn">❓ <b>'+vrEsc(pl)+'</b> เลขคล้าย <b>'+vrEsc(f.plate)+'</b> ('+vrEsc(vrOwnerLabel(f.v))+') — เป็นคันเดียวกันหรือเปล่า?</div>');
+  });
+  h.innerHTML=msgs.join('');
+  vrChgInfo();
+}
+function vrChgInfo(){
+  var box=vrEl('vr-chg'), btn=vrEl('vr-save'), p=vrState.changeOf;
+  if(box) box.style.display=p?'':'none';
+  if(btn) btn.textContent=p?'🔁 บันทึกการเปลี่ยนเจ้าของ':'💾 บันทึก';
+  if(!p) return;
+  var di=vrEl('vr-chg-date'); if(di&&!di.value) di.value=vrToday();
+  var d=di?di.value:'', nw=(vrOwnerCb&&vrOwnerCb.value)||'เจ้าของใหม่', v=vehData[p]||{};
+  vrEl('vr-chg-ex').innerHTML=d?'เที่ยวก่อน '+vrBE(d)+' ยังนับเป็นของ <b>'+vrEsc(v.canonical||'-')+'</b> · ตั้งแต่ '+vrBE(d)+' นับเป็นของ <b>'+vrEsc(nw)+'</b>':'ใส่วันที่เริ่ม';
+}
+function vrKey(e){
+  if(e.key!=='Enter') return;
+  e.preventDefault();
+  if(vrState.who!=='ours' && vrOwnerCb && !vrOwnerCb.value){ vrOwnerCb.input.focus(); return; }
+  vehAdd();
+}
+function vrSearch(v){ vrState.q=v||''; drawVeh(); }
+
+/* ══ บันทึกการเปลี่ยนเจ้าของ (ใช้ทั้งฟอร์มบนและปุ่มในตาราง) ══ */
+function vehChangeOwner(plate,newOwner,date,cb){
+  var v=vehData[plate]; if(!v) return;
+  if(!newOwner){ cb('❌ เลือกเจ้าของใหม่ก่อน'); return; }
+  if(newOwner===v.canonical){ cb('⚠️ เป็นเจ้าของคนนี้อยู่แล้ว'); return; }
+  if(!date){ cb('❌ ใส่วันที่เริ่มเปลี่ยนเจ้าของ'); return; }
+  if(v.ownerFrom && date<=v.ownerFrom){ cb('❌ วันที่ต้องหลัง '+vrBE(v.ownerFrom)+' (วันที่เปลี่ยนครั้งก่อน)'); return; }
+  var hist=(v.ownerHist||[]).concat([{canonical:v.canonical||'',ownerName:v.ownerName||v.canonical||'',from:v.ownerFrom||''}]);
+  var upd={canonical:newOwner,ownerName:newOwner,ownerFrom:date,ownerHist:hist};
+  db.collection('vehicles').doc(plate).update(upd)
+    .then(function(){ Object.assign(vehData[plate],upd); cb(null,'✅ '+plate+' เปลี่ยนเป็นของ '+newOwner+' ตั้งแต่ '+vrBE(date)); drawVeh(); })
+    .catch(function(e){ cb('❌ '+e.message); });
+}
+function vehUndoOwner(plate){
+  var v=vehData[plate]; if(!v||!(v.ownerHist||[]).length) return;
+  if(!confirm('ยกเลิกการเปลี่ยนเจ้าของครั้งล่าสุดของ '+plate+'?\nจะกลับเป็นของ '+v.ownerHist[v.ownerHist.length-1].canonical)) return;
+  var h=v.ownerHist.slice(), last=h.pop();
+  var upd={canonical:last.canonical,ownerName:last.ownerName||last.canonical,ownerFrom:last.from||'',ownerHist:h};
+  db.collection('vehicles').doc(plate).update(upd)
+    .then(function(){ Object.assign(vehData[plate],upd); toast('↩ '+plate+' กลับเป็นของ '+last.canonical,2200); drawVeh(); })
+    .catch(function(e){ toast('❌ '+e.message,4000); });
+}
+
+/* ══ ตาราง ══ */
 function drawVeh(){
-  var tabs=document.getElementById('veh-filter');
+  vrEnsureCombo();
+  if(typeof vrDrawUnknown==='function') vrDrawUnknown();
+  var tabs=vrEl('veh-filter');
   if(tabs) [].forEach.call(tabs.querySelectorAll('button'),function(b){ b.classList.toggle('on',b.dataset.f===vehFilter); });
-  var all=Object.keys(vehData).sort(function(a,b){ var ka=vehKindOf(vehData[a]), kb=vehKindOf(vehData[b]); return ka===kb?a.localeCompare(b):(ka<kb?1:-1); });
+  var all=Object.keys(vehData).sort(function(a,b){
+    var va=vehData[a]||{}, vb=vehData[b]||{};
+    if(!!va.ours!==!!vb.ours) return va.ours?1:-1;
+    var ka=vehKindOf(va), kb=vehKindOf(vb); if(ka!==kb) return ka<kb?1:-1;
+    var oa=va.ours?'':(va.canonical||''), ob=vb.ours?'':(vb.canonical||'');
+    return oa===ob?a.localeCompare(b):oa.localeCompare(ob,'th');
+  });
   var cnt={ours:0,partner:0}; all.forEach(function(p){ if(vehData[p].ours) cnt.ours++; else cnt.partner++; });
-  if(tabs){ var bs=tabs.querySelectorAll('button'); if(bs[0]) bs[0].textContent='รถเรา ('+cnt.ours+')'; if(bs[1]) bs[1].textContent='รถร่วม ('+cnt.partner+')'; if(bs[2]) bs[2].textContent='ทั้งหมด ('+all.length+')'; }
-  var plates=all.filter(function(p){ var o=!!vehData[p].ours; return vehFilter==='all'||(vehFilter==='ours'?o:!o); });
-  var tb=document.getElementById('veh-tbody'); if(!tb) return;
-  if(!plates.length){ tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">'+(all.length?'ไม่มีรายการในแถบนี้':'ยังไม่มีทะเบียน — เพิ่มด้านบน')+'</td></tr>'; return; }
-  function sel(p,f,val,opts){ return '<select class="veh-sel" onchange="vehSetField(\''+p+'\',\''+f+'\',this.value)">'+opts.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===val?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>'; }
+  if(tabs) [].forEach.call(tabs.querySelectorAll('button'),function(b){ var f=b.dataset.f; b.textContent=(f==='ours'?'รถเรา':f==='partner'?'รถร่วม':'ทั้งหมด')+' ('+(f==='all'?all.length:cnt[f])+')'; });
+  var q=vrState.q.trim().toLowerCase(), qn=q.replace(/[\s\-.]/g,'');
+  var plates=all.filter(function(p){
+    var v=vehData[p], o=!!v.ours;
+    if(!(vehFilter==='all'||(vehFilter==='ours'?o:!o))) return false;
+    if(!q) return true;
+    if(p.toLowerCase().replace(/[\s\-.]/g,'').indexOf(qn)>=0) return true;
+    if(String(v.canonical||'').toLowerCase().indexOf(q)>=0) return true;
+    return (v.ownerHist||[]).some(function(h){ return String(h.canonical||'').toLowerCase().indexOf(q)>=0; });
+  });
+  var tb=vrEl('veh-tbody'); if(!tb) return;
+  if(!plates.length){ tb.innerHTML='<tr class="vr-empty"><td colspan="7">'+(q?'ไม่พบ "'+vrEsc(vrState.q)+'"':all.length?'ไม่มีรายการในแถบนี้':'ยังไม่มีทะเบียน — เพิ่มด้านบน')+'</td></tr>'; return; }
+  function sel(p,f,val,opts){ return '<select class="veh-sel" data-p="'+vrEsc(p)+'" onchange="vehSetField(this.dataset.p,\''+f+'\',this.value)">'+opts.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===val?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>'; }
+  function tg(p,f,on,lb){ return '<label class="vr-tg"><input type="checkbox" data-p="'+vrEsc(p)+'" '+(on?'checked':'')+' onchange="vehSetField(this.dataset.p,\''+f+'\',this.checked)"><span></span><em>'+lb+'</em></label>'; }
+  var today=vrToday();
   tb.innerHTML=plates.map(function(p){
-    var v=vehData[p], diff=v.ownerName!==v.canonical, k=vehKindOf(v);
-    return '<tr'+(v.ours?' class="veh-ours"':'')+'><td><b>'+p+'</b></td>'
-      +'<td>'+sel(p,'kind',k,[['truck','รถบรรทุก'],['boat','เรือ'],['excavator','แม็กโคร']])+'</td>'
-      +'<td style="text-align:center"><label class="veh-chk"><input type="checkbox" '+(v.ours?'checked':'')+' onchange="vehSetField(\''+p+'\',\'ours\',this.checked)"> รถเรา</label></td>'
-      +'<td>'+sel(p,'meter',v.meter||'',[['','ไม่มีมิเตอร์'],['km','เลขไมล์ (กม.)'],['hr','ชั่วโมงเครื่อง']])+'</td>'
-      +'<td style="text-align:center"><label class="veh-chk"><input type="checkbox" '+(v.rungchai?'checked':'')+' onchange="vehSetField(\''+p+'\',\'rungchai\',this.checked)"> รุ่งชัย</label></td>'
-      +'<td>'+(v.ownerName||'')+'</td>'
-      +'<td><input type="text" value="'+(v.canonical||'')+'" data-plate="'+p+'"'
-      +' style="padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;font-family:var(--font);width:140px">'
-      +(diff?' <span class="badge-warn">แก้สะกด</span>':'')+'</td>'
-      +'<td style="white-space:nowrap">'
-      +'<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="vehSaveCanonical(\''+p+'\')">💾</button> '
-      +'<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--err)" onclick="vehDelete(\''+p+'\')">🗑️</button>'
-      +'</td></tr>';
+    var v=vehData[p], k=vehKindOf(v), hs=v.ownerHist||[];
+    var future=v.ownerFrom&&v.ownerFrom>today;
+    var hist=hs.length?'<div class="vr-was">เดิม: '+vrEsc(hs[hs.length-1].canonical)+' · <i>'+(future?'จะเปลี่ยน':'เปลี่ยนเมื่อ')+' '+vrBE(v.ownerFrom)+'</i></div>':'';
+    var r='<tr class="vr-row'+(v.ours?' veh-ours':' vr-pt')+'">'
+      +'<td class="vr-c-pl"><span class="vr-ic">'+(VEH_ICON[k]||'🚛')+'</span><b>'+vrEsc(p)+'</b>'+(v.ours?'<span class="vr-tag">รถเรา</span>':'')+'</td>'
+      +'<td class="vr-c-ow"><b>'+vrEsc(v.canonical||'-')+'</b>'+hist+'</td>'
+      +'<td data-l="ประเภท" class="vr-c-kd">'+sel(p,'kind',k,[['truck','รถบรรทุก'],['boat','เรือ'],['excavator','แม็กโคร']])+'</td>'
+      +'<td data-l="มิเตอร์" class="vr-c-mt">'+sel(p,'meter',v.meter||'',[['','ไม่มีมิเตอร์'],['km','เลขไมล์ (กม.)'],['hr','ชั่วโมงเครื่อง']])+'</td>'
+      +'<td class="vr-c-tg vr-c-o">'+tg(p,'ours',v.ours,'รถเรา')+'</td>'
+      +'<td class="vr-c-tg vr-c-r">'+tg(p,'rungchai',v.rungchai,'รุ่งชัย')+'</td>'
+      +'<td class="vr-c-del">'+(v.ours?'':'<button type="button" class="vr-rb'+(vrState.openRow===p?' on':'')+'" data-p="'+vrEsc(p)+'" onclick="vrRowOpen(this.dataset.p)">🔁 เปลี่ยนเจ้าของ</button>')
+      +'<button type="button" class="vr-rb vr-del" data-p="'+vrEsc(p)+'" title="ลบทะเบียนนี้" onclick="vehDelete(this.dataset.p)">🗑️</button></td>'
+      +'</tr>';
+    if(vrState.openRow===p){
+      var tl=hs.concat([{canonical:v.canonical,from:v.ownerFrom||''}]);
+      r+='<tr class="vr-panel"><td colspan="7"><div class="vr-pn">'
+        +'<div><label class="vr-lb" for="vr-row-owner">เจ้าของใหม่ของ '+vrEsc(p)+'</label><div id="vr-row-combo"></div></div>'
+        +'<div><label class="vr-lb" for="vr-row-date">เริ่มตั้งแต่วันที่</label><input type="date" class="vr-in" id="vr-row-date" value="'+today+'" oninput="vrRowInfo()"></div>'
+        +'<div class="vr-pn-btn"><button type="button" class="vr-save vr-sm-btn" onclick="vrRowSave()">บันทึก</button><button type="button" class="vr-save vr-sm-btn vr-gh" onclick="vrRowOpen(null)">ยกเลิก</button></div></div>'
+        +'<div class="vr-warn" id="vr-row-ex" style="margin-top:10px"></div>'
+        +'<ul class="vr-tl">'+tl.map(function(x,i){ var nx=tl[i+1]; return '<li class="'+(i===tl.length-1?'cur':'')+'"><b>'+vrEsc(x.canonical||'-')+'</b> — '+(x.from?'ตั้งแต่ '+vrBE(x.from):'ตั้งแต่เริ่มบันทึก')+(nx?' ถึง '+vrBE(vrDayBefore(nx.from)):' ถึงปัจจุบัน')+'</li>'; }).join('')+'</ul>'
+        +(hs.length?'<button type="button" class="vr-undo" data-p="'+vrEsc(p)+'" onclick="vehUndoOwner(this.dataset.p)">↩ ยกเลิกการเปลี่ยนครั้งล่าสุด (ถ้ากดผิด)</button>':'')
+        +'</td></tr>';
+    }
+    return r;
   }).join('');
+  if(vrState.openRow&&vrEl('vr-row-combo')){
+    vrRowCb=vrCombo(vrEl('vr-row-combo'),'vr-row-owner',vrRowInfo);
+    vrRowCb.onEnter=vrRowSave;
+    vrRowInfo();
+  }
+}
+function vrRowOpen(p){ vrState.openRow=(p&&vrState.openRow!==p)?p:null; drawVeh(); }
+function vrRowInfo(){
+  var ex=vrEl('vr-row-ex'), p=vrState.openRow; if(!ex||!p) return;
+  var d=vrEl('vr-row-date').value, nw=(vrRowCb&&vrRowCb.value)||'เจ้าของใหม่', v=vehData[p]||{};
+  ex.innerHTML=d?'เที่ยวก่อน '+vrBE(d)+' ยังนับเป็นของ <b>'+vrEsc(v.canonical||'-')+'</b> · ตั้งแต่ '+vrBE(d)+' นับเป็นของ <b>'+vrEsc(nw)+'</b>':'ใส่วันที่เริ่ม';
+}
+function vrRowSave(){
+  var p=vrState.openRow; if(!p) return;
+  vehChangeOwner(p,vrRowCb&&vrRowCb.value,vrEl('vr-row-date').value,function(err,ok){
+    if(err){ toast(err,3000); return; }
+    vrState.openRow=null; toast(ok,2600); drawVeh();
+  });
 }
 function vehSetFilter(f){ vehFilter=f; drawVeh(); }
 function vehSetField(plate,field,val){
   if(!vehData[plate]) return;
   var upd={}; upd[field]=val;
+  if(field==='ours' && val && !vehData[plate].canonical){ upd.canonical='รถบริษัท'; upd.ownerName=vehData[plate].ownerName||'รถบริษัท'; }
   var old=vehData[plate][field];
   vehData[plate][field]=val;
   db.collection('vehicles').doc(plate).update(upd)
-    .then(function(){ setMsg('veh-add-msg','✅ อัปเดต '+plate,'ok'); drawVeh(); if(typeof fxOnVehChange==='function') fxOnVehChange(); })
-    .catch(function(e){ if(vehData[plate]) vehData[plate][field]=old; drawVeh(); setMsg('veh-add-msg','❌ '+e.message,'err'); });
+    .then(function(){ toast('✅ อัปเดต '+plate,1600); drawVeh(); if(typeof fxOnVehChange==='function') fxOnVehChange(); })
+    .catch(function(e){ if(vehData[plate]) vehData[plate][field]=old; drawVeh(); toast('❌ '+e.message,4000); });
 }
 function vehAdd(){
-  var plate=(document.getElementById('veh-plate-in').value||'').trim().toUpperCase();
-  var owner=(document.getElementById('veh-owner-in').value||'').trim();
-  if(!plate||!owner){ setMsg('veh-add-msg','❌ กรอกทะเบียนและชื่อเจ้าของ','err'); return; }
-  if(vehData[plate]){ setMsg('veh-add-msg','⚠️ ทะเบียน '+plate+' มีอยู่แล้ว','warn'); return; }
-  var match=findFuzzyMatch(owner);
-  if(match){
-    fuzzyPending={plate:plate,ownerName:owner,matchCanonical:match.canonical,score:Math.round(match.score*100)};
-    document.getElementById('fuzzy-msg').innerHTML=
-      '"<b>'+owner+'</b>" น่าจะเป็นคนเดียวกับ "<b>'+match.canonical+'</b>" ('+fuzzyPending.score+'%)<br>'
-      +'ถ้าใช่ จะใช้ชื่อ canonical เดิม: <b>'+match.canonical+'</b>';
-    document.getElementById('fuzzy-dialog').style.display='flex';
-  } else { vehSave(plate,owner,owner); }
+  vrEnsureCombo();
+  var ours=vrState.who==='ours';
+  var kind=ours?(vrSegVal('vr-kind')||'truck'):'truck';
+  var plates=vrPlates();
+  var owner=ours?'รถบริษัท':((vrOwnerCb&&vrOwnerCb.value)||'');
+  if(!plates.length){ setMsg('veh-add-msg','❌ ใส่'+(ours&&kind!=='truck'?'ชื่อเรียก':'ทะเบียน')+'ก่อน','err'); vrEl('veh-plate-in').focus(); return; }
+  if(!owner){ setMsg('veh-add-msg','❌ เลือกเจ้าของรถจากรายการ (หรือกด + เพิ่มเจ้าของใหม่)','err'); vrOwnerCb.input.focus(); return; }
+  var bad=plates.filter(function(p){ return /[\/#\[\]]/.test(p); });
+  if(bad.length){ setMsg('veh-add-msg','❌ ห้ามมีเครื่องหมาย / # [ ] : '+bad.join(', '),'err'); return; }
+  if(vrState.changeOf){
+    var cp=vrState.changeOf;
+    vehChangeOwner(cp,owner,vrEl('vr-chg-date').value,function(err,ok){
+      if(err){ setMsg('veh-add-msg',err,'err'); return; }
+      setMsg('veh-add-msg',ok,'ok');
+      vrEl('veh-plate-in').value=''; vrEl('vr-chg-date').value=''; if(vrOwnerCb) vrOwnerCb.set(''); var oh=vrEl('vr-owner-hint'); if(oh) oh.innerHTML=''; vrPlateCheck();
+    });
+    return;
+  }
+  var dup=[], ok=[];
+  plates.forEach(function(p){ var f=vrFind(p); if(f&&f.same) dup.push(f.plate); else ok.push(p); });
+  if(!ok.length){ setMsg('veh-add-msg','⚠️ มีอยู่แล้วทั้งหมด: '+dup.join(', '),'warn'); return; }
+  vehSave({plates:ok,dup:dup,ownerName:owner,kind:kind,ours:ours,meter:ours?vrSegVal('vr-meter'):'',rungchai:ours&&!!(vrEl('vr-rungchai')&&vrEl('vr-rungchai').checked)},owner);
 }
 function fuzzyConfirm(isSame){
-  document.getElementById('fuzzy-dialog').style.display='none';
+  vrEl('fuzzy-dialog').style.display='none';
   if(!fuzzyPending) return;
-  vehSave(fuzzyPending.plate, fuzzyPending.ownerName, isSame?fuzzyPending.matchCanonical:fuzzyPending.ownerName);
-  fuzzyPending=null;
+  var p=fuzzyPending; fuzzyPending=null;
+  vehSave(p, isSame?p.matchCanonical:p.ownerName);
 }
-function vehSave(plate,ownerName,canonical){
-  var kEl=document.getElementById('veh-kind-in'), oEl=document.getElementById('veh-ours-in');
-  var rec={ownerName:ownerName,canonical:canonical,active:true,kind:(kEl&&kEl.value)||'truck',ours:!!(oEl&&oEl.checked)};
-  db.collection('vehicles').doc(plate).set(rec)
-    .then(function(){ setMsg('veh-add-msg','✅ เพิ่ม '+plate+' → '+canonical,'ok');
-      document.getElementById('veh-plate-in').value=''; document.getElementById('veh-owner-in').value='';
-      var oc=document.getElementById('veh-ours-in'); if(oc) oc.checked=false; })
-    .catch(function(e){ setMsg('veh-add-msg','❌ '+e.message,'err'); });
+function vehSave(pend,canonical){
+  var btn=vrEl('vr-save'); if(btn) btn.disabled=true;
+  var rec={ownerName:pend.ownerName,canonical:canonical,active:true,kind:pend.kind,ours:pend.ours};
+  if(pend.ours){ rec.meter=pend.meter||''; rec.rungchai=!!pend.rungchai; }
+  Promise.all(pend.plates.map(function(pl){ return db.collection('vehicles').doc(pl).set(rec); }))
+    .then(function(){
+      setMsg('veh-add-msg','✅ เพิ่ม '+pend.plates.length+' คัน: '+pend.plates.join(', ')+(pend.ours?'':' → '+canonical)
+        +(pend.dup.length?' · ข้าม (มีแล้ว): '+pend.dup.join(', '):'')
+        +(pend.ours?'':' · เจ้าของยังค้างไว้ เพิ่มคันต่อไปได้เลย'),'ok');
+      var pi=vrEl('veh-plate-in'); pi.value='';
+      if(!pend.ours && vrOwnerCb){ vrOwnerCb.set(canonical); var oh=vrEl('vr-owner-hint'); if(oh) oh.innerHTML=''; }
+      vrPlateCheck();
+      if(typeof fxOnVehChange==='function') fxOnVehChange();
+      pi.focus();
+    })
+    .catch(function(e){ setMsg('veh-add-msg','❌ '+e.message,'err'); })
+    .then(function(){ if(btn) btn.disabled=false; });
 }
-function vehSaveCanonical(plate){
-  var inp=document.querySelector('[data-plate="'+plate+'"]'); if(!inp) return;
-  var nc=inp.value.trim(); if(!nc) return;
+function vehSaveCanonical(plate,nc){
+  if(!nc) return;
   db.collection('vehicles').doc(plate).update({canonical:nc})
-    .then(function(){ setMsg('veh-add-msg','✅ อัปเดต '+plate+' → '+nc,'ok'); })
-    .catch(function(e){ setMsg('veh-add-msg','❌ '+e.message,'err'); });
+    .then(function(){ toast('✅ '+plate+' → '+nc,1800); })
+    .catch(function(e){ toast('❌ '+e.message,4000); });
 }
 function vehDelete(plate){
   if(!confirm('ลบทะเบียน '+plate+'?')) return;
   db.collection('vehicles').doc(plate).delete()
-    .then(function(){ setMsg('veh-add-msg','🗑️ ลบ '+plate+' แล้ว','warn'); })
-    .catch(function(e){ setMsg('veh-add-msg','❌ '+e.message,'err'); });
+    .then(function(){ toast('🗑️ ลบ '+plate+' แล้ว',2000); })
+    .catch(function(e){ toast('❌ '+e.message,4000); });
+}
+
+/* ══ ทะเบียนที่ยังไม่มีเจ้าของ (จากใบชั่ง + บิลเที่ยวดิน) — ติ๊กหลายคันแล้วตั้งเจ้าของทีเดียว ══ */
+var vrUnk={sel:{}, days:90, showAll:false, showHidden:false, ignore:{}, unIgn:null, cb:null};
+function vrUnkListen(){
+  if(vrUnk.unIgn||typeof db==='undefined') return;
+  vrUnk.unIgn=true;
+  vrUnk.unIgn=db.collection('os_config').doc('veh_ignore').onSnapshot(function(d){
+    vrUnk.ignore=(d.exists&&d.data().map)||{}; vrDrawUnknown();
+  },function(e){ console.warn('veh_ignore',e); });
+}
+function vrUnkCollect(){
+  var m={}, known={}, cut='';
+  if(vrUnk.days){ var d=new Date(); d.setDate(d.getDate()-vrUnk.days); cut=d.toISOString().slice(0,10); }
+  function add(raw,date,cust,src,owner){
+    if(cut&&(!date||date<cut)) return;
+    var np=normPlate(raw); if(!np||np==='-') return;
+    if(!(np in known)) known[np]=!!(lookupVeh(raw)||lookupVeh(np));
+    if(known[np]) return;
+    var key=np.replace(/-/g,'');
+    var r=m[key]||(m[key]={plate:np,sand:0,dirt:0,last:'',cust:{},owner:'',vars:{}});
+    r.vars[np]=(r.vars[np]||0)+1;
+    r[src]++; if(date&&date>r.last) r.last=date;
+    if(cust) r.cust[cust]=(r.cust[cust]||0)+1;
+    if(owner&&!r.owner) r.owner=owner;
+  }
+  (typeof wData!=='undefined'&&wData||[]).forEach(function(w){ if(w&&w.plate) add(w.plate,w.date,w.customer,'sand',''); });
+  (typeof osBills!=='undefined'&&osBills||[]).forEach(function(b){
+    if(!b||!b.plate||b.status==='cancelled'||b.isFreight===false) return;
+    add(b.plate,b.date,b.customer,'dirt',b.plateOwner||'');
+  });
+  return Object.keys(m).map(function(k){
+    var r=m[k], vs=Object.keys(r.vars).sort(function(a,b){ return (b.indexOf('-')>=0)-(a.indexOf('-')>=0)||r.vars[b]-r.vars[a]; });
+    r.plate=vs[0]; r.alt=vs.slice(1); return r;
+  }).sort(function(a,b){ return b.last.localeCompare(a.last)||(b.sand+b.dirt)-(a.sand+a.dirt); });
+}
+function vrDrawUnknown(){
+  var body=vrEl('vr-unk-body'); if(!body) return;
+  vrUnkListen();
+  var all=vrUnkCollect(), ign=vrUnk.ignore;
+  var hidden=all.filter(function(r){ return ign[r.plate]; });
+  var list=vrUnk.showHidden?hidden:all.filter(function(r){ return !ign[r.plate]; });
+  Object.keys(vrUnk.sel).forEach(function(p){ if(!list.some(function(r){ return r.plate===p; })) delete vrUnk.sel[p]; });
+  var t=vrEl('vr-unk-title'), hb=vrEl('vr-unk-hid'), card=vrEl('vr-unk');
+  var nOpen=all.length-hidden.length;
+  var pl={90:'ใน 3 เดือน',365:'ใน 1 ปี',0:''}[vrUnk.days]||'';
+  if(t) t.textContent=vrUnk.showHidden?('🚫 ไม่ใช่รถร่วม ('+hidden.length+')'):(nOpen?'⚠️ ทะเบียนที่ยังไม่มีเจ้าของ ('+nOpen+' คัน)':'✅ ทุกทะเบียน'+(pl?' '+pl:'')+'มีเจ้าของแล้ว');
+  if(card) card.classList.toggle('vr-unk-ok',!nOpen&&!vrUnk.showHidden);
+  if(hb){ hb.style.display=(hidden.length||vrUnk.showHidden)?'':'none'; hb.textContent=vrUnk.showHidden?'← กลับ':'🚫 ไม่ใช่รถร่วม ('+hidden.length+')'; }
+  var per='<div class="vr-uper"><span>ดูเที่ยวย้อนหลัง</span><div class="vr-seg vr-sm">'+[[90,'3 เดือน'],[365,'1 ปี'],[0,'ทั้งหมด']].map(function(x){ return '<button type="button" class="'+(vrUnk.days===x[0]?'on':'')+'" onclick="vrUnk.days='+x[0]+';vrUnk.sel={};vrDrawUnknown()">'+x[1]+'</button>'; }).join('')+'</div></div>';
+  if(!list.length){ body.innerHTML=per+(vrUnk.showHidden?'<div class="vr-unk-empty">ยังไม่มีทะเบียนที่ตั้งเป็น "ไม่ใช่รถร่วม"</div>':''); return; }
+  var shown=vrUnk.showAll?list:list.slice(0,10);
+  var nSel=Object.keys(vrUnk.sel).length, allOn=nSel&&shown.every(function(r){ return vrUnk.sel[r.plate]; });
+  var bar=vrUnk.showHidden
+    ? '<div class="vr-ubar"><label class="vr-uall"><input type="checkbox" '+(allOn?'checked':'')+' onchange="vrUnkAll(this.checked)"> เลือกทั้งหมด</label><span class="vr-ucnt">เลือกแล้ว <b>'+nSel+'</b> คัน</span><div class="vr-uact"><button type="button" class="vr-save vr-sm-btn" '+(nSel?'':'disabled')+' onclick="vrUnkHide(false)">↩ ย้ายกลับไปรอตั้งเจ้าของ</button></div></div>'
+    : '<div class="vr-ubar"><label class="vr-uall"><input type="checkbox" '+(allOn?'checked':'')+' onchange="vrUnkAll(this.checked)"> เลือกทั้งหมด</label><span class="vr-ucnt">เลือกแล้ว <b>'+nSel+'</b> คัน</span>'
+      +'<div class="vr-uown"><div id="vr-unk-combo"></div></div>'
+      +'<div class="vr-uact"><button type="button" class="vr-save vr-sm-btn" id="vr-unk-save" '+(nSel?'':'disabled')+' onclick="vrUnkSave()">💾 ตั้งเจ้าของ'+(nSel?' '+nSel+' คัน':'')+'</button>'
+      +'<button type="button" class="vr-rb" '+(nSel?'':'disabled')+' onclick="vrUnkOurs()">🏠 เป็นรถเรา</button>'
+      +'<button type="button" class="vr-rb" '+(nSel?'':'disabled')+' onclick="vrUnkHide(true)" title="ลูกค้ามารับเอง ไม่ต้องจ่ายค่าเที่ยว">🚫 ไม่ใช่รถร่วม</button></div></div>';
+  var rows=shown.map(function(r){
+    var on=!!vrUnk.sel[r.plate];
+    var cs=Object.keys(r.cust).sort(function(a,b){ return r.cust[b]-r.cust[a]; });
+    var trips=[]; if(r.sand) trips.push('ทราย '+r.sand); if(r.dirt) trips.push('ดิน '+r.dirt);
+    var f=vrFind(r.plate), hint='';
+    if(r.alt.length) hint+='<span class="vr-uh">ใบชั่งพิมพ์ไว้หลายแบบ: '+vrEsc(r.alt.join(', '))+' (นับรวมกันแล้ว)</span>';
+    if(r.owner) hint+='<span class="vr-uh">บิลระบุเจ้าของ: <b>'+vrEsc(r.owner)+'</b></span>';
+    if(f&&!f.same) hint+='<span class="vr-uh vr-uh-w">เลขคล้าย <b>'+vrEsc(f.plate)+'</b> ('+vrEsc(vrOwnerLabel(f.v))+') — พิมพ์ผิดหรือเปล่า?</span>';
+    return '<label class="vr-urow'+(on?' on':'')+'"><input type="checkbox" data-p="'+vrEsc(r.plate)+'" '+(on?'checked':'')+' onchange="vrUnkPick(this.dataset.p,this.checked)">'
+      +'<span class="vr-upl">'+vrEsc(r.plate)+'</span>'
+      +'<span class="vr-uinfo"><span>'+trips.join(' · ')+' เที่ยว</span><span>ล่าสุด '+vrBE(r.last)+'</span><span class="vr-ucs">'+vrEsc(cs.slice(0,2).join(', '))+(cs.length>2?' +'+(cs.length-2):'')+'</span></span>'
+      +(hint?'<span class="vr-uhints">'+hint+'</span>':'')+'</label>';
+  }).join('');
+  var more=list.length>10?'<button type="button" class="vr-umore" onclick="vrUnk.showAll=!vrUnk.showAll;vrDrawUnknown()">'+(vrUnk.showAll?'ย่อ':'ดูทั้งหมด '+list.length+' คัน ▾')+'</button>':'';
+  var keep=vrUnk.cb?vrUnk.cb.value:'';
+  body.innerHTML=per+bar+'<div class="vr-ulist">'+rows+'</div>'+more;
+  if(vrEl('vr-unk-combo')){
+    vrUnk.cb=vrCombo(vrEl('vr-unk-combo'),'vr-unk-owner',function(){}); vrUnk.cb.input.placeholder='เลือกเจ้าของให้คันที่ติ๊ก';
+    if(keep) vrUnk.cb.set(keep);
+    vrUnk.cb.onEnter=vrUnkSave;
+  }
+}
+function vrUnkPick(p,on){ if(on) vrUnk.sel[p]=1; else delete vrUnk.sel[p]; vrUnkSync(); }
+function vrUnkSync(){
+  var body=vrEl('vr-unk-body'); if(!body) return;
+  var n=Object.keys(vrUnk.sel).length, boxes=body.querySelectorAll('.vr-urow input'), allOn=boxes.length>0;
+  [].forEach.call(boxes,function(b){ var on=!!vrUnk.sel[b.dataset.p]; b.checked=on; b.parentNode.classList.toggle('on',on); if(!on) allOn=false; });
+  var a=body.querySelector('.vr-uall input'); if(a) a.checked=n>0&&allOn;
+  var c=body.querySelector('.vr-ucnt b'); if(c) c.textContent=n;
+  [].forEach.call(body.querySelectorAll('.vr-uact button'),function(b){ b.disabled=!n; });
+  var sv=vrEl('vr-unk-save'); if(sv) sv.textContent='💾 ตั้งเจ้าของ'+(n?' '+n+' คัน':'');
+}
+function vrUnkAll(on){
+  var ign=vrUnk.ignore, list=vrUnkCollect().filter(function(r){ return vrUnk.showHidden?ign[r.plate]:!ign[r.plate]; });
+  if(!vrUnk.showAll) list=list.slice(0,10);
+  vrUnk.sel={}; if(on) list.forEach(function(r){ vrUnk.sel[r.plate]=1; });
+  vrUnkSync();
+}
+function vrUnkWrite(rec,label){
+  var ps=Object.keys(vrUnk.sel); if(!ps.length) return;
+  Promise.all(ps.map(function(p){ return db.collection('vehicles').doc(p).set(rec,{merge:true}); }))
+    .then(function(){ vrUnk.sel={}; toast('✅ '+ps.length+' คัน → '+label,2600); vrDrawUnknown(); if(typeof fxOnVehChange==='function') fxOnVehChange(); })
+    .catch(function(e){ toast('❌ '+e.message,4000); });
+}
+function vrUnkSave(){
+  var o=vrUnk.cb&&vrUnk.cb.value;
+  if(!Object.keys(vrUnk.sel).length){ toast('ติ๊กทะเบียนก่อน',2000); return; }
+  if(!o){ toast('เลือกเจ้าของก่อน (หรือ + เพิ่มเจ้าของใหม่)',2600); if(vrUnk.cb) vrUnk.cb.input.focus(); return; }
+  vrUnkWrite({ownerName:o,canonical:o,active:true,kind:'truck',ours:false},o);
+}
+function vrUnkOurs(){ vrUnkWrite({ownerName:'รถบริษัท',canonical:'รถบริษัท',active:true,kind:'truck',ours:true},'รถเรา'); }
+function vrUnkHide(on){
+  var ps=Object.keys(vrUnk.sel); if(!ps.length) return;
+  var upd={}; ps.forEach(function(p){ upd[p]=on?true:firebase.firestore.FieldValue.delete(); });
+  db.collection('os_config').doc('veh_ignore').set({map:upd},{merge:true})
+    .then(function(){ ps.forEach(function(p){ if(on) vrUnk.ignore[p]=true; else delete vrUnk.ignore[p]; }); vrUnk.sel={}; toast(on?'🚫 '+ps.length+' คัน → ไม่ใช่รถร่วม':'↩ ย้ายกลับ '+ps.length+' คัน',2200); vrDrawUnknown(); })
+    .catch(function(e){ toast('❌ '+e.message,4000); });
+}
+function vrUnkToggleHidden(){ vrUnk.showHidden=!vrUnk.showHidden; vrUnk.sel={}; vrDrawUnknown(); }
+
+/* ทะเบียนที่ตั้งเป็น "ไม่ใช่รถร่วม" (ลูกค้ามารับเอง) — ไม่ต้องถามเจ้าของตอนออกใบจ่าย */
+function vrIsNotPartner(plate){
+  var ig=vrUnk.ignore||{}, k=normPlate(plate).replace(/-/g,'');
+  for(var p in ig){ if(ig[p]&&normPlate(p).replace(/-/g,'')===k) return true; }
+  return false;
 }
 
 /* ── Invoice ── */
@@ -6455,14 +6868,14 @@ function frFetchInvoice(){
     var net=(w.kg/KPC)-(dData[w._id]||0);
     if(net<=0) return;
     var np=normPlate(w.plate);
-    var v=lookupVeh(w.plate);
-    var canonical=(v&&v.canonical)||('❓ '+np);
-    if(!plateMap[np]) plateMap[np]={canonical:canonical,netKiu:0};
-    plateMap[np].netKiu+=net;
+    var canonical=lookupOwnerAt(w.plate,w.date)||('❓ '+np);
+    var mk=np+'\u0001'+canonical;
+    if(!plateMap[mk]) plateMap[mk]={plate:np,canonical:canonical,netKiu:0};
+    plateMap[mk].netKiu+=net;
   });
 
   frInvData = Object.keys(plateMap).map(function(p){
-    return {plate:p, canonical:plateMap[p].canonical, netKiu:plateMap[p].netKiu};
+    return {plate:plateMap[p].plate, canonical:plateMap[p].canonical, netKiu:plateMap[p].netKiu};
   }).filter(function(t){return t.netKiu>0.0001;})
     .sort(function(a,b){return a.canonical.localeCompare(b.canonical,'th')||a.plate.localeCompare(b.plate);});
 
@@ -6772,7 +7185,7 @@ function frRunPayBuild(custList, from, to, refInvoice){
     if(w.date<from||w.date>to) return;
     var net=(w.kg/KPC)-(typeof dData!=='undefined'&&dData[w._id]?dData[w._id]:0);
     if(net<=0) return;
-    if(!lookupVeh(w.plate)){ unknownSet[normPlate(w.plate)]=true; }
+    if(!lookupVeh(w.plate) && !(typeof vrIsNotPartner==='function' && vrIsNotPartner(w.plate))){ unknownSet[normPlate(w.plate)]=true; }
   });
   var unknowns=Object.keys(unknownSet);
   if(unknowns.length){
@@ -6799,7 +7212,7 @@ function frManualLoad(){
     if(w.date<from||w.date>to) return;
     var net=(w.kg/KPC)-(typeof dData!=='undefined'&&dData[w._id]?dData[w._id]:0);
     if(net<=0) return;
-    if(!lookupVeh(w.plate)){ unknownSet[normPlate(w.plate)]=true; }
+    if(!lookupVeh(w.plate) && !(typeof vrIsNotPartner==='function' && vrIsNotPartner(w.plate))){ unknownSet[normPlate(w.plate)]=true; }
   });
   var unknowns=Object.keys(unknownSet);
   if(unknowns.length){
@@ -6902,8 +7315,7 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
     var net=(w.kg/KPC)-(typeof dData!=='undefined'&&dData[w._id]?dData[w._id]:0);
     if(net<=0) return;
     var np=normPlate(w.plate);
-    var v=lookupVeh(w.plate);
-    var canon=(v&&v.canonical)||('\u2753 '+np);
+    var canon=lookupOwnerAt(w.plate,w.date)||('\u2753 '+np);
     if(!custMap[w.customer]) custMap[w.customer]={};
     if(!custMap[w.customer][canon]) custMap[w.customer][canon]={};
     if(!custMap[w.customer][canon][np]) custMap[w.customer][canon][np]=0;
@@ -6915,8 +7327,7 @@ function frManualBuild(custSet,from,to,custList,refInvoice){
     if(!custSet[b.customer]) return;
     if(b.date<from||b.date>to) return;
     var np=normPlate(b.plate);
-    var v=lookupVeh(b.plate);
-    var canon=(v&&v.canonical)||b.plateOwner||('\u2753 '+np);
+    var canon=lookupOwnerAt(b.plate,b.date)||b.plateOwner||('\u2753 '+np);
     var fp=parseFloat(b.freightPay)||0;
     if(fp>0){
       /* พนักงานกรอกค่าเที่ยวมาแล้ว → ใช้ยอดนี้ (แทน คิว×เรต) */
@@ -11881,6 +12292,190 @@ html.mb .mb-p-in.wd-off{border-color:#e0a458;background:#fffaf3}
 .veh-sel{padding:6px 8px;background:var(--bg3,#fff);border:1px solid var(--border);border-radius:6px;font-size:12.5px;font-family:inherit;color:var(--text,#1a1d1f)}
 .veh-chk{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;cursor:pointer;white-space:nowrap}
 tr.veh-ours td:first-child{box-shadow:inset 3px 0 0 #0f7b3f}
+/* ── จัดการทะเบียนรถ (3 ต.ค.69) ── ฟอร์มเพิ่มง่าย + ตารางแก้ในที่ */
+#fr-vehicles-panel{max-width:1080px}
+.vr-card{padding:18px 20px!important}
+.vr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.vr-title{font-size:17px;font-weight:700;color:var(--text-primary,#1a1d1f)}
+.vr-sub{font-size:13px;color:#6b7680;margin-top:2px}
+.vr-mut{font-weight:400;color:#8a949c;font-size:12px}
+.vr-lb{display:block;font-size:13px;color:#5f6b76;margin:0 0 5px;font-weight:600}
+.vr-seg{display:flex;gap:4px;background:#eef1f3;border-radius:12px;padding:4px}
+.vr-seg button{flex:1;border:0;background:none;border-radius:9px;padding:8px 12px;font-family:inherit;font-size:14px;color:#5f6b76;cursor:pointer;line-height:1.3}
+.vr-seg button.on{background:#fff;color:#0f7b3f;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.vr-who{max-width:560px;margin-bottom:14px}
+.vr-who button{display:flex;flex-direction:column;align-items:center;padding:10px 12px}
+.vr-who button b{font-size:15px}
+.vr-who button small{font-size:11.5px;font-weight:400;color:#8a949c}
+.vr-who button.on small{color:#4b8f68}
+.vr-sm{display:inline-flex;max-width:420px;width:100%}
+.vr-grid{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.4fr);gap:16px 18px;align-items:start}
+.vr-is-ours .vr-grid{grid-template-columns:minmax(220px,1fr) minmax(260px,1.4fr)}
+.vr-in{height:46px;border:1px solid #cfd6dc;border-radius:10px;padding:0 12px;font-size:16px;background:#fff;color:#1a1d1f;box-sizing:border-box;width:100%;font-family:inherit;outline:none}
+.vr-in:focus{border:2px solid #0f7b3f;box-shadow:0 0 0 3px #d6eee0;padding:0 11px}
+.vr-tip{font-size:12px;color:#8a949c;margin-top:5px}
+.vr-hint:empty{display:none}
+.vr-hint{margin-top:6px;font-size:13px;line-height:1.55}
+.vr-bad{color:#b3261e;background:#fdecea;border-radius:8px;padding:5px 9px;margin-top:4px}
+.vr-warn{color:#8a5a12;background:#fdf3e7;border-radius:8px;padding:5px 9px;margin-top:4px}
+.vr-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+.vr-chips-l{font-size:12px;color:#8a949c;margin-right:2px}
+.vr-chip{border:1px solid #d5dce1;background:#fff;border-radius:999px;padding:5px 11px;font-size:13px;font-family:inherit;color:#1a1d1f;cursor:pointer}
+.vr-chip small{color:#8a949c;font-size:11px;margin-left:2px}
+.vr-chip:hover{border-color:#0f7b3f;color:#0f7b3f;background:#f3faf6}
+.vr-okn{color:#0f7b3f;background:#e8f5ee;border-radius:8px;padding:5px 9px;margin-top:4px}
+.vr-pill{display:inline-block;font-size:11px;font-weight:700;background:#fff;border:1px solid #f3ddbc;border-radius:6px;padding:0 6px;margin-right:4px}
+.vr-ours-only{display:none}
+.vr-is-ours .vr-ours-only{display:block}
+.vr-is-ours .vr-partner-only{display:none}
+#vr-kind-row{margin-bottom:14px}
+.vr-chkrow{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;cursor:pointer}
+.vr-chkrow input{width:18px;height:18px;accent-color:#0f7b3f}
+.vr-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:16px}
+.vr-save{height:46px;padding:0 26px;border:0;border-radius:10px;background:#0f7b3f;color:#fff;font-size:15.5px;font-weight:700;font-family:inherit;cursor:pointer}
+.vr-save:hover{background:#0c6a36}
+.vr-save:disabled{opacity:.55;cursor:wait}
+.vr-msg{flex:1;min-width:220px;min-height:0!important;font-size:13px!important}
+.vr-msg:empty{display:none}
+.vr-srch{display:flex;align-items:center;gap:6px;border:1px solid #cfd6dc;border-radius:10px;padding:0 10px;height:40px;background:#fff;width:260px;max-width:100%;box-sizing:border-box}
+.vr-srch input{border:0;outline:none;font-size:14.5px;font-family:inherit;width:100%;background:none;color:#1a1d1f}
+.vr-note{font-size:12px;color:#8a949c;margin:0 0 10px;line-height:1.6}
+.vr-t td{vertical-align:middle}
+.vr-c-pl{white-space:nowrap}
+.vr-c-pl b{font-size:14.5px}
+.vr-ic{margin-right:6px}
+.vr-tag{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:700;color:#0f7b3f;background:#e8f5ee;border-radius:6px;padding:1px 6px;vertical-align:1px}
+.vr-was{font-size:11px;color:#a0690f;margin-top:3px}
+.vr-c-tg{text-align:center}
+.vr-tg{display:inline-flex;align-items:center;cursor:pointer;position:relative;vertical-align:middle}
+.vr-tg input{position:absolute;opacity:0;width:0;height:0}
+.vr-tg span{width:38px;height:22px;border-radius:999px;background:#cfd6dc;position:relative;transition:background .15s}
+.vr-tg span:after{content:'';position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.vr-tg input:checked+span{background:#0f7b3f}
+.vr-tg input:checked+span:after{left:19px}
+.vr-tg input:focus-visible+span{box-shadow:0 0 0 3px #d6eee0}
+.vr-tg em{display:none}
+.vr-empty td{text-align:center;color:#8a949c;padding:26px!important}
+@media (max-width:900px){ .vr-grid,.vr-is-ours .vr-grid{grid-template-columns:1fr} }
+/* ── มือถือ ── */
+html.mb .vr-card{padding:14px 14px!important;border-radius:14px}
+html.mb .vr-who{max-width:none}
+html.mb .vr-sm{max-width:none;display:flex}
+html.mb .vr-seg button{padding:10px 6px;font-size:14px}
+html.mb .vr-save{width:100%;height:50px;font-size:16px}
+html.mb .vr-msg{min-width:0;flex-basis:100%}
+html.mb .vr-chip{padding:8px 13px;font-size:14px}
+html.mb .vr-srch{width:100%;height:44px}
+html.mb .vr-srch input{font-size:16px}
+html.mb .veh-filter{width:auto}
+html.mb .veh-filter button{flex:1;padding:9px 6px}
+html.mb .vr-note{display:none}
+html.mb .vr-tw{overflow:visible;border:0}
+html.mb .vr-t,html.mb .vr-t tbody{display:block;width:100%}
+html.mb .vr-t thead{display:none}
+html.mb .vr-t tr.vr-row{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:'pl del' 'ow ow' 'kd mt' 'o r';gap:8px 10px;padding:12px;margin-bottom:10px;border:1px solid #e3e8ec;border-radius:12px;background:#fff}
+html.mb .vr-t tr.vr-row.veh-ours{border-left:4px solid #0f7b3f}
+html.mb .vr-t tr.vr-row td{display:block;padding:0!important;border:0!important;box-shadow:none!important;background:none!important}
+html.mb .vr-t tr.vr-pt{grid-template-areas:'pl del' 'ow ow' 'o o'}
+html.mb .vr-t tr.vr-pt .vr-c-kd,html.mb .vr-t tr.vr-pt .vr-c-mt,html.mb .vr-t tr.vr-pt .vr-c-r{display:none!important}
+html.mb .vr-t .vr-c-kd{grid-area:kd}html.mb .vr-t .vr-c-mt{grid-area:mt}html.mb .vr-t .vr-c-o{grid-area:o}html.mb .vr-t .vr-c-r{grid-area:r}
+html.mb .vr-t td[data-l]:before{content:attr(data-l);display:block;font-size:11.5px;color:#8a949c;margin-bottom:3px}
+html.mb .vr-t .vr-c-pl{grid-area:pl;align-self:center}
+html.mb .vr-t .vr-c-pl b{font-size:17px}
+html.mb .vr-t .vr-c-del{grid-area:del;justify-self:end;align-self:center}
+html.mb .vr-t .vr-c-ow{grid-area:ow}
+html.mb .vr-t .veh-sel{width:100%;height:40px;font-size:14px}
+html.mb .vr-t .vr-c-tg{text-align:left}
+html.mb .vr-t .vr-c-tg:before{display:none!important}
+html.mb .vr-tg{gap:8px;height:34px}
+html.mb .vr-tg em{display:inline;font-style:normal;font-size:14px;color:#1a1d1f}
+html.mb .vr-empty{display:block}
+html.mb .vr-empty td{display:block}
+
+/* ช่องเลือกเจ้าของ (dropdown + พิมพ์ได้) */
+.vr-cb{position:relative}
+.vr-cb .vr-in{padding-right:46px}
+.vr-cb-tg{position:absolute;right:5px;top:5px;width:36px;height:36px;border:0;border-radius:8px;background:#f1f3f5;color:#6b7680;cursor:pointer;font-size:14px}
+.vr-cb-list{position:absolute;left:0;right:0;top:50px;z-index:60;background:#fff;border:1px solid #dfe5e3;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.16);max-height:320px;overflow:auto;padding:6px}
+.vr-cb-sec{font-size:11.5px;color:#8a949c;padding:6px 10px 3px}
+.vr-cb-opt{display:flex;justify-content:space-between;gap:8px;width:100%;border:0;background:none;text-align:left;padding:9px 10px;border-radius:8px;font-family:inherit;font-size:14.5px;color:#1a1d1f;cursor:pointer}
+.vr-cb-opt small{color:#8a949c;font-size:12px;white-space:nowrap}
+.vr-cb-opt em{font-style:normal;color:#8a5a12;font-size:11.5px}
+.vr-cb-opt.hi,.vr-cb-opt:hover{background:#e8f5ee}
+.vr-cb-new{display:block;width:100%;margin-top:4px;border:1.5px dashed #0f7b3f;background:none;color:#0f7b3f;border-radius:9px;padding:10px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left}
+.vr-cb-new.hi,.vr-cb-new:hover{background:#e8f5ee}
+.vr-cb-none{padding:8px 10px;color:#8a949c;font-size:13px}
+/* เปลี่ยนเจ้าของ */
+.vr-chg{margin-top:16px;border:1px solid #e0a458;background:#fdf3e7;border-radius:12px;padding:12px 14px}
+.vr-chg .vr-lb{color:#8a5a12}
+.vr-chg-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.vr-chg .vr-in{width:200px;max-width:100%}
+.vr-chg-ex{font-size:13px;color:#8a5a12}
+.vr-c-ow b{font-weight:600}
+.vr-was i{font-style:normal;color:#a0690f}
+.vr-was{color:#8a949c}
+.vr-c-del{white-space:nowrap;text-align:right}
+.vr-rb{border:1px solid #dfe5e3;background:#fff;color:#1a1d1f;border-radius:8px;padding:6px 10px;font-family:inherit;font-size:13px;cursor:pointer;margin-left:4px}
+.vr-rb:hover,.vr-rb.on{border-color:#0f7b3f;color:#0f7b3f}
+.vr-rb.vr-del{color:#b3261e}
+.vr-rb.vr-del:hover{border-color:#b3261e;background:#fdecea}
+tr.vr-panel td{background:#f4f7f6!important;padding:14px!important;white-space:normal}
+.vr-t td.vr-c-ow{white-space:normal}
+.vr-pn{display:grid;grid-template-columns:minmax(0,1.3fr) 200px auto;gap:12px;align-items:end}
+.vr-pn-btn{display:flex;gap:8px}
+.vr-sm-btn{height:46px;padding:0 18px;font-size:14.5px}
+.vr-gh{background:#e7ecea!important;color:#1a1d1f!important}
+.vr-tl{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:4px;font-size:13px}
+.vr-tl li{display:flex;gap:8px;align-items:baseline}
+.vr-tl li:before{content:'';width:8px;height:8px;border-radius:50%;background:#aab3ba;flex:none}
+.vr-tl li.cur:before{background:#0f7b3f}
+.vr-undo{margin-top:10px;border:0;background:none;color:#8a5a12;font-family:inherit;font-size:12.5px;cursor:pointer;padding:0;text-decoration:underline}
+@media (max-width:900px){ .vr-pn{grid-template-columns:1fr} .vr-chg .vr-in{width:100%} }
+html.mb .vr-t tr.vr-row{grid-template-columns:1fr auto}
+html.mb .vr-t .vr-c-del{display:flex!important;gap:6px}
+html.mb .vr-rb{margin:0;padding:7px 10px}
+html.mb .vr-t tr.vr-panel{display:block;margin:-6px 0 12px}
+html.mb .vr-t tr.vr-panel td{display:block;border:1px solid #e3e8ec!important;border-top:0!important;border-radius:0 0 12px 12px}
+html.mb .vr-pn-btn .vr-save{flex:1}
+html.mb .vr-cb-opt{padding:11px 10px}
+/* ทะเบียนที่ยังไม่มีเจ้าของ */
+.vr-unk{border:1px solid #f0d3a6!important;background:#fffcf6!important}
+.vr-unk.vr-unk-ok{border-color:#cfe7d9!important;background:#f6fbf8!important}
+.vr-unk.vr-unk-ok .vr-sub{display:none}
+.vr-unk.vr-unk-ok .vr-head{margin-bottom:0}
+.vr-ubar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:10px 12px;background:#fff;border:1px solid #eadfcd;border-radius:12px;margin-bottom:10px}
+.vr-uall{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;white-space:nowrap}
+.vr-uall input,.vr-urow input{width:20px;height:20px;accent-color:#0f7b3f;flex:none}
+.vr-ucnt{font-size:13.5px;color:#5f6b76;white-space:nowrap}
+.vr-uown{flex:1;min-width:220px}
+.vr-uact{display:flex;gap:8px;flex-wrap:wrap}
+.vr-uact .vr-rb{height:46px;margin:0}
+.vr-rb:disabled,.vr-save:disabled{opacity:.45;cursor:not-allowed}
+.vr-ulist{display:grid;gap:6px}
+.vr-urow{display:grid;grid-template-columns:auto 130px 1fr;gap:4px 12px;align-items:center;padding:10px 12px;border:1px solid #eee5d6;border-radius:10px;background:#fff;cursor:pointer}
+.vr-urow:hover{border-color:#cfd6dc}
+.vr-urow.on{border-color:#0f7b3f;background:#f3faf6}
+.vr-upl{font-weight:700;font-size:15px}
+.vr-uinfo{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:#5f6b76}
+.vr-ucs{color:#1a1d1f}
+.vr-uhints{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:4px 12px}
+.vr-uh{font-size:12.5px;color:#1f5f99}
+.vr-uh-w{color:#8a5a12}
+.vr-umore{margin-top:8px;border:0;background:none;color:#0f7b3f;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;padding:4px 0}
+.vr-unk-empty{font-size:13px;color:#8a949c}
+html.mb .vr-ubar{position:sticky;top:0;z-index:5;box-shadow:0 4px 10px rgba(0,0,0,.06)}
+html.mb .vr-uown{flex-basis:100%;min-width:0}
+html.mb .vr-uact{flex-basis:100%}
+html.mb .vr-uact .vr-save{flex:1}
+html.mb .vr-urow{grid-template-columns:auto 1fr;padding:12px}
+html.mb .vr-uinfo{grid-column:2}
+html.mb .vr-uhints{grid-column:2}
+html.mb .vr-upl{font-size:17px}
+.vr-uper{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px;color:#5f6b76;flex-wrap:wrap}
+.vr-uper .vr-seg{max-width:300px}
+.vr-uper .vr-seg button{padding:6px 10px;font-size:13px}
+.vr-unk.vr-unk-ok .vr-uper{margin:10px 0 0}
+html.mb .vr-uper .vr-seg{max-width:none;flex:1}
 </style>
 <style id="fx-css">
 /* ── เบิกน้ำมันจากถัง แบบหลายคัน (26 ก.ย.69) ── จอคอม/แท็บเล็ต */
