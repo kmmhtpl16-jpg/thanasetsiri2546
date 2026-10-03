@@ -2105,6 +2105,20 @@ function showApp() {
 ================================================================ */
 var TG_DAILY_HOUR = 18; // ส่งสรุปประจำวันอัตโนมัติหลังเวลานี้ (เวลาเครื่อง)
 
+async function prWdDelete(id){
+  if (curRole !== 'admin') { toast('❌ เฉพาะเจ้าของ/CFO'); return; }
+  const w = prWithdrawals.find(x => x.fsId === id); if (!w) return;
+  const emp = (typeof prEmployees!=='undefined' ? prEmployees : []).find(e => e.id === w.empId) || {};
+  const nm = emp.nickname || w.empName || w.empId || '';
+  if (!confirm('ลบรายการเบิก ' + nm + ' ' + fmtBaht(w.amount) + ' ฿ (' + (w.date||'') + ') ?\nลบแล้วกู้คืนไม่ได้')) return;
+  try {
+    await prDb().collection('withdrawals').doc(id).delete();
+    prWithdrawals = prWithdrawals.filter(x => x.fsId !== id);
+    toast('🗑️ ลบรายการเบิกแล้ว');
+    tgNotify('🗑️ ยกเลิกรายการเบิก\n• ' + nm + ' ' + fmtBaht(w.amount) + ' ฿ (วันที่ ' + (w.date||'-') + ')\nลบโดย ' + String(curEmail||'').replace('@sand.local',''));
+    renderWdPanel();
+  } catch(e) { toast('❌ ' + e.message); }
+}
 function tgNotify(text){
   try{
     return fetch('/api/notify', {
@@ -3260,7 +3274,7 @@ async function renderWdPanel() {
                 <td style="padding:5px 8px;color:var(--text-primary);">${w.date || '-'}</td>
                 <td style="padding:5px 8px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent-amber);">${fmtBaht(w.amount)} ฿</td>
                 <td style="padding:5px 8px;color:var(--text-secondary);">${(w.recordedBy || '').replace('@sand.local','')}</td>
-                <td style="padding:5px 8px;color:var(--accent-red);">${w.isOverdrawn ? '⚠️ เกินค่าแรง' : ''}</td>
+                <td style="padding:5px 8px;color:var(--accent-red);">${w.isOverdrawn ? '⚠️ เกินค่าแรง' : ''}${(curRole==='admin'&&w.fsId)?`<button title="ลบรายการเบิกนี้" onclick="prWdDelete('${w.fsId}')" style="float:right;background:none;border:1px solid #fca5a5;border-radius:5px;color:#dc2626;cursor:pointer;font-size:11px;padding:2px 8px;">🗑️ ลบ</button>`:''}</td>
               </tr>`).join('')}
               <tr style="background:var(--bg-surface);">
                 <td style="padding:5px 8px;font-weight:700;color:var(--text-secondary);">รวม</td>
@@ -4279,7 +4293,7 @@ function parseAndSave(rows, fname) {
 
   var existIds=new Set(wData.map(function(w){return w._id;}));
   var batch=db.batch();
-  var imp=0, skip=0, _autoPriced=0, _noTruckType=0;
+  var imp=0, skip=0, _autoPriced=0, _noTruckType=0, _impPl={};
   var impDates={};
 
   for(var i=hr+2; i<rows.length; i++){
@@ -4334,6 +4348,7 @@ function parseAndSave(rows, fname) {
     var _pm = (typeof crPayOf==='function') ? crPayOf(_cust) : '';
     if(_pm) _doc.pay_method=_pm;
     batch.set(db.collection('weighings').doc(id), _doc);
+    if(_doc.plate) _impPl[_doc.plate]=1;
     imp++;
     impDates[dateStr]=1;
   }
@@ -4346,6 +4361,8 @@ function parseAndSave(rows, fname) {
           +((imp-_autoPriced)>0?(' · ยังไม่มีราคา '+(imp-_autoPriced)+' ใบ'):'')
           +(_noTruckType>0?(' (ในนั้น '+_noTruckType+' ใบเป็นลูกค้าขายตามคันที่ทะเบียนยังไม่ระบุชนิดรถ — ตั้งได้ในแท็บลูกค้า)'):''),
           _noTruckType>0?'warn':'ok');
+        if(typeof vrImportNote==='function'){ var _m0=document.getElementById('s1'); var _t0=_m0?_m0.textContent:'', _c0=_m0?_m0.className:'';
+          vrImportNote(_impPl,function(note,sim){ if(note&&_m0&&_m0.textContent===_t0){ _m0.textContent=_t0+note; if(sim) _m0.className='smsg warn'; } }); }
         vMode='latest'; updVBtn(); pushDailySummary(impDates);
       })
       .catch(function(e){ setMsg('s1','❌ Firestore: '+e.message,'err'); });
@@ -6743,7 +6760,32 @@ function vrFind(pl){
   for(i=0;i<keys.length;i++) if(normPlate(keys[i]).toUpperCase().replace(/-/g,'')===np) return {same:true,plate:keys[i],v:vehData[keys[i]]};
   var d=np.replace(/\D/g,'');
   if(d.length>=4) for(i=0;i<keys.length;i++) if(normPlate(keys[i]).replace(/\D/g,'')===d) return {same:false,plate:keys[i],v:vehData[keys[i]]};
+  /* เลขต่างกัน 1 ตัว หรือสลับ 2 ตัวติดกัน เช่น 82-1289 ≈ 85-1289 (3 ต.ค.69) */
+  if(d.length>=5) for(i=0;i<keys.length;i++) if(vrNear(d,normPlate(keys[i]).replace(/\D/g,''))) return {same:false,near:true,plate:keys[i],v:vehData[keys[i]]};
   return null;
+}
+function vrNear(a,b){
+  if(!b||a.length!==b.length||a===b) return false;
+  var df=[],i; for(i=0;i<a.length;i++) if(a[i]!==b[i]){ df.push(i); if(df.length>2) return false; }
+  if(df.length===1) return true;
+  return df[1]===df[0]+1&&a[df[0]]===b[df[1]]&&a[df[1]]===b[df[0]];
+}
+/* สรุปทะเบียนใหม่ตอนนำเข้าใบชั่ง — cb(ข้อความ, มีเลขคล้ายไหม) (3 ต.ค.69) */
+function vrImportNote(plates,cb){
+  var go=function(ign){
+    var nw=[],sim=[];
+    Object.keys(plates||{}).forEach(function(p){
+      if(!p||ign[p]) return; var f=vrFind(p);
+      if(f&&f.same) return; nw.push(p); if(f) sim.push(p+' ≈ '+f.plate);
+    });
+    if(!nw.length) return cb('',false);
+    cb('\n🚚 ทะเบียนใหม่ '+nw.length+' คัน: '+nw.slice(0,8).join(', ')+(nw.length>8?' …':'')+' — ไปตั้งเจ้าของที่หน้า "ทะเบียนรถ"'
+      +(sim.length?'\n❓ เลขคล้ายรถเดิม — พิมพ์ผิดหรือเปล่า? '+sim.join(' · '):''),sim.length>0);
+  };
+  var ignNow=(typeof vrUnk!=='undefined'&&vrUnk.ignore)||null;
+  var pv=Object.keys(vehData||{}).length?Promise.resolve():db.collection('vehicles').get().then(function(q){ q.docs.forEach(function(x){ vehData[x.id]=x.data(); }); });
+  var pi=ignNow?Promise.resolve(ignNow):db.collection('os_config').doc('veh_ignore').get().then(function(x){ return (x.exists&&x.data().map)||{}; });
+  Promise.all([pv,pi]).then(function(r){ go(r[1]||{}); }).catch(function(){ cb('',false); });
 }
 function vrOwnerLabel(v){ return v.ours?'รถเรา':(v.canonical||v.ownerName||'-'); }
 function vrPlateCheck(){
@@ -13061,6 +13103,7 @@ html.mb .vr-upl{font-size:17px}
 .vr-uper .vr-seg button{padding:6px 10px;font-size:13px}
 .vr-unk.vr-unk-ok .vr-uper{margin:10px 0 0}
 html.mb .vr-uper .vr-seg{max-width:none;flex:1}
+#s1{white-space:pre-line}
 </style>
 <style id="fx-css">
 /* ── เบิกน้ำมันจากถัง แบบหลายคัน (26 ก.ย.69) ── จอคอม/แท็บเล็ต */
