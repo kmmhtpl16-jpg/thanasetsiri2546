@@ -1845,7 +1845,7 @@ select{color-scheme:light;}
             <label>ท่าที่ซื้อ <input type="text" id="xsJrSup" value="จิราวัฒน์"></label>
             <label>ส่งให้โครงการ <select id="xsJrProj" class="xs-sel"></select></label>
             <label>ราคาซื้อ (บาท/คิว รวม VAT) <input type="number" id="xsJrPrice" value="170" step="0.01" style="width:120px;min-width:120px"></label>
-            <label>ค่าเที่ยว (บาท/เที่ยว) <input type="number" id="xsJrFreight" value="250" step="0.01" style="width:110px;min-width:110px"></label>
+            <label>ค่าเที่ยว (บาท/เที่ยว) <input type="number" id="xsJrFreight" value="" placeholder="0" step="0.01" style="width:110px;min-width:110px"></label>
           </div>
           <div class="drop-zone" style="margin-top:12px">
             <input type="file" accept="application/pdf,.pdf" onchange="xsJrFile(event)">
@@ -1854,6 +1854,16 @@ select{color-scheme:light;}
             <p>ระบบอ่านตารางให้เอง · ตรวจเลขบิลซ้ำ · เทียบยอดกับตารางสรุปท้ายไฟล์</p>
           </div>
           <div id="xsJrPreview" style="margin-top:12px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✏️ กรอกเอง (ไม่มีไฟล์ PDF)</div>
+          <div style="font-size:13px;color:var(--muted);margin:-4px 0 8px">ใช้ ท่า / โครงการ / ราคาซื้อ / ค่าเที่ยว จากช่องด้านบน · กรอกยอดรายวัน (เที่ยว · คิว) แล้วกดบันทึก</div>
+          <div class="table-wrap"><table><thead><tr><th>วันที่</th><th class="r">เที่ยว</th><th class="r">คิว</th><th class="r">ค่าทราย</th><th></th></tr></thead><tbody id="xsJmBody"></tbody></table></div>
+          <div class="frow" style="margin-top:10px">
+            <label>หมายเหตุ / อ้างอิง <input type="text" id="xsJmNote" placeholder="เช่น สรุปรับทราย เขื่อนโพนสา 13–23 ก.ย. 69"></label>
+          </div>
+          <div id="xsJmSum" style="margin-top:10px"></div>
+          <div class="brow" style="margin-top:10px"><button class="btn btn-ghost" onclick="xsJmAdd()">＋ เพิ่มวัน</button><button class="btn btn-green" onclick="xsJmSave()">💾 บันทึกรายการกรอกเอง</button></div>
         </div>
         <div class="card">
           <div class="card-title">📋 ทรายซื้อที่บันทึกแล้ว</div>
@@ -11046,7 +11056,7 @@ function xsSub(k){
   document.querySelectorAll('#tp10 .xs-subtab').forEach(function(b){ b.classList.toggle('active', b.dataset.xs===k); });
   document.querySelectorAll('#tp10 .xs-pane').forEach(function(p){ p.style.display = (p.id==='xs-'+k)?'':'none'; });
   if(!XS.loaded) return;
-  if(k==='sum') xsDrawSum(); if(k==='rc') xsDrawRc(); if(k==='jr') xsDrawJr(); if(k==='book') xsDrawBook();
+  if(k==='sum') xsDrawSum(); if(k==='rc') xsDrawRc(); if(k==='jr'){ xsDrawJr(); var jb=document.getElementById('xsJmBody'); if(jb && !jb.children.length) xsJmAdd(); } if(k==='book') xsDrawBook();
 }
 
 /* ══════════ สรุปรวมทุกแหล่ง ══════════ */
@@ -11268,7 +11278,10 @@ function xsJrPreview(){
   chk.push((dupIn?'⚠️':'✅')+' เลขบิลซ้ำในไฟล์ '+dupIn+' ใบ');
   chk.push((fresh.length<p.rows.length?'⚠️':'✅')+' เคยนำเข้าแล้ว '+(p.rows.length-fresh.length-dupIn)+' เที่ยว (ข้าม)');
   if(p.bad.length) chk.push('⚠️ อ่านไม่ออก '+p.bad.length+' บรรทัด');
-  if(mism.length) ok=false;
+  var manD={}; xsExt('jr').forEach(function(x){ if(x.manual && (x.sup||'')===sup) manD[x.date]=1; });
+  var manHit=dNew.filter(function(d){ return manD[d.date]; });
+  if(manHit.length) chk.push('❌ วันที่ '+manHit.map(function(d){return xsTh(d.date);}).join(', ')+' เคยกรอกเองไว้แล้ว — ลบรายการกรอกเองวันนั้นก่อน ไม่งั้นยอดซ้ำ');
+  if(mism.length || manHit.length) ok=false;
   var price=parseFloat(document.getElementById('xsJrPrice').value)||0, frt=parseFloat(document.getElementById('xsJrFreight').value)||0;
   var body=dNew.map(function(d){ return '<tr><td>'+xsTh(d.date)+'</td><td class="r">'+d.trips+'</td><td class="r">'+xsN(d.tons)+'</td><td class="r">'+xsN(d.kiu)+'</td><td class="r">'+xsN(d.kiu*price)+'</td><td class="r">'+xsN(d.trips*frt,0)+'</td></tr>'; }).join('');
   var tT=dNew.reduce(function(a,d){return a+d.trips;},0), tK=dNew.reduce(function(a,d){return a+d.kiu;},0);
@@ -11296,10 +11309,63 @@ function xsJrCommit(){
   }).then(function(){ toast('✅ บันทึกทรายซื้อแล้ว'); XS.jr=null; xsJrPreview(); xsDrawJr(); })
     .catch(function(e){ alert('บันทึกไม่สำเร็จ: '+e.message); });
 }
+/* ── กรอกเอง (ไม่มีไฟล์ PDF) ── */
+function xsJmRow(d){
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td><input type="date" class="xjm-d" value="'+(d||'')+'" oninput="xsJmCalc()"></td>'
+    +'<td class="r"><input type="number" class="xjm-t" min="0" step="1" style="width:80px;min-width:80px;text-align:right" oninput="xsJmCalc()"></td>'
+    +'<td class="r"><input type="number" class="xjm-k" min="0" step="0.01" style="width:110px;min-width:110px;text-align:right" oninput="xsJmCalc()"></td>'
+    +'<td class="r xjm-m">–</td>'
+    +'<td style="text-align:right"><button class="btn-red" onclick="this.closest(\'tr\').remove();xsJmCalc()">ลบ</button></td>';
+  return tr;
+}
+function xsJmAdd(){
+  var b=document.getElementById('xsJmBody'); if(!b) return;
+  var last=b.querySelectorAll('.xjm-d'), d='';
+  if(last.length && last[last.length-1].value){ var x=new Date(last[last.length-1].value+'T00:00:00'); x.setDate(x.getDate()+1); d=x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
+  b.appendChild(xsJmRow(d)); xsJmCalc();
+}
+function xsJmRows(){
+  var out=[]; document.querySelectorAll('#xsJmBody tr').forEach(function(tr){
+    var d=tr.querySelector('.xjm-d').value, t=parseInt(tr.querySelector('.xjm-t').value,10)||0, k=parseFloat(tr.querySelector('.xjm-k').value)||0;
+    out.push({tr:tr,date:d,trips:t,kiu:xsR2(k)});
+  }); return out;
+}
+function xsJmCalc(){
+  var price=parseFloat(document.getElementById('xsJrPrice').value)||0, frt=parseFloat(document.getElementById('xsJrFreight').value)||0;
+  var rows=xsJmRows(), tT=0, tK=0, tM=0;
+  rows.forEach(function(r){ var m=xsR2(r.kiu*price); r.tr.querySelector('.xjm-m').textContent=r.kiu?xsN(m):'–'; tT+=r.trips; tK+=r.kiu; tM+=m; });
+  var el=document.getElementById('xsJmSum'); if(!el) return;
+  el.innerHTML=rows.length?('<div class="smsg info" style="display:block;line-height:1.8">รวม <b>'+tT+'</b> เที่ยว · <b>'+xsN(tK)+'</b> คิว × '+xsN(price)+' = ค่าทราย <b>'+xsN(tM)+'</b> บาท'+(frt?' · ค่าเที่ยว '+xsN(tT*frt,0)+' บาท':'')+'</div>'):'';
+}
+function xsJmSave(){
+  var sup=(document.getElementById('xsJrSup').value||'').trim(), proj=document.getElementById('xsJrProj').value;
+  var price=parseFloat(document.getElementById('xsJrPrice').value)||0, frt=parseFloat(document.getElementById('xsJrFreight').value)||0;
+  var note=(document.getElementById('xsJmNote').value||'').trim();
+  var rows=xsJmRows().filter(function(r){ return r.date||r.trips||r.kiu; });
+  if(!sup){ alert('กรอกชื่อท่าที่ซื้อ'); return; } if(!proj){ alert('เลือกโครงการ'); return; }
+  if(!rows.length){ alert('ยังไม่มีรายการ — กด ＋ เพิ่มวัน'); return; }
+  var bad=rows.filter(function(r){ return !r.date || !(r.kiu>0); }); if(bad.length){ alert('มี '+bad.length+' แถวที่ยังไม่ใส่วันที่หรือคิว'); return; }
+  var seen={}, dup=rows.filter(function(r){ if(seen[r.date]) return true; seen[r.date]=1; return false; }); if(dup.length){ alert('วันที่ซ้ำในตาราง: '+xsTh(dup[0].date)); return; }
+  var have=xsExt('jr',proj).filter(function(x){ return (x.sup||'')===sup && seen[x.date]; });
+  if(have.length){ alert('มีรายการซื้อจาก '+sup+' โครงการนี้ในวันที่ '+have.map(function(x){return xsTh(x.date);}).join(', ')+' อยู่แล้ว — ลบของเดิมก่อน หรือเอาวันนั้นออก'); return; }
+  if(!(price>0) && !confirm('ยังไม่ใส่ราคาซื้อ — บันทึกไปก่อนแล้วมาแก้ราคาทีหลัง?')) return;
+  var tT=rows.reduce(function(a,r){return a+r.trips;},0), tK=xsR2(rows.reduce(function(a,r){return a+r.kiu;},0));
+  if(!confirm('บันทึกซื้อทราย '+sup+' → '+proj+'\n'+rows.length+' วัน · '+tT+' เที่ยว · '+xsN(tK)+' คิว\nค่าทราย '+xsN(rows.reduce(function(a,r){return a+xsR2(r.kiu*price);},0))+' บาท ?')) return;
+  var now=new Date().toISOString(), who=xsWho(), file='กรอกเอง '+now.slice(0,16).replace('T',' ');
+  xsExtWrite(function(all){
+    var clash=all.filter(function(x){ return x.src==='jr' && (x.sup||'')===sup && x.project===proj && seen[x.date]; });
+    if(clash.length) throw new Error('มีคนบันทึกวันที่ '+xsTh(clash[0].date)+' ไปแล้ว');
+    return all.concat(rows.map(function(r){ return {id:'j'+r.date.replace(/-/g,'')+Math.random().toString(36).slice(2,7), src:'jr', manual:true, sup:sup, date:r.date, project:proj,
+      trips:r.trips, kiu:r.kiu, bills:[], buy:price, freight:frt, file:file, note:note, by:who, at:now}; }));
+  }).then(function(){
+    toast('✅ บันทึกทรายซื้อ (กรอกเอง) แล้ว'); document.getElementById('xsJmBody').innerHTML=''; document.getElementById('xsJmNote').value=''; xsJmAdd(); xsDrawJr();
+  }).catch(function(e){ alert('บันทึกไม่สำเร็จ: '+e.message); });
+}
 function xsDrawJr(){
   var rows=xsExt('jr').slice().sort(function(a,b){ return a.date<b.date?1:-1; });
   document.getElementById('xsJrBody').innerHTML = rows.length ? rows.map(function(x){
-    return '<tr><td>'+xsTh(x.date)+'</td><td>'+xsEsc(x.sup||'')+'</td><td>'+xsEsc(x.project||'')+'</td><td class="r">'+(x.trips||0)+'</td><td class="r">'+xsN(x.kiu)+'</td><td class="r">'+(x.buy?xsN(x.buy):'<span class="badge-warn">ยังไม่ใส่</span>')+'</td><td class="r">'+xsN((x.kiu||0)*(x.buy||0))+'</td><td class="r">'+xsN((x.trips||0)*(x.freight||0),0)+'</td>'
+    return '<tr><td>'+xsTh(x.date)+'</td><td>'+xsEsc(x.sup||'')+(x.manual?' <span class="badge-warn" title="'+xsEsc(x.note||'')+'">กรอกเอง</span>':'')+'</td><td>'+xsEsc(x.project||'')+'</td><td class="r">'+(x.trips||0)+'</td><td class="r">'+xsN(x.kiu)+'</td><td class="r">'+(x.buy?xsN(x.buy):'<span class="badge-warn">ยังไม่ใส่</span>')+'</td><td class="r">'+xsN((x.kiu||0)*(x.buy||0))+'</td><td class="r">'+xsN((x.trips||0)*(x.freight||0),0)+'</td>'
       +'<td>'+(x.invDoc?'<span class="badge-billed">'+xsEsc(x.invDoc)+'</span>':'<span class="badge-pending">ยังไม่วางบิล</span>')+'</td>'
       +'<td style="text-align:right;white-space:nowrap"><button class="btn-edit-cust" onclick="xsJrPriceEdit(\''+x.id+'\')">แก้ราคา</button> '+(x.invDoc?'':'<button class="btn-red" onclick="xsRowDel(\''+x.id+'\')">ลบ</button>')+'</td></tr>'; }).join('')
     : '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มี — นำเข้าไฟล์ PDF ด้านบน</td></tr>';
