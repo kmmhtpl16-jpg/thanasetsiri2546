@@ -3241,7 +3241,8 @@ async function renderWdPanel() {
       const withdrawn = R.taken;
       const isSocial  = emp.socialSecurity && period === '16-end' && !R.trip;
       const prevWd    = getPeriodWithdrawals(emp.id, ym, R.per);
-      const defaultAmt = R.trip ? '' : Math.max(0, earned - withdrawn);
+      // ช่องเบิกเริ่มว่างเสมอ (เดิมใส่ยอดคงเหลือให้เอง → ติ๊กทุกคนแล้วกดบันทึก = เบิกเต็มทั้งงวดโดยไม่ตั้งใจ · 15 ต.ค. 69)
+      const fullLeft  = R.trip ? Math.max(0, R.left) : Math.max(0, Math.round((earned - withdrawn)*100)/100);
 
       return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -3258,9 +3259,9 @@ async function renderWdPanel() {
           <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
             <span style="font-size:12px;color:var(--text-secondary);">เบิก</span>
             <input type="number" id="wdamt_${emp.id}" class="wd-input" style="width:120px;"
-              value="${defaultAmt}" min="0" oninput="checkWdOverdraw('${emp.id}',${R.trip?R.left:earned})">
+              value="" placeholder="0" min="0" oninput="checkWdOverdraw('${emp.id}',${R.trip?R.left:earned});var c=document.getElementById('wdchk_${emp.id}');if(c&&parseFloat(this.value)>0)c.checked=true;">
             <span style="font-size:12px;color:var(--text-secondary);">฿</span>
-            <button onclick="document.getElementById('wdamt_${emp.id}').focus()" style="background:none;border:1px solid var(--border);border-radius:5px;color:var(--text-secondary);cursor:pointer;font-size:13px;padding:4px 8px;">✏️</button>
+            <button title="ใส่ยอดเต็มที่เบิกได้" onclick="var i=document.getElementById('wdamt_${emp.id}');i.value='${fullLeft}';document.getElementById('wdchk_${emp.id}').checked=true;checkWdOverdraw('${emp.id}',${R.trip?R.left:earned});" style="background:none;border:1px solid var(--border);border-radius:5px;color:var(--text-secondary);cursor:pointer;font-size:12px;padding:4px 8px;">เต็มจำนวน</button>
           </div>
           ${isSocial ? `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
             <input type="checkbox" id="wdsoc_${emp.id}" checked style="accent-color:var(--accent-blue);">
@@ -3316,6 +3317,26 @@ async function submitAllWithdrawals() {
     return cb && cb.checked;
   });
   if (!checked.length) { toast('⚠️ ติ๊กเลือกพนักงานก่อน'); return; }
+
+  // ── ยืนยันก่อนบันทึก: แสดงรายชื่อ+ยอด และเตือนถ้าเบิกเต็มยอดคงเหลือ (= เหมือนจ่ายเงินเดือนทั้งงวด) · 15 ต.ค. 69
+  const preview = [], fullPay = [];
+  let preTotal = 0;
+  for (const emp of checked) {
+    const amt = parseFloat(document.getElementById('wdamt_' + emp.id)?.value) || 0;
+    if (amt <= 0) continue;
+    const R = prWdRef(emp, ym, period);
+    const left = Math.round((R.ref - R.taken) * 100) / 100;
+    preview.push('• ' + emp.nickname + '  ' + fmtBaht(amt) + ' ฿');
+    preTotal += amt;
+    if (!R.trip && left > 0 && amt >= left - 0.01) fullPay.push(emp.nickname);
+  }
+  if (!preview.length) { toast('⚠️ ยังไม่ได้ใส่ยอดเบิก'); return; }
+  let msg = 'ยืนยันบันทึกเบิก ' + preview.length + ' คน รวม ' + fmtBaht(preTotal) + ' ฿\n\n' + preview.join('\n');
+  if (fullPay.length) {
+    msg += '\n\n⚠️ ' + fullPay.join(', ') + ' เบิกเต็มยอดคงเหลือของงวด → ยอดรอรับจะเหลือ 0'
+         + '\nถ้านี่คือ “จ่ายเงินเดือนตามงวด” ไม่ต้องบันทึกที่หน้านี้ — ให้เจ้าของกด “ยืนยันจ่าย & ปิดงวด” ในหน้าสรุปตามงวด';
+  }
+  if (!confirm(msg)) return;
 
   toast('⏳ กำลังบันทึก...');
   let count = 0;
