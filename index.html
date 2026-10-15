@@ -1940,6 +1940,11 @@ select{color-scheme:light;}
       <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">วันก่อนหน้านี้ยังคิดตามอัตราเดิม (ไม่คำนวณย้อนหลัง)</div>
     </div>
     <div id="fRateHist" style="font-size:11px;color:var(--text-secondary);margin:-4px 0 10px;"></div>
+    <div class="form-row" id="fRcEmpRow" style="display:none;">
+      <label class="form-label">คนขับในโปรแกรมรุ่งชัย (ใช้ดึงรายได้ถึงวันนี้)</label>
+      <select id="fRcEmp" class="form-input"><option value="">— ยังไม่จับคู่ —</option></select>
+      <div id="fRcEmpHint" style="font-size:11px;color:var(--text-secondary);margin-top:4px;">เบิกได้รวมทั้งเดือนไม่เกิน 2 เท่าของรายได้ถึงวันนี้ · ยังไม่จับคู่ = ใช้วงเงินด้านบนแทน</div>
+    </div>
     <div class="form-row">
       <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
         <input type="checkbox" id="fSocial" style="width:16px;height:16px;cursor:pointer;">
@@ -2500,16 +2505,108 @@ function prTripIncome(empId, ym){
   const d = (typeof prSettlements !== 'undefined' && prSettlements) ? prSettlements[prTripKey(ym, empId)] : null;
   return d ? { total: +d.total || 0, rcPart: +d.rcPart || 0, entered: true } : { total: 0, rcPart: 0, entered: false };
 }
-// อ้างอิงตอนเบิก: คนปกติ = ค่าแรงงวดที่เลือก · คนขับวิ่งเที่ยว = วงเงินทั้งเดือน (งวด 16-end)
+// ══ รายได้คนขับถึงวันนี้ จากโปรแกรมรุ่งชัย (Edge Function tha-driver-earnings) — 15 ต.ค. 69 ══
+// สัญญากลาง: _แผน-ดึงรายได้คนขับจากรุ่งชัย-15ตค69/0_กติกาและสัญญาเชื่อมต่อ.md
+// ยืนยันตัวตนด้วย Firebase ID token ของผู้ใช้ที่ล็อกอินอยู่ — ไม่มีรหัสลับในไฟล์นี้
+// กติกาเบิก: ยอดเบิกรวมทั้งเดือน (รวมครั้งนี้) ≤ 2 × รายได้ถึงวันนี้ · เกินได้ แต่เตือน + Telegram
+const RC_EARN_URL = 'https://gsruyrjdjbjjxoaxkbcq.supabase.co/functions/v1/tha-driver-earnings';
+const RC_EARN_TTL = 5 * 60 * 1000;
+const _rcEarn = {};   // ym → { at, res:{ok,drivers,upTo,asOf,error}, p }
+function rcUpToFor(ym){   // เดือนนี้ = ถึงวันนี้ · เดือนที่ผ่านมา = ทั้งเดือน · เดือนหน้า = ไม่ดึง
+  const cur = currentYM();
+  if (ym === cur) return todayYMD();
+  if (ym < cur) return ym + '-' + String(daysInMonth(ym)).padStart(2, '0');
+  return null;
+}
+async function rcFetchEarnings(ym, upTo, force){
+  upTo = upTo || rcUpToFor(ym);
+  if (!/^\d{4}-\d{2}$/.test(String(ym)) || !upTo) return { ok: false, error: 'ยังไม่ถึงเดือนนี้' };
+  const key = ym + '|' + upTo, c = _rcEarn[key];
+  if (c && !force && c.p) return c.p;
+  if (c && !force && Date.now() - c.at < ((c.res.ok && !c.res.stale) ? RC_EARN_TTL : 30000)) return c.res;
+  const p = (async () => {
+    try {
+      const u = typeof firebase !== 'undefined' && firebase.auth().currentUser;
+      if (!u) throw new Error('ยังไม่ได้เข้าสู่ระบบ');
+      const tok = await u.getIdToken();
+      const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const tm = ctl ? setTimeout(() => ctl.abort(), 15000) : 0;
+      const r = await fetch(RC_EARN_URL, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ym, upTo }),
+        signal: ctl ? ctl.signal : undefined
+      }).finally(() => { if (tm) clearTimeout(tm); });
+      let j = null; try { j = await r.json(); } catch (e) {}
+      if (!r.ok || !j || j.ok !== true || !Array.isArray(j.drivers)) throw new Error((j && j.error) || ('HTTP ' + r.status));
+      const num = v => (v !== null && v !== '' && Number.isFinite(+v)) ? +v : NaN;
+      const drivers = j.drivers.map(d => ({
+        rcEmpId: String(d.rcEmpId || ''), name: String(d.name || ''), nickname: d.nickname == null ? '' : String(d.nickname),
+        jobPay: num(d.jobPay) || 0, jobCount: num(d.jobCount) || 0, allowance: num(d.allowance) || 0,   // ยอดย่อยใช้แสดงเท่านั้น
+        leaveDays: num(d.leaveDays) || 0, deduct: num(d.deduct) || 0, total: num(d.total)
+      })).filter(d => d.rcEmpId && Number.isFinite(d.total) && d.total >= 0);   // ยอดรวมผิดรูป/ติดลบ = ไม่ใช้คนนั้น
+      return { ok: true, ym, upTo: String(j.upTo || upTo), asOf: j.asOf || '', drivers };
+    } catch (e) {
+      console.warn('rcFetchEarnings', e);
+      return { ok: false, error: 'ดึงยอดรุ่งชัยไม่ได้' + (e && e.message ? ' (' + e.message + ')' : '') };
+    }
+  })();
+  const seq = (c && c.seq || 0) + 1, okAt = c ? c.okAt : 0;
+  _rcEarn[key] = { at: c ? c.at : 0, okAt, seq, res: c ? c.res : { ok: false, error: 'กำลังดึงยอดรุ่งชัย' }, p };
+  const res = await p;
+  if (_rcEarn[key].seq !== seq) return _rcEarn[key].p || _rcEarn[key].res;   // มีคำขอใหม่กว่าแล้ว — ไม่เขียนทับ
+  // ดึงไม่ได้ → ใช้ยอดสำเร็จครั้งล่าสุดต่อได้ไม่เกิน 30 นาที (ติดป้าย "ยอดเก่า") และลองใหม่ทุก 30 วินาที
+  const keepOld = !res.ok && c && c.res.ok && Date.now() - okAt < 30 * 60 * 1000;
+  _rcEarn[key] = { at: Date.now(), okAt: res.ok ? Date.now() : okAt, seq, p: null,
+    res: keepOld ? Object.assign({}, c.res, { stale: true }) : res };
+  return _rcEarn[key].res;
+}
+// โหลดยอดรุ่งชัยของเดือนนั้นก่อนวาดหน้าเบิก (เฉพาะเมื่อมีคนขับวิ่งเที่ยวที่จับคู่แล้ว) — ไม่ throw
+async function rcEnsureEarnings(ym, force){
+  if (!prEmployees.some(e => e.active && prIsTrip(e) && e.rcEmpId)) return null;
+  return rcFetchEarnings(ym, null, force);
+}
+// อ่านแบบ sync จาก cache (ใช้ใน prWdRef) → {total,...} | null + สถานะ
+function rcEarnState(ym){
+  const up = rcUpToFor(ym), c = up && _rcEarn[ym + '|' + up];
+  return c ? c.res : null;
+}
+function rcEarnOf(emp, ym){
+  if (!emp || !emp.rcEmpId) return null;
+  const s = rcEarnState(ym);
+  if (!s || !s.ok) return null;
+  return s.drivers.find(d => d.rcEmpId === emp.rcEmpId) || { rcEmpId: emp.rcEmpId, total: 0, jobPay: 0, jobCount: 0, allowance: 0, leaveDays: 0, deduct: 0, missing: true };
+}
+
+// อ้างอิงตอนเบิก: คนปกติ = ค่าแรงงวดที่เลือก · คนขับวิ่งเที่ยว = 2 × รายได้ถึงวันนี้จากรุ่งชัย (ทั้งเดือน)
+//   ดึงยอดรุ่งชัยไม่ได้/ยังไม่จับคู่ → ถอยไปใช้วงเงินเดิม (ยอดที่ใส่ตอนปิดงวด หรือ emp.rate) และบอกบนจอ
 function prWdRef(emp, ym, period){
   if (prIsTrip(emp)) {
-    const per = '16-end', taken = totalWithdrawn(emp.id, ym, per), inc = prTripIncome(emp.id, ym);
+    const per = '16-end', taken = totalWithdrawn(emp.id, ym, '1-15') + totalWithdrawn(emp.id, ym, '16-end');
+    const rc = rcEarnOf(emp, ym);
+    if (rc) {
+      const X = rc.total, cap = Math.round(2 * X * 100) / 100, st = rcEarnState(ym) || {};
+      return { per, ref: cap, taken, left: Math.max(0, cap - taken), trip: true, rc: true, earnX: X,
+        label: 'เพดานเบิกรวม (2 × รายได้)',
+        info: 'รายได้ถึงวันนี้ (รุ่งชัย) ' + fmtBaht(X) + ' ฿ · เบิกได้รวมไม่เกิน ' + fmtBaht(cap) + ' ฿ · เบิกแล้ว ' + fmtBaht(taken) + ' ฿ · เบิกได้อีก ' + fmtBaht(Math.max(0, cap - taken)) + ' ฿'
+          + (rc.missing ? ' (ไม่พบคนนี้ในรุ่งชัยเดือนนี้)' : '') + (st.stale ? ' (ยอดเก่า — ดึงใหม่ไม่ได้)' : '') };
+    }
+    const inc = prTripIncome(emp.id, ym);
     const ref = inc.entered ? inc.total : (+emp.rate || 0);
-    return { per, ref, taken, left: Math.max(0, ref - taken), trip: true,
-      label: inc.entered ? 'รายได้เดือนนี้ (โปรแกรมรุ่งชัย)' : 'วงเงินเบิกเดือนนี้ · จ่ายสิ้นเดือน' };
+    const st = rcEarnState(ym);
+    const why = !emp.rcEmpId ? 'ยังไม่ได้จับคู่กับรุ่งชัยในทะเบียนพนักงาน' : (st && !st.ok ? st.error : 'ยังไม่ได้ดึงยอดรุ่งชัย');
+    return { per, ref, taken, left: Math.max(0, ref - taken), trip: true, rc: false,
+      label: inc.entered ? 'รายได้เดือนนี้ (โปรแกรมรุ่งชัย)' : 'วงเงินเบิกเดือนนี้ · จ่ายสิ้นเดือน',
+      info: '⚠️ ' + why + ' — ใช้วงเงินเดิม ' + fmtBaht(ref) + ' ฿ · เบิกแล้ว ' + fmtBaht(taken) + ' ฿ · เบิกได้อีก ' + fmtBaht(Math.max(0, ref - taken)) + ' ฿' };
   }
   const earned = calcPeriodEarned(emp.id, ym, period), taken = totalWithdrawn(emp.id, ym, period);
   return { per: period, ref: earned, taken, left: Math.max(0, earned - taken), trip: false, label: 'ค่าแรงรอบนี้' };
+}
+// เกินเกณฑ์ไหม (ยอดเบิกรวมหลังครั้งนี้) — คนขับที่ดึงยอดรุ่งชัยได้: รายได้ต้อง "มากกว่า" ครึ่งของยอดเบิก
+//   (เบิก 12,000 ต้องมีรายได้เกิน 6,000 · เท่ากันพอดี = เกิน) · คนอื่น/วงเงินเดิม: เกินเมื่อมากกว่าเพดาน
+function prWdOver(R, amt){
+  const y = R.taken + amt;
+  return (R.trip && R.rc) ? (y > 0 && y >= R.ref - 0.001) : (y > R.ref + 0.001);
 }
 async function _prTripWrite(ym, empId, total){
   const emp = prEmployees.find(e => e.id === empId);
@@ -2563,6 +2660,32 @@ async function prTripPaste(ym){
   await renderCycleSummary();
   toast(done.length ? ('✅ ใส่ยอดแล้ว: ' + done.join(' · ') + (miss.length ? ' · ไม่พบในทะเบียน: ' + miss.join(', ') : '')) : '⚠️ ไม่พบชื่อที่ตรงกับคนขับวิ่งเที่ยวในทะเบียน');
 }
+/* ปิดงวดสิ้นเดือน: ดึงรายได้เดือนของคนขับจากรุ่งชัย (API) → บันทึกยอดรวมจ่ายแทนพิมพ์เอง · แก้มือทีหลังได้ (15 ต.ค. 69) */
+async function prTripFetchRc(ym){
+  if (typeof curRole !== 'undefined' && curRole !== 'admin') { toast('❌ เฉพาะเจ้าของ/CFO'); return; }
+  const upTo = rcUpToFor(ym);
+  if (!upTo) { toast('⚠️ ยังไม่ถึงเดือน ' + ym); return; }
+  toast('⏳ กำลังดึงยอดจากรุ่งชัย...');
+  const res = await rcFetchEarnings(ym, upTo, true);
+  if (!res.ok || res.stale) { toast('❌ ' + (res.error || 'ดึงยอดรุ่งชัยไม่ได้')); return; }
+  const trips = prEmployees.filter(e => e.active && prIsTrip(e));
+  const hit = [], miss = [];
+  trips.forEach(e => {
+    const d = e.rcEmpId && res.drivers.find(x => x.rcEmpId === e.rcEmpId);
+    if (d) hit.push({ e, d }); else miss.push(e.nickname + (e.rcEmpId ? ' (ไม่พบในรุ่งชัยเดือนนี้)' : ' (ยังไม่จับคู่ในทะเบียน)'));
+  });
+  if (!hit.length) { toast('⚠️ ไม่มีคนขับที่จับคู่กับรุ่งชัยไว้ — ไปเลือกในทะเบียนพนักงานก่อน'); return; }
+  const partial = upTo < ym + '-' + String(daysInMonth(ym)).padStart(2, '0');
+  const msg = 'ใส่ยอดรวมจ่ายจากรุ่งชัย เดือน ' + ym + ' (ถึงวันที่ ' + isoToBE(upTo) + ')' + (partial ? '\n⚠️ ยังไม่สิ้นเดือน — ยอดยังไม่ครบเดือน' : '') + '\n\n'
+    + hit.map(x => '• ' + x.e.nickname + '  ' + fmtBaht(x.d.total) + ' ฿  (ค่าเที่ยว ' + fmtBaht(x.d.jobPay) + ' · เบี้ยเลี้ยง ' + fmtBaht(x.d.allowance) + (x.d.deduct ? ' · หักลา ' + fmtBaht(x.d.deduct) : '') + ')').join('\n')
+    + (miss.length ? '\n\nไม่ได้ใส่: ' + miss.join(', ') : '') + '\n\nยอดเดิมที่ใส่ไว้จะถูกแทนที่ — แก้มือทีหลังได้';
+  if (!confirm(msg)) return;
+  try {
+    for (const x of hit) await _prTripWrite(ym, x.e.id, x.d.total);
+    await renderCycleSummary();
+    toast('✅ ใส่ยอดจากรุ่งชัยแล้ว ' + hit.length + ' คน' + (miss.length ? ' · ไม่ได้ใส่: ' + miss.join(', ') : ''));
+  } catch (e) { toast('❌ ' + e.message); }
+}
 function prTripBlock(ym, period){
   const trips = prEmployees.filter(e => e.active && prIsTrip(e));
   if (!trips.length) return '';
@@ -2583,7 +2706,8 @@ function prTripBlock(ym, period){
   const rc = prTripRc(ym);
   return `<div class="table-wrap" style="margin-bottom:14px;border:1px solid rgba(59,130,246,0.35);">
     <div class="table-toolbar"><div class="table-toolbar-title">🚛 คนขับวิ่งเที่ยว — ยอดจากโปรแกรมค่าเที่ยวรุ่งชัย (${ym})</div></div>
-    ${isAdm ? `<details style="margin:0 14px 10px;" ${trips.some(e=>!prTripIncome(e.id, ym).entered)?'open':''}><summary style="cursor:pointer;font-size:13px;color:var(--accent-blue);font-weight:700;">📋 ดึงยอดอัตโนมัติ — วางจากโปรแกรมรุ่งชัย</summary>
+    ${isAdm ? `<div style="margin:0 14px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><button class="btn btn-gold" style="font-size:13px;" onclick="prTripFetchRc('${ym}')">⚡ ดึงยอดจากรุ่งชัย</button><span style="font-size:12px;color:var(--text-secondary);">ดึงรายได้เดือนนี้ของคนขับที่จับคู่ไว้ในทะเบียนพนักงาน · ยังแก้ยอดเองได้ในตาราง</span></div>` : ''}
+    ${isAdm ? `<details style="margin:0 14px 10px;"><summary style="cursor:pointer;font-size:13px;color:var(--accent-blue);font-weight:700;">📋 วิธีสำรอง — วางจากโปรแกรมรุ่งชัย (ใช้เมื่อดึงยอดไม่ได้)</summary>
       <div style="font-size:12px;color:var(--text-secondary);margin:8px 0;line-height:1.6;">1) เปิดโปรแกรมค่าเที่ยวรุ่งชัย → แท็บ <b>สรุปสิ้นเดือน</b> → เลือกเดือน → กดปุ่ม <b>“คัดลอกสรุปรายคน”</b><br>2) คลิกในกล่องนี้ กด Ctrl+V แล้วกด <b>ใส่ยอดให้อัตโนมัติ</b> — ทำซ้ำระหว่างเดือนได้ ยอดจะอัปเดตเป็นล่าสุด</div>
       <textarea id="trPaste" class="form-input" rows="3" style="width:100%;font-family:var(--font-mono);font-size:12px;" placeholder="วางข้อมูลที่คัดลอกมาตรงนี้"></textarea>
       <button class="btn btn-gold" style="margin-top:8px;font-size:13px;" onclick="prTripPaste('${ym}')">⚡ ใส่ยอดให้อัตโนมัติ</button>
@@ -3230,6 +3354,7 @@ async function renderWdPanel() {
 
   await prLoadWithdrawals(ym);
   await prLoadSettlements(ym);
+  await rcEnsureEarnings(ym);   // รายได้คนขับวิ่งเที่ยวจากรุ่งชัย (cache 5 นาที · พังไม่ทำให้หน้าพัง)
 
   const panel  = document.getElementById('wdPanel');
   const active = prEmployees.filter(e => e.active);
@@ -3259,16 +3384,17 @@ async function renderWdPanel() {
           <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
             <span style="font-size:12px;color:var(--text-secondary);">เบิก</span>
             <input type="number" id="wdamt_${emp.id}" class="wd-input" style="width:120px;"
-              value="" placeholder="0" min="0" oninput="checkWdOverdraw('${emp.id}',${R.trip?R.left:earned});var c=document.getElementById('wdchk_${emp.id}');if(c&&parseFloat(this.value)>0)c.checked=true;">
+              value="" placeholder="0" min="0" oninput="checkWdOverdraw('${emp.id}',${R.left});var c=document.getElementById('wdchk_${emp.id}');if(c&&parseFloat(this.value)>0)c.checked=true;">
             <span style="font-size:12px;color:var(--text-secondary);">฿</span>
-            <button title="ใส่ยอดเต็มที่เบิกได้" onclick="var i=document.getElementById('wdamt_${emp.id}');i.value='${fullLeft}';document.getElementById('wdchk_${emp.id}').checked=true;checkWdOverdraw('${emp.id}',${R.trip?R.left:earned});" style="background:none;border:1px solid var(--border);border-radius:5px;color:var(--text-secondary);cursor:pointer;font-size:12px;padding:4px 8px;">เต็มจำนวน</button>
+            <button title="ใส่ยอดเต็มที่เบิกได้" onclick="var i=document.getElementById('wdamt_${emp.id}');i.value='${fullLeft}';document.getElementById('wdchk_${emp.id}').checked=true;checkWdOverdraw('${emp.id}',${R.left});" style="background:none;border:1px solid var(--border);border-radius:5px;color:var(--text-secondary);cursor:pointer;font-size:12px;padding:4px 8px;">เต็มจำนวน</button>
           </div>
           ${isSocial ? `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
             <input type="checkbox" id="wdsoc_${emp.id}" checked style="accent-color:var(--accent-blue);">
             หักปกส 875฿
           </label>` : ''}
         </div>
-        <div id="wdwarn_${emp.id}" style="display:none;font-size:11px;color:var(--accent-amber);margin-top:6px;padding:4px 8px;background:rgba(245,158,11,0.1);border-radius:4px;">⚠️ เบิกเกิน${R.trip?'วงเงิน — บันทึกได้ แต่จะแจ้งเตือนใน Telegram':'ค่าแรง'}</div>
+        <div id="wdwarn_${emp.id}" style="display:none;font-size:11px;color:var(--accent-amber);margin-top:6px;padding:4px 8px;background:rgba(245,158,11,0.1);border-radius:4px;">⚠️ เบิกเกิน${R.trip?(R.rc?'กติกา (เบิกรวมเกิน 2 เท่ารายได้ถึงวันนี้)':'วงเงิน')+' — บันทึกได้ แต่จะแจ้งเตือนใน Telegram':'ค่าแรงงวดนี้ (รวมที่เบิกไปแล้ว)'}</div>
+        ${R.trip && R.info ? `<div style="font-size:11.5px;color:${R.rc?'var(--text-secondary)':'var(--accent-amber)'};margin-top:6px;">🚛 ${escHtml(R.info)}</div>` : ''}
         ${prevWd.length > 0 ? `<div style="margin-top:10px;">
           <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;font-weight:600;">📋 ประวัติเบิกเงินรอบนี้ (${prevWd.length} ครั้ง)</div>
           <table style="width:100%;border-collapse:collapse;font-size:11px;">
@@ -3319,7 +3445,8 @@ async function submitAllWithdrawals() {
   if (!checked.length) { toast('⚠️ ติ๊กเลือกพนักงานก่อน'); return; }
 
   // ── ยืนยันก่อนบันทึก: แสดงรายชื่อ+ยอด และเตือนถ้าเบิกเต็มยอดคงเหลือ (= เหมือนจ่ายเงินเดือนทั้งงวด) · 15 ต.ค. 69
-  const preview = [], fullPay = [];
+  if (checked.some(e => prIsTrip(e))) await rcEnsureEarnings(ym);   // รายได้คนขับจากรุ่งชัย (ใช้ cache ถ้ายังไม่เกิน 5 นาที)
+  const preview = [], fullPay = [], overMsg = [];
   let preTotal = 0;
   for (const emp of checked) {
     const amt = parseFloat(document.getElementById('wdamt_' + emp.id)?.value) || 0;
@@ -3329,6 +3456,11 @@ async function submitAllWithdrawals() {
     preview.push('• ' + emp.nickname + '  ' + fmtBaht(amt) + ' ฿');
     preTotal += amt;
     if (!R.trip && left > 0 && amt >= left - 0.01) fullPay.push(emp.nickname);
+    if (prWdOver(R, amt)) {
+      if (R.trip && R.rc) overMsg.push('🚨 ' + emp.nickname + ' เบิกรวมเดือนนี้ ' + fmtBaht(R.taken + amt) + ' ฿ เกินกติกา 50% — รายได้ถึงวันนี้ (รุ่งชัย) ' + fmtBaht(R.earnX) + ' ฿ (ต้องเกิน ' + fmtBaht((R.taken + amt) / 2) + ' ฿)');
+      else if (R.trip) overMsg.push('🚨 ' + emp.nickname + ' เบิกรวมเดือนนี้ ' + fmtBaht(R.taken + amt) + ' ฿ เกินวงเงิน ' + fmtBaht(R.ref) + ' ฿ (ดึงยอดรุ่งชัยไม่ได้ — ใช้วงเงินเดิม)');
+      else overMsg.push('⚠️ ' + emp.nickname + ' เบิกรวมงวดนี้ ' + fmtBaht(R.taken + amt) + ' ฿ เกินค่าแรงงวด ' + fmtBaht(R.ref) + ' ฿');
+    }
   }
   if (!preview.length) { toast('⚠️ ยังไม่ได้ใส่ยอดเบิก'); return; }
   let msg = 'ยืนยันบันทึกเบิก ' + preview.length + ' คน รวม ' + fmtBaht(preTotal) + ' ฿\n\n' + preview.join('\n');
@@ -3336,6 +3468,7 @@ async function submitAllWithdrawals() {
     msg += '\n\n⚠️ ' + fullPay.join(', ') + ' เบิกเต็มยอดคงเหลือของงวด → ยอดรอรับจะเหลือ 0'
          + '\nถ้านี่คือ “จ่ายเงินเดือนตามงวด” ไม่ต้องบันทึกที่หน้านี้ — ให้เจ้าของกด “ยืนยันจ่าย & ปิดงวด” ในหน้าสรุปตามงวด';
   }
+  if (overMsg.length) msg += '\n\n' + overMsg.join('\n') + '\n(บันทึกได้ แต่จะติดธงเบิกเกินและแจ้ง Telegram ให้เจ้าของ)';
   if (!confirm(msg)) return;
 
   toast('⏳ กำลังบันทึก...');
@@ -3352,17 +3485,20 @@ async function submitAllWithdrawals() {
       const isSocial = emp.socialSecurity && period === '16-end' && !R.trip;
       const socEl = document.getElementById('wdsoc_' + emp.id);
       const socialDeducted = isSocial && socEl && socEl.checked;
-      const over = R.trip ? (R.taken + amt > R.ref + 0.001) : (amt > earned);
+      // เกินเกณฑ์: คนขับวิ่งเที่ยว = เบิกรวมทั้งเดือน > 2×รายได้ (หรือวงเงินเดิม) · คนอื่น = เบิกแล้ว+ครั้งนี้ > ค่าแรงงวด
+      const over = prWdOver(R, amt);
       await prSaveWithdrawal({
         empId: emp.id, period: R.per, month: ym,
         date: todayYMD(), amount: amt,
-        earnedAtTime: earned, socialDeducted,
+        earnedAtTime: (R.trip && R.rc) ? R.earnX : earned, socialDeducted,
         isOverdrawn: over,
         recordedBy: typeof curEmail !== 'undefined' ? curEmail : 'admin'
       });
       count++;
       tgLines.push('• ' + emp.nickname + ' ' + fmtBaht(amt) + ' ฿' + (over ? ' ⚠️' : ''));
-      if (over && R.trip) overLines.push('⚠️ <b>' + emp.nickname + '</b> (คนขับวิ่งเที่ยว) เบิกเดือนนี้รวม <b>' + fmtBaht(R.taken + amt) + ' ฿</b> เกิน' + (prTripIncome(emp.id, ym).entered ? 'รายได้' : 'วงเงิน') + ' ' + fmtBaht(R.ref) + ' ฿ อยู่ <b>' + fmtBaht(R.taken + amt - R.ref) + ' ฿</b>');
+      if (over && R.trip && R.rc) overLines.push('🚨 เบิกเกินกติกา 50%: <b>' + emp.nickname + '</b> เบิกรวม <b>' + fmtBaht(R.taken + amt) + ' ฿</b> · รายได้ถึงวันนี้ ' + fmtBaht(R.earnX) + ' ฿ (ต้องเกิน ' + fmtBaht((R.taken + amt) / 2) + ' ฿)');
+      else if (over && !R.trip) overLines.push('⚠️ <b>' + emp.nickname + '</b> เบิกรวมงวดนี้ <b>' + fmtBaht(R.taken + amt) + ' ฿</b> เกินค่าแรงงวด ' + fmtBaht(R.ref) + ' ฿');
+      else if (over && R.trip) overLines.push('⚠️ <b>' + emp.nickname + '</b> (คนขับวิ่งเที่ยว) เบิกเดือนนี้รวม <b>' + fmtBaht(R.taken + amt) + ' ฿</b> เกิน' + (prTripIncome(emp.id, ym).entered ? 'รายได้' : 'วงเงิน') + ' ' + fmtBaht(R.ref) + ' ฿ อยู่ <b>' + fmtBaht(R.taken + amt - R.ref) + ' ฿</b>');
     }
     await renderWdPanel();
     toast('✅ บันทึก ' + count + ' คนแล้ว' + (overLines.length ? ' · ⚠️ มีเบิกเกิน ' + overLines.length + ' คน (แจ้ง Telegram แล้ว)' : ''));
@@ -3967,6 +4103,8 @@ function openEmpModal(id) {
   document.getElementById('specialRoleList').innerHTML = '';
   prEditSpecialCount = 0;
   document.getElementById('fRateFromRow').style.display = 'none';
+  const rcSel = document.getElementById('fRcEmp');
+  if (rcSel) { delete rcSel.dataset.picked; delete rcSel.dataset.ready; rcSel.dataset.ticket = String((+rcSel.dataset.ticket || 0) + 1); rcSel.value = ''; }
   if (id) {
     const emp = prEmployees.find(e => e.id === id);
     document.getElementById('empModalTitle').textContent = 'แก้ไขพนักงาน';
@@ -4013,6 +4151,40 @@ function setEmpType(type) {
   document.getElementById('typeBtnMonthly')?.classList.toggle('active', type === 'monthly');
   document.getElementById('typeBtnTrip')?.classList.toggle('active', type === 'trip');
   document.getElementById('rateLabel').textContent = type === 'daily' ? 'อัตราค่าแรง (บาท/วัน) *' : type === 'trip' ? 'วงเงินเบิกต่อเดือน (บาท) * — รายได้จริงคิดในโปรแกรมรุ่งชัย · เบิกเกินวงเงินจะแจ้ง Telegram' : 'เงินเดือน (บาท/เดือน) *';
+  const rcRow = document.getElementById('fRcEmpRow');
+  if (rcRow) { rcRow.style.display = type === 'trip' ? '' : 'none'; if (type === 'trip') rcFillEmpSelect(); }
+}
+
+// รายชื่อคนขับจากรุ่งชัย → ช่องเลือกในทะเบียนพนักงาน (สร้างด้วย DOM ไม่ต่อ HTML จากชื่อ)
+async function rcFillEmpSelect(){
+  const sel = document.getElementById('fRcEmp'), hint = document.getElementById('fRcEmpHint');
+  if (!sel) return;
+  const id = document.getElementById('empModalId').value;
+  const emp = id ? prEmployees.find(e => e.id === id) : null;
+  const cur = sel.dataset.picked != null ? sel.dataset.picked : ((emp && emp.rcEmpId) || '');
+  const ticket = sel.dataset.ticket = String((+sel.dataset.ticket || 0) + 1);
+  const res = await rcFetchEarnings(currentYM());
+  // ระหว่างรอ ผู้ใช้ปิด/เปิดพนักงานคนอื่นหรือเปลี่ยนประเภท → ทิ้งผลนี้ (กันจับคู่ผิดคน)
+  if (sel.dataset.ticket !== ticket || document.getElementById('empModalId').value !== id
+      || document.getElementById('empModalOverlay').style.display === 'none' || prEditEmpType !== 'trip') return;
+  const opt = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; return o; };
+  sel.innerHTML = '';
+  sel.appendChild(opt('', '— ยังไม่จับคู่ —'));
+  const list = res.ok ? res.drivers : [];
+  list.forEach(d => sel.appendChild(opt(d.rcEmpId, (d.nickname ? d.nickname + ' · ' : '') + d.name)));
+  if (cur && !list.some(d => d.rcEmpId === cur)) sel.appendChild(opt(cur, '(จับคู่ไว้แล้ว — ไม่พบในรายชื่อเดือนนี้)'));
+  let val = cur, guessed = false;
+  if (!val) {   // ยังไม่จับคู่ → เดาจากชื่อเล่น ให้เจ้าของตรวจก่อนกดบันทึก
+    const nn = String(document.getElementById('fNickname').value || '').replace(/\s/g, '');
+    const g = nn && list.find(d => d.nickname.replace(/\s/g, '') === nn || d.name.replace(/\s/g, '').indexOf(nn) >= 0);
+    if (g) { val = g.rcEmpId; guessed = true; }
+  }
+  sel.value = val;
+  sel.dataset.ready = '1';
+  sel.onchange = () => { sel.dataset.picked = sel.value; };
+  if (hint) hint.textContent = !res.ok ? (res.error + ' — ลองเปิดหน้านี้ใหม่ภายหลัง')
+    : guessed ? '⚠️ เลือกให้ตามชื่อเล่น — ตรวจให้ถูกคนก่อนกดบันทึก'
+    : 'เบิกได้รวมทั้งเดือนไม่เกิน 2 เท่าของรายได้ถึงวันนี้ · ยังไม่จับคู่ = ใช้วงเงินด้านบนแทน';
 }
 
 function addSpecialRoleField(name = '', rate = '') {
@@ -4057,6 +4229,16 @@ async function saveEmployee() {
     specialRoles, active: true
   };
   if (rateHistory.length) emp.rateHistory = rateHistory;
+  // จับคู่คนขับรุ่งชัย (เฉพาะคนขับวิ่งเที่ยว) · ช่องยังโหลดไม่เสร็จ = คงค่าเดิมไว้ ไม่ล้าง
+  if (prEditEmpType === 'trip') {
+    const rcSel = document.getElementById('fRcEmp');
+    const rcId = (rcSel && rcSel.dataset.ready === '1') ? rcSel.value : ((oldEmp && oldEmp.rcEmpId) || '');
+    if (rcId) {
+      const dup = prEmployees.find(e => e.id !== id && e.active && e.rcEmpId === rcId);
+      if (dup) { toast('⚠️ คนขับรุ่งชัยคนนี้จับคู่กับ ' + dup.nickname + ' อยู่แล้ว'); return; }
+      emp.rcEmpId = rcId;
+    }
+  }
   try {
     await prSaveEmployee(emp);
     closeEmpModal();
@@ -12540,8 +12722,9 @@ html.mb #empModalOverlay .type-toggle .type-btn{flex:1;}
       var cb=$('wdchk_'+e.id), on=cb?cb.checked:false;
       return '<div class="mb-p-card" data-id="'+esc(e.id)+'" data-left="'+left+'">'
         + '<div class="mb-p-pr'+(on?' on':'')+'" data-tick="1"><div class="mb-p-box">'+S(J.check,14)+'</div>'
-        +   '<div class="mb-p-nm">'+esc(e.nickname)+'</div><span class="mb-p-tag">'+(R.trip?(R.label.indexOf('รายได้')===0?'รายได้เดือนนี้ ':'วงเงินเดือนนี้ '):'ค่าแรงรอบนี้ ')+fb(earned)+' ฿</span></div>'
-        + (taken>0?'<div class="mb-p-red">เบิกไปแล้ว '+fb(taken)+' ฿ · เบิกได้อีก '+fb(left)+' ฿</div>':'')
+        +   '<div class="mb-p-nm">'+esc(e.nickname)+'</div><span class="mb-p-tag">'+(R.trip?(R.rc?'เบิกได้รวมไม่เกิน ':(R.label.indexOf('รายได้')===0?'รายได้เดือนนี้ ':'วงเงินเดือนนี้ ')):'ค่าแรงรอบนี้ ')+fb(earned)+' ฿</span></div>'
+        + (R.trip&&R.info ? '<div class="mb-p-red" style="color:'+(R.rc?'var(--m-text2)':'var(--m-orange)')+';">'+esc(R.info)+'</div>'
+          : (taken>0?'<div class="mb-p-red">เบิกไปแล้ว '+fb(taken)+' ฿ · เบิกได้อีก '+fb(left)+' ฿</div>':''))
         + '<div class="mb-p-amt">'
         +   '<span class="mb-p-lb0">เบิก</span>'
         +   '<div class="mb-p-in mb-p-grow"><input class="sh" type="number" min="0" placeholder="0.00" data-amt="1"><b class="mb-p-cur">฿</b></div>'
