@@ -1778,6 +1778,7 @@ select{color-scheme:light;}
         <button class="xs-subtab active" data-xs="sum" onclick="xsSub('sum')">📊 สรุปรวมทุกแหล่ง</button>
         <button class="xs-subtab" data-xs="rc" onclick="xsSub('rc')">🏭 กองรุ่งชัย (น้ำโสม)</button>
         <button class="xs-subtab" data-xs="jr" onclick="xsSub('jr')">📄 ซื้อทรายท่าอื่น</button>
+        <button class="xs-subtab" data-xs="dep" onclick="xsSub('dep')">💰 มัดจำท่าทราย</button>
         <button class="xs-subtab" data-xs="book" onclick="xsSub('book')">📒 สมุดรายชื่อลูกค้า</button>
       </div>
       <div id="xsMsg" class="smsg" style="display:none"></div>
@@ -1868,6 +1869,36 @@ select{color-scheme:light;}
         <div class="card">
           <div class="card-title">📋 ทรายซื้อที่บันทึกแล้ว</div>
           <div class="table-wrap"><table><thead><tr><th>วันที่</th><th>ท่า</th><th>โครงการ</th><th class="r">เที่ยว</th><th class="r">คิว</th><th class="r">ราคา/คิว</th><th class="r">ค่าทราย</th><th class="r">ค่าเที่ยว</th><th>ใบแจ้งหนี้</th><th></th></tr></thead><tbody id="xsJrBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- ── มัดจำท่าทราย (16 ต.ค. 69) ── -->
+      <div class="xs-pane" id="xs-dep" style="display:none">
+        <div class="smsg info" style="display:block">เงินมัดจำ = เงินที่จ่ายท่าทรายล่วงหน้า (ยังไม่ใช่รายจ่าย · ไม่เข้าแท็บ 8) · ระบบหักด้วยค่าทรายจาก "📄 ซื้อทรายท่าอื่น" ที่ <b>ชื่อท่า + โครงการ ตรงกัน</b> และวันที่รับทราย ≥ วันโอนมัดจำครั้งแรก ให้เอง · ชื่อท่าต้องพิมพ์ให้ตรงกับตอนบันทึกซื้อทราย</div>
+        <div class="card">
+          <div class="card-title">💰 ยอดมัดจำคงเหลือ <button class="btn btn-gold" style="margin-left:auto;color:#fff" onclick="xsDepEdit('')">＋ บันทึกเงินมัดจำ</button></div>
+          <div id="xsDepForm" style="display:none;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;background:var(--bg3)">
+            <div id="xsDepFormTitle" style="font-weight:700;margin-bottom:8px">＋ บันทึกเงินมัดจำ</div>
+            <div class="frow">
+              <label>วันที่โอน <input type="date" id="xsDepDate"></label>
+              <label>ท่า <input type="text" id="xsDepSup" list="xsDepSupList" placeholder="เช่น จิราวัฒน์"></label>
+              <label>โครงการ <input type="text" id="xsDepProj" list="xsDepProjList" placeholder="เลือกหรือพิมพ์ชื่อใหม่"></label>
+              <label>จำนวนเงิน (บาท รวม VAT) <input type="number" id="xsDepAmt" step="0.01" min="0" oninput="xsDepCalc()" style="width:140px;min-width:140px"></label>
+              <label>จำนวนคิว <input type="number" id="xsDepKiu" step="0.01" min="0" oninput="xsDepCalc()" style="width:110px;min-width:110px"></label>
+            </div>
+            <div class="frow" style="margin-top:8px">
+              <label>โอนจากบัญชี <input type="text" id="xsDepAcct" placeholder="เช่น กสิกร ท่าทราย"></label>
+              <label>หมายเหตุ / เลขใบรับเงิน <input type="text" id="xsDepNote" placeholder="—"></label>
+            </div>
+            <datalist id="xsDepSupList"></datalist><datalist id="xsDepProjList"></datalist>
+            <div id="xsDepCalcOut" style="margin-top:8px;font-size:13px;color:var(--muted)"></div>
+            <div class="brow" style="margin-top:10px"><button class="btn btn-ghost" onclick="xsDepCancel()">ยกเลิก</button><button class="btn btn-green" onclick="xsDepSave()">💾 บันทึก</button></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>ท่า</th><th>โครงการ</th><th class="r">มัดจำ (บาท)</th><th class="r">มัดจำ (คิว)</th><th class="r">รับทรายแล้ว (คิว)</th><th class="r">ค่าทรายที่รับแล้ว</th><th class="r">คงเหลือ (คิว)</th><th class="r">คงเหลือ (บาท)</th><th>สถานะ</th></tr></thead><tbody id="xsDepSumBody"></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 ประวัติเงินมัดจำ</div>
+          <div class="table-wrap"><table><thead><tr><th>วันที่โอน</th><th>ท่า</th><th>โครงการ</th><th class="r">จำนวนเงิน</th><th class="r">คิว</th><th class="r">บาท/คิว</th><th>โอนจากบัญชี</th><th>หมายเหตุ</th><th></th></tr></thead><tbody id="xsDepBody"></tbody></table></div>
         </div>
       </div>
 
@@ -11180,7 +11211,7 @@ tr.xs-tot td{background:rgba(21,128,61,.08);font-weight:800}
      os_config/ext_cfg   {stock:['รุ่งชัย']}
    ใบแจ้งหนี้ตามโครงการ = invoices เดิม + scope:'project' (1 บรรทัด) · แถว ext ที่วางบิลแล้วจะมี invDoc กันวางซ้ำ
 ══════════════════════════════════════════════════════════════════ */
-var XS = { ext:[], book:{}, cfg:{stock:['รุ่งชัย']}, invs:[], loaded:false, sub:'sum', chk:{port:true,rc:true,jr:true}, jr:null, bookId:'' };
+var XS = { ext:[], book:{}, cfg:{stock:['รุ่งชัย']}, invs:[], loaded:false, sub:'sum', chk:{port:true,rc:true,jr:true}, jr:null, bookId:'', dep:[], depId:'' };
 
 function xsRef(id){ return db.collection('os_config').doc(id); }
 function xsEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -11194,14 +11225,16 @@ function xsMsg(t,type){ var el=document.getElementById('xsMsg'); if(!el) return;
 
 function xsLoad(){
   return Promise.all([
-    xsRef('ext_sand').get(), xsRef('addrbook').get(), xsRef('ext_cfg').get(),
+    xsRef('ext_sand').get(), xsRef('addrbook').get(), xsRef('ext_cfg').get(), xsRef('ext_deposit').get().catch(function(e){ console.warn('[มัดจำ] โหลด ext_deposit ไม่ได้', e); return {depErr:e}; }),
     db.collection('invoices').orderBy('createdAt','desc').limit(500).get()
   ]).then(function(r){
     XS.ext = (r[0].exists && Array.isArray(r[0].data().rows)) ? r[0].data().rows : [];
     XS.book = (r[1].exists && r[1].data().map) ? r[1].data().map : {};
     var c = r[2].exists ? r[2].data() : {};
     XS.cfg = { stock: (Array.isArray(c.stock)&&c.stock.length) ? c.stock : ['รุ่งชัย'] };
-    XS.invs = []; r[3].forEach(function(d){ var v=d.data(); if(v && v.docNo) XS.invs.push(v); });
+    XS.depErr = (r[3] && r[3].depErr) ? (r[3].depErr.message||'error') : '';
+    XS.dep = (!XS.depErr && r[3] && r[3].exists && Array.isArray(r[3].data().rows)) ? r[3].data().rows : [];
+    XS.invs = []; r[4].forEach(function(d){ var v=d.data(); if(v && v.docNo) XS.invs.push(v); });
     XS.loaded = true;
   });
 }
@@ -11211,6 +11244,7 @@ function xsProjects(opt){
   opt=opt||{}; var cnt={};
   (wData||[]).forEach(function(r){ var c=(r.customer||'').trim(); if(c) cnt[c]=(cnt[c]||0)+1; });
   XS.ext.forEach(function(x){ if(x.project && cnt[x.project]==null) cnt[x.project]=0; });
+  (XS.dep||[]).forEach(function(x){ if(x.project && !x.void && cnt[x.project]==null) cnt[x.project]=0; });
   Object.keys(XS.book).forEach(function(k){ (XS.book[k].projects||[]).forEach(function(p){ if(cnt[p]==null) cnt[p]=0; }); });
   return Object.keys(cnt).filter(function(p){ return !opt.noStock || !xsIsStock(p); })
     .sort(function(a,b){ return (cnt[b]-cnt[a]) || a.localeCompare(b,'th'); })
@@ -11259,7 +11293,7 @@ function xsSub(k){
   document.querySelectorAll('#tp10 .xs-subtab').forEach(function(b){ b.classList.toggle('active', b.dataset.xs===k); });
   document.querySelectorAll('#tp10 .xs-pane').forEach(function(p){ p.style.display = (p.id==='xs-'+k)?'':'none'; });
   if(!XS.loaded) return;
-  if(k==='sum') xsDrawSum(); if(k==='rc') xsDrawRc(); if(k==='jr'){ xsDrawJr(); var jb=document.getElementById('xsJmBody'); if(jb && !jb.children.length) xsJmAdd(); } if(k==='book') xsDrawBook();
+  if(k==='sum') xsDrawSum(); if(k==='rc') xsDrawRc(); if(k==='jr'){ xsDrawJr(); var jb=document.getElementById('xsJmBody'); if(jb && !jb.children.length) xsJmAdd(); } if(k==='book') xsDrawBook(); if(k==='dep') xsDrawDep();
 }
 
 /* ══════════ สรุปรวมทุกแหล่ง ══════════ */
@@ -11572,6 +11606,154 @@ function xsDrawJr(){
       +'<td>'+(x.invDoc?'<span class="badge-billed">'+xsEsc(x.invDoc)+'</span>':'<span class="badge-pending">ยังไม่วางบิล</span>')+'</td>'
       +'<td style="text-align:right;white-space:nowrap"><button class="btn-edit-cust" onclick="xsJrPriceEdit(\''+x.id+'\')">แก้ราคา</button> '+(x.invDoc?'':'<button class="btn-red" onclick="xsRowDel(\''+x.id+'\')">ลบ</button>')+'</td></tr>'; }).join('')
     : '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มี — นำเข้าไฟล์ PDF ด้านบน</td></tr>';
+}
+
+/* ══════════ มัดจำท่าทราย (16 ต.ค. 69) ══════════
+   ที่เก็บ: os_config/ext_deposit {rows:[{id,date,sup,project,amount,kiu,acct,note,by,at,void,voidBy,voidAt,voidWhy,hist:[]}]}
+   คงเหลือ = Σ มัดจำ (ไม่นับยกเลิก) − Σ ค่าทราย (kiu×buy) ของแถว "ซื้อท่าอื่น" ที่ ชื่อท่า + โครงการ ตรงกัน และวันที่ ≥ วันมัดจำแรก
+   ไม่เขียนแท็บ 8 / ไม่แตะ ext_sand */
+function xsDepKey(sup,proj){ return String(sup||'').trim()+'\u0001'+String(proj||'').trim(); }
+function xsDepWrite(mut){
+  return db.runTransaction(function(tx){
+    return tx.get(xsRef('ext_deposit')).then(function(d){
+      var rows=(d.exists && Array.isArray(d.data().rows)) ? d.data().rows.slice() : [];
+      var next=mut(rows); if(!next) throw new Error('ยกเลิก');
+      tx.set(xsRef('ext_deposit'), {rows:next, updatedAt:new Date().toISOString(), updatedBy:xsWho()});
+      return next;
+    });
+  }).then(function(next){ XS.dep=next; return next; });
+}
+function xsDepSummary(){
+  var g={}, order=[];
+  (XS.dep||[]).forEach(function(d){
+    if(d.void) return;
+    var k=xsDepKey(d.sup,d.project);
+    if(!g[k]){ g[k]={sup:String(d.sup||'').trim(), project:String(d.project||'').trim(), amt:0, kiu:0, usedKiu:0, usedAmt:0, noPrice:0, from:d.date||''}; order.push(k); }
+    if(d.date && (!g[k].from || d.date<g[k].from)) g[k].from=d.date;
+    g[k].amt+= +d.amount||0; g[k].kiu+= +d.kiu||0;
+  });
+  xsExt('jr').forEach(function(x){
+    var k=xsDepKey(x.sup,x.project); if(!g[k]) return;
+    if(g[k].from && x.date && x.date<g[k].from) return;
+    g[k].usedKiu+= +x.kiu||0; g[k].usedAmt+= xsR2((+x.kiu||0)*(+x.buy||0));
+    if(!(+x.buy>0)) g[k].noPrice++;
+  });
+  return order.map(function(k){ var o=g[k]; o.amt=xsR2(o.amt); o.kiu=xsR2(o.kiu); o.usedKiu=xsR2(o.usedKiu); o.usedAmt=xsR2(o.usedAmt); o.left=xsR2(o.amt-o.usedAmt); o.leftKiu=xsR2(o.kiu-o.usedKiu); return o; });
+}
+function xsDrawDep(){
+  var sum=xsDepSummary(), tb=document.getElementById('xsDepSumBody'); if(!tb) return;
+  if(XS.depErr){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#c0392b;padding:24px">⚠️ โหลดข้อมูลมัดจำไม่สำเร็จ ('+xsEsc(XS.depErr)+') — กดรีเฟรชหน้าอีกครั้ง อย่าเพิ่งบันทึกซ้ำ</td></tr>'; }
+  else if(!sum.length){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มีเงินมัดจำ — กด ＋ บันทึกเงินมัดจำ</td></tr>'; }
+  else {
+    var T={amt:0,usedAmt:0,left:0};
+    tb.innerHTML = sum.map(function(o){
+      T.amt+=o.amt; T.usedAmt+=o.usedAmt; T.left+=o.left;
+      var st = o.left<0 ? '<span class="badge-warn" style="background:rgba(192,57,43,.12);color:#c0392b;border-color:rgba(192,57,43,.4)">ค้างจ่ายท่า '+xsN(-o.left)+' บาท</span>'
+             : (o.left===0 ? '<span class="badge-billed">ใช้มัดจำหมดแล้ว</span>' : '<span class="badge-pending">ยังมีมัดจำเหลือ</span>');
+      if(o.noPrice) st+=' <span class="badge-warn" title="แถวซื้อทรายที่ยังไม่ใส่ราคา ยังไม่ถูกหักเป็นเงิน">ยังไม่ใส่ราคา '+o.noPrice+' วัน</span>';
+      return '<tr><td>'+xsEsc(o.sup)+'</td><td>'+xsEsc(o.project)+'</td><td class="r">'+xsN(o.amt)+'</td><td class="r">'+(o.kiu?xsN(o.kiu):'-')+'</td><td class="r">'+xsN(o.usedKiu)+'</td><td class="r">'+xsN(o.usedAmt)+'</td>'
+        +'<td class="r"'+(o.leftKiu<0?' style="color:#c0392b"':'')+'>'+(o.kiu?xsN(o.leftKiu):'-')+'</td><td class="r" style="font-weight:700'+(o.left<0?';color:#c0392b':'')+'">'+xsN(o.left)+'</td><td>'+st+'</td></tr>';
+    }).join('')
+      +'<tr style="font-weight:700;background:var(--bg3)"><td colspan="2">รวม</td><td class="r">'+xsN(T.amt)+'</td><td></td><td></td><td class="r">'+xsN(T.usedAmt)+'</td><td></td><td class="r">'+xsN(T.left)+'</td><td></td></tr>';
+  }
+  var rows=(XS.dep||[]).slice().sort(function(a,b){ return (a.date<b.date)?1:(a.date>b.date?-1:0); });
+  document.getElementById('xsDepBody').innerHTML = rows.length ? rows.map(function(d){
+    var v=!!d.void, sid=String(d.id||''), okId=/^[\w-]+$/.test(sid), per=(+d.kiu>0)?xsN((+d.amount||0)/(+d.kiu)):'-';
+    return '<tr'+(v?' style="opacity:.55;text-decoration:line-through" title="ยกเลิกแล้ว: '+xsEsc(d.voidWhy||'')+'"':'')+'><td>'+xsTh(d.date)+'</td><td>'+xsEsc(d.sup||'')+'</td><td>'+xsEsc(d.project||'')+'</td><td class="r">'+xsN(d.amount)+'</td><td class="r">'+(+d.kiu>0?xsN(d.kiu):'-')+'</td><td class="r">'+per+'</td><td>'+xsEsc(d.acct||'')+'</td><td>'+xsEsc(d.note||'')+((d.hist&&d.hist.length)?' <span class="badge-warn" title="แก้ไขแล้ว '+d.hist.length+' ครั้ง">แก้ไขแล้ว</span>':'')+'</td>'
+      +'<td style="text-align:right;white-space:nowrap">'+(v?'<span style="font-size:12px;color:var(--muted);text-decoration:none">ยกเลิกแล้ว</span>':!okId?'<span style="font-size:12px;color:#c0392b">รหัสรายการผิดรูปแบบ</span>':'<button class="btn-edit-cust" onclick="xsDepEdit(\''+sid+'\')">แก้ไข</button> <button class="btn-red" onclick="xsDepVoid(\''+sid+'\')">ยกเลิก</button>')+'</td></tr>';
+  }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มี</td></tr>';
+}
+function xsDepLists(){
+  var sups={}; xsExt('jr').forEach(function(x){ if(x.sup) sups[String(x.sup).trim()]=1; }); (XS.dep||[]).forEach(function(d){ if(d.sup) sups[String(d.sup).trim()]=1; });
+  document.getElementById('xsDepSupList').innerHTML=Object.keys(sups).sort().map(function(n){ return '<option value="'+xsEsc(n)+'">'; }).join('');
+  document.getElementById('xsDepProjList').innerHTML=xsProjects({noStock:true}).map(function(p){ return '<option value="'+xsEsc(p.name)+'">'; }).join('');
+}
+function xsDepCalc(){
+  var a=parseFloat(document.getElementById('xsDepAmt').value)||0, k=parseFloat(document.getElementById('xsDepKiu').value)||0;
+  document.getElementById('xsDepCalcOut').textContent = (a>0&&k>0) ? 'คิดเป็น '+xsN(a/k)+' บาท/คิว (รวม VAT)' : '';
+}
+function xsDepEdit(id){
+  if(XS.depErr){ alert('โหลดข้อมูลมัดจำไม่สำเร็จ — กรุณารีเฟรชหน้าก่อน'); return; }
+  XS.depId=id||'';
+  var d=id?(XS.dep||[]).filter(function(x){return x.id===id;})[0]:null;
+  if(id && !d){ alert('ไม่พบรายการ'); return; }
+  if(d && d.void){ alert('รายการนี้ยกเลิกแล้ว แก้ไขไม่ได้'); return; }
+  xsDepLists();
+  document.getElementById('xsDepFormTitle').textContent = d ? '✏️ แก้ไขเงินมัดจำ '+xsTh(d.date)+' · '+(d.sup||'') : '＋ บันทึกเงินมัดจำ';
+  document.getElementById('xsDepDate').value = d ? (d.date||'') : todayYMD();
+  document.getElementById('xsDepSup').value = d ? (d.sup||'') : '';
+  document.getElementById('xsDepProj').value = d ? (d.project||'') : '';
+  document.getElementById('xsDepAmt').value = d ? (d.amount||'') : '';
+  document.getElementById('xsDepKiu').value = d ? (d.kiu||'') : '';
+  document.getElementById('xsDepAcct').value = d ? (d.acct||'') : '';
+  document.getElementById('xsDepNote').value = d ? (d.note||'') : '';
+  xsDepCalc();
+  var f=document.getElementById('xsDepForm'); f.style.display='block'; f.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function xsDepProjRefresh(){
+  ['xsJrProj','xsSumProj','xsRcProj'].forEach(function(sid){ var el=document.getElementById(sid); if(el) xsProjOptions(sid, el.value, {noStock:true}); });
+}
+function xsDepCancel(){ XS.depId=''; document.getElementById('xsDepForm').style.display='none'; }
+function xsDepSave(){
+  if(XS.depBusy) return;
+  if(XS.depErr){ alert('โหลดข้อมูลมัดจำไม่สำเร็จ — กรุณารีเฟรชหน้าก่อนบันทึก'); return; }
+  var id=XS.depId;
+  var date=document.getElementById('xsDepDate').value;
+  var sup=(document.getElementById('xsDepSup').value||'').trim(), proj=(document.getElementById('xsDepProj').value||'').trim();
+  var amt=xsR2(parseFloat(document.getElementById('xsDepAmt').value)||0), kiu=xsR2(parseFloat(document.getElementById('xsDepKiu').value)||0);
+  var acct=(document.getElementById('xsDepAcct').value||'').trim(), note=(document.getElementById('xsDepNote').value||'').trim();
+  if(!date){ alert('ใส่วันที่โอน'); return; }
+  if(!sup){ alert('กรอกชื่อท่า'); return; }
+  if(!proj){ alert('กรอกโครงการ'); return; }
+  if(!(amt>0)){ alert('ใส่จำนวนเงินมัดจำ'); return; }
+  if(kiu<0){ alert('จำนวนคิวติดลบไม่ได้'); return; }
+  var knownSup=xsExt('jr').some(function(x){ return String(x.sup||'').trim()===sup; }) || (XS.dep||[]).some(function(x){ return x.id!==id && String(x.sup||'').trim()===sup; });
+  var knownProj=xsProjects().some(function(p){ return p.name===proj; });
+  var warn='';
+  if(!knownSup) warn+='\n• ชื่อท่า "'+sup+'" ยังไม่เคยมีในระบบ — ตอนบันทึกซื้อทรายต้องพิมพ์ชื่อนี้ให้ตรงกัน';
+  if(!knownProj) warn+='\n• โครงการ "'+proj+'" เป็นชื่อใหม่';
+  if(!id){
+    var dup=(XS.dep||[]).filter(function(x){ return !x.void && x.date===date && String(x.sup||'').trim()===sup && xsR2(x.amount)===amt; });
+    if(dup.length) warn+='\n• ⚠️ มีมัดจำ '+sup+' วันที่ '+xsTh(date)+' ยอด '+xsN(amt)+' อยู่แล้ว — ระวังบันทึกซ้ำ';
+  }
+  if(!confirm((id?'แก้ไข':'บันทึก')+'เงินมัดจำ\n'+sup+' → '+proj+'\n'+xsN(amt)+' บาท'+(kiu>0?' · '+xsN(kiu)+' คิว ('+xsN(amt/kiu)+' บาท/คิว)':'')+'\nวันที่โอน '+xsTh(date)+warn+'\n\nยืนยัน?')) return;
+  var now=new Date().toISOString(), who=xsWho();
+  XS.depBusy=true;
+  xsDepWrite(function(rows){
+    if(id){
+      var hit=false;
+      var next=rows.map(function(x){
+        if(x.id!==id) return x;
+        if(x.void) throw new Error('รายการนี้เพิ่งถูกยกเลิก');
+        hit=true;
+        var prev={date:x.date,sup:x.sup,project:x.project,amount:x.amount,kiu:x.kiu,acct:x.acct,note:x.note};
+        var y={}; Object.keys(x).forEach(function(k){ y[k]=x[k]; });
+        y.date=date; y.sup=sup; y.project=proj; y.amount=amt; y.kiu=kiu; y.acct=acct; y.note=note;
+        y.hist=(x.hist||[]).concat([{prev:prev, by:who, at:now}]); y.editBy=who; y.editAt=now;
+        return y;
+      });
+      if(!hit) throw new Error('ไม่พบรายการ (อาจถูกแก้จากเครื่องอื่น)');
+      return next;
+    }
+    return rows.concat([{id:'d'+date.replace(/-/g,'')+Math.random().toString(36).slice(2,7), date:date, sup:sup, project:proj, amount:amt, kiu:kiu, acct:acct, note:note, by:who, at:now}]);
+  }).then(function(){
+    XS.depBusy=false;
+    toast(id?'✅ แก้ไขเงินมัดจำแล้ว':'✅ บันทึกเงินมัดจำแล้ว'); xsDepCancel(); xsDepProjRefresh();
+    xsDrawDep();
+  }).catch(function(e){ XS.depBusy=false; alert('บันทึกไม่สำเร็จ: '+e.message); });
+}
+function xsDepVoid(id){
+  var d=(XS.dep||[]).filter(function(x){return x.id===id;})[0]; if(!d || d.void) return;
+  var why=prompt('ยกเลิกเงินมัดจำ '+(d.sup||'')+' '+xsN(d.amount)+' บาท ('+xsTh(d.date)+')\nรายการจะไม่ถูกลบ แต่ไม่นับในยอดคงเหลือ\n\nใส่เหตุผล:','');
+  if(why===null) return; why=String(why).trim(); if(!why){ alert('ต้องใส่เหตุผล'); return; }
+  var now=new Date().toISOString(), who=xsWho();
+  xsDepWrite(function(rows){
+    var hit=false;
+    var next=rows.map(function(x){ if(x.id!==id) return x; if(x.void) throw new Error('ยกเลิกไปแล้ว'); hit=true; var y={}; Object.keys(x).forEach(function(k){ y[k]=x[k]; }); y.void=true; y.voidWhy=why; y.voidBy=who; y.voidAt=now; return y; });
+    if(!hit) throw new Error('ไม่พบรายการ');
+    return next;
+  }).then(function(){ toast('ยกเลิกรายการแล้ว'); if(XS.depId===id) xsDepCancel(); xsDepProjRefresh(); xsDrawDep(); })
+    .catch(function(e){ alert('ยกเลิกไม่สำเร็จ: '+e.message); });
 }
 
 /* ══════════ สมุดรายชื่อลูกค้า ══════════ */
