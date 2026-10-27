@@ -1779,6 +1779,7 @@ select{color-scheme:light;}
         <button class="xs-subtab" data-xs="rc" onclick="xsSub('rc')">🏭 กองรุ่งชัย (น้ำโสม)</button>
         <button class="xs-subtab" data-xs="jr" onclick="xsSub('jr')">📄 ซื้อทรายท่าอื่น</button>
         <button class="xs-subtab" data-xs="dep" onclick="xsSub('dep')">💰 มัดจำท่าทราย</button>
+        <button class="xs-subtab" data-xs="pt" onclick="xsSub('pt')">🤝 หุ้นส่วนโครงการ</button>
         <button class="xs-subtab" data-xs="book" onclick="xsSub('book')">📒 สมุดรายชื่อลูกค้า</button>
       </div>
       <div id="xsMsg" class="smsg" style="display:none"></div>
@@ -1882,11 +1883,12 @@ select{color-scheme:light;}
             <div class="frow">
               <label>วันที่โอน <input type="date" id="xsDepDate"></label>
               <label>ท่า <input type="text" id="xsDepSup" list="xsDepSupList" placeholder="เช่น จิราวัฒน์"></label>
-              <label>โครงการ <input type="text" id="xsDepProj" list="xsDepProjList" placeholder="เลือกหรือพิมพ์ชื่อใหม่"></label>
+              <label>โครงการ <input type="text" id="xsDepProj" list="xsDepProjList" placeholder="เลือกหรือพิมพ์ชื่อใหม่" oninput="xsDepFundOpts()"></label>
               <label>จำนวนเงิน (บาท รวม VAT) <input type="number" id="xsDepAmt" step="0.01" min="0" oninput="xsDepCalc()" style="width:140px;min-width:140px"></label>
               <label>จำนวนคิว <input type="number" id="xsDepKiu" step="0.01" min="0" oninput="xsDepCalc()" style="width:110px;min-width:110px"></label>
             </div>
             <div class="frow" style="margin-top:8px">
+              <label>เงินของใคร <select id="xsDepFund" class="xs-sel"><option value="">เงินร้าน (ไม่ใช่เงินหุ้นส่วน)</option></select></label>
               <label>โอนจากบัญชี <input type="text" id="xsDepAcct" placeholder="เช่น กสิกร ท่าทราย"></label>
               <label>หมายเหตุ / เลขใบรับเงิน <input type="text" id="xsDepNote" placeholder="—"></label>
             </div>
@@ -1898,7 +1900,68 @@ select{color-scheme:light;}
         </div>
         <div class="card">
           <div class="card-title">📋 ประวัติเงินมัดจำ</div>
-          <div class="table-wrap"><table><thead><tr><th>วันที่โอน</th><th>ท่า</th><th>โครงการ</th><th class="r">จำนวนเงิน</th><th class="r">คิว</th><th class="r">บาท/คิว</th><th>โอนจากบัญชี</th><th>หมายเหตุ</th><th></th></tr></thead><tbody id="xsDepBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>วันที่โอน</th><th>ท่า</th><th>โครงการ</th><th class="r">จำนวนเงิน</th><th class="r">คิว</th><th class="r">บาท/คิว</th><th>เงินของใคร</th><th>โอนจากบัญชี</th><th>หมายเหตุ</th><th></th></tr></thead><tbody id="xsDepBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- ── หุ้นส่วนโครงการ (27 ต.ค. 69) ── -->
+      <div class="xs-pane" id="xs-pt" style="display:none">
+        <div class="smsg info" style="display:block">สรุปเงินหุ้นส่วน <b>เฉพาะโครงการที่เลือก</b> · คิว/ค่าทรายดึงจาก "📄 ซื้อทรายท่าอื่น" · เงินที่ใช้วางมัดจำดึงจาก "💰 มัดจำท่าทราย" (ช่อง เงินของใคร) · ไม่เข้าแท็บ 8 · ทุนคืนทั้งก้อนตอนจบโครงการ</div>
+        <div class="t1filter" style="margin:0">
+          <label>โครงการ <select id="xsPtProj" class="xs-sel" onchange="xsPtCloseForms();xsDrawPt()"></select></label>
+          <button class="btn btn-gold" style="margin-left:auto;color:#fff" onclick="xsPtEditCfg()">⚙️ ตั้งค่าหุ้นส่วน / สูตรกำไร</button>
+        </div>
+        <div id="xsPtCfgForm" style="display:none;border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:12px;background:var(--bg3)">
+          <div style="font-weight:700;margin-bottom:8px">⚙️ ตั้งค่าโครงการ <span id="xsPtCfgName"></span></div>
+          <div class="frow">
+            <label>ราคาขาย/คิว (รวม VAT) <input type="number" id="xsPtSell" step="0.01" min="0" oninput="xsPtCfgCalc()" style="width:120px;min-width:120px"></label>
+            <label>ค่าทราย/คิว (รวม VAT) <input type="number" id="xsPtSand" step="0.01" min="0" oninput="xsPtCfgCalc()" style="width:120px;min-width:120px"></label>
+            <label>ค่าขนส่ง/คิว (ประมาณ) <input type="number" id="xsPtFr" step="0.01" min="0" oninput="xsPtCfgCalc()" style="width:120px;min-width:120px"></label>
+            <label>คิด VAT <select id="xsPtVat" class="xs-sel" onchange="xsPtCfgCalc()"><option value="full">หัก VAT ขายเต็ม (ค่าเริ่มต้น)</option><option value="claim">หัก VAT ซื้อค่าทรายคืนด้วย</option></select></label>
+          </div>
+          <div id="xsPtCfgCalcOut" style="margin-top:8px;font-size:13px;color:var(--muted)"></div>
+          <div style="font-weight:700;margin:12px 0 6px">หุ้นส่วน (แบ่งกำไรตามจำนวน "ส่วน" เช่น 1 : 1 : 1 = คนละ 1/3)</div>
+          <div class="table-wrap"><table><thead><tr><th>ชื่อหุ้นส่วน</th><th class="r">ส่วน</th><th class="r">คิดเป็น</th><th></th></tr></thead><tbody id="xsPtPBody"></tbody></table></div>
+          <div class="brow" style="margin-top:8px"><button class="btn btn-ghost" onclick="xsPtPAdd()">＋ เพิ่มหุ้นส่วน</button></div>
+          <div class="brow" style="margin-top:10px"><button class="btn btn-ghost" onclick="xsPtCfgCancel()">ยกเลิก</button><button class="btn btn-green" onclick="xsPtCfgSave()">💾 บันทึกการตั้งค่า</button></div>
+        </div>
+        <div class="kpi-row" id="xsPtKpi" style="margin-top:14px"></div>
+        <div class="card">
+          <div class="card-title">🤝 เงินหุ้นส่วนโครงการนี้</div>
+          <div class="table-wrap"><table><thead><tr><th>หุ้นส่วน</th><th class="r">สัดส่วน</th><th class="r">ส่วนแบ่ง ตามข้อตกลง</th><th class="r">ส่วนแบ่ง ตามที่บันทึกจริง</th><th class="r">ลงเงิน</th><th class="r">ใช้วางมัดจำแล้ว</th><th class="r">เงินเหลือ (ยังไม่ใช้)</th><th class="r">คืนทุนแล้ว</th><th class="r">ทุนค้างคืน</th></tr></thead><tbody id="xsPtBody"></tbody></table></div>
+          <div id="xsPtNote" style="margin-top:8px;font-size:13px;color:var(--muted);line-height:1.7"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🧮 กำไรโครงการ</div>
+          <div id="xsPtProfit"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">💵 เงินลง / คืนทุน <button class="btn btn-gold" style="margin-left:auto;color:#fff" onclick="xsPtFundOpen()">＋ บันทึกเงินลง / คืนทุน</button></div>
+          <div id="xsPtFundForm" style="display:none;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;background:var(--bg3)">
+            <div class="xs-fgrid">
+              <label>วันที่ <input type="date" id="xsPtFDate"></label>
+              <label>หุ้นส่วน <select id="xsPtFWho"></select></label>
+              <label>รายการ <select id="xsPtFType"><option value="in">ลงเงิน</option><option value="ret">คืนทุน</option></select></label>
+              <label>จำนวนเงิน (บาท) <input type="number" id="xsPtFAmt" step="0.01" min="0" placeholder="0.00"></label>
+              <label class="xs-wide">หมายเหตุ <input type="text" id="xsPtFNote" placeholder="เช่น วงเงินสำรองมัดจำ"></label>
+              <div class="xs-fbtn"><button class="btn btn-ghost" onclick="xsPtFundClose()">ยกเลิก</button><button class="btn btn-green" onclick="xsPtFundSave()">💾 บันทึก</button></div>
+            </div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>วันที่</th><th>หุ้นส่วน</th><th>รายการ</th><th class="r">จำนวนเงิน</th><th>หมายเหตุ</th><th>บันทึกโดย</th><th></th></tr></thead><tbody id="xsPtFundBody"></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🧾 ค่าใช้จ่ายอื่นของโครงการ (ไม่เข้าแท็บ 8) <button class="btn btn-gold" style="margin-left:auto;color:#fff" onclick="xsPtCostOpen()">＋ บันทึกค่าใช้จ่าย</button></div>
+          <div id="xsPtCostForm" style="display:none;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;background:var(--bg3)">
+            <div class="xs-fgrid">
+              <label>วันที่ <input type="date" id="xsPtCDate"></label>
+              <label class="xs-wide">รายการ <input type="text" id="xsPtCLabel" list="xsPtCList" placeholder="เช่น ค่าขนส่งรถร่วม"></label>
+              <label>จำนวนเงิน (บาท) <input type="number" id="xsPtCAmt" step="0.01" min="0" placeholder="0.00"></label>
+              <label class="xs-wide">หมายเหตุ <input type="text" id="xsPtCNote" placeholder="—"></label>
+              <div class="xs-fbtn"><button class="btn btn-ghost" onclick="xsPtCostClose()">ยกเลิก</button><button class="btn btn-green" onclick="xsPtCostSave()">💾 บันทึก</button></div>
+            </div>
+            <datalist id="xsPtCList"><option value="ค่าขนส่งรถร่วม"><option value="ค่าเครื่องจักร"><option value="ค่าน้ำมัน"><option value="ค่าแรง"></datalist>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>วันที่</th><th>รายการ</th><th class="r">จำนวนเงิน</th><th>หมายเหตุ</th><th>บันทึกโดย</th><th></th></tr></thead><tbody id="xsPtCostBody"></tbody></table></div>
         </div>
       </div>
 
@@ -11167,6 +11230,13 @@ html.mb .mb-shbtn.red{background:#fdf3f2;border-color:#f0c9c4;color:var(--m-red)
 #tp10 .xs-pane{display:flex;flex-direction:column;gap:14px}
 #tp10 .xs-pane[style*="display:none"]{display:none!important}
 .xs-split{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.xs-fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px 10px;align-items:end}
+.xs-fgrid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.xs-fgrid input,.xs-fgrid select{box-sizing:border-box;width:100%;min-width:0;max-width:none;height:38px;margin:0;padding:0 10px;font-size:14px;line-height:normal;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font)}
+.xs-fgrid input:focus,.xs-fgrid select:focus{outline:none;border-color:var(--gold)}
+.xs-fgrid .xs-wide{grid-column:span 2}
+.xs-fgrid .xs-fbtn{display:flex;gap:6px}
+.xs-fgrid .xs-fbtn .btn{flex:1;height:38px;min-height:0;padding:0 12px;white-space:nowrap}
 .xs-sel{padding:7px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--font);min-width:160px;max-width:320px}
 tr.xs-tot td{background:rgba(21,128,61,.08);font-weight:800}
 .xs-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9990;align-items:center;justify-content:center;padding:16px}
@@ -11211,7 +11281,7 @@ tr.xs-tot td{background:rgba(21,128,61,.08);font-weight:800}
      os_config/ext_cfg   {stock:['รุ่งชัย']}
    ใบแจ้งหนี้ตามโครงการ = invoices เดิม + scope:'project' (1 บรรทัด) · แถว ext ที่วางบิลแล้วจะมี invDoc กันวางซ้ำ
 ══════════════════════════════════════════════════════════════════ */
-var XS = { ext:[], book:{}, cfg:{stock:['รุ่งชัย']}, invs:[], loaded:false, sub:'sum', chk:{port:true,rc:true,jr:true}, jr:null, bookId:'', dep:[], depId:'' };
+var XS = { ext:[], book:{}, cfg:{stock:['รุ่งชัย']}, invs:[], loaded:false, sub:'sum', chk:{port:true,rc:true,jr:true}, jr:null, bookId:'', dep:[], depId:'', pt:{}, ptErr:'' };
 
 function xsRef(id){ return db.collection('os_config').doc(id); }
 function xsEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -11226,7 +11296,8 @@ function xsMsg(t,type){ var el=document.getElementById('xsMsg'); if(!el) return;
 function xsLoad(){
   return Promise.all([
     xsRef('ext_sand').get(), xsRef('addrbook').get(), xsRef('ext_cfg').get(), xsRef('ext_deposit').get().catch(function(e){ console.warn('[มัดจำ] โหลด ext_deposit ไม่ได้', e); return {depErr:e}; }),
-    db.collection('invoices').orderBy('createdAt','desc').limit(500).get()
+    db.collection('invoices').orderBy('createdAt','desc').limit(500).get(),
+    xsRef('ext_partner').get().catch(function(e){ console.warn('[หุ้นส่วน] โหลด ext_partner ไม่ได้', e); return {ptErr:e}; })
   ]).then(function(r){
     XS.ext = (r[0].exists && Array.isArray(r[0].data().rows)) ? r[0].data().rows : [];
     XS.book = (r[1].exists && r[1].data().map) ? r[1].data().map : {};
@@ -11235,6 +11306,8 @@ function xsLoad(){
     XS.depErr = (r[3] && r[3].depErr) ? (r[3].depErr.message||'error') : '';
     XS.dep = (!XS.depErr && r[3] && r[3].exists && Array.isArray(r[3].data().rows)) ? r[3].data().rows : [];
     XS.invs = []; r[4].forEach(function(d){ var v=d.data(); if(v && v.docNo) XS.invs.push(v); });
+    XS.ptErr = (r[5] && r[5].ptErr) ? (r[5].ptErr.message||'error') : '';
+    XS.pt = (!XS.ptErr && r[5] && r[5].exists && r[5].data().map && typeof r[5].data().map==='object') ? r[5].data().map : {};
     XS.loaded = true;
   });
 }
@@ -11282,6 +11355,7 @@ function xsInit(){
     xsProjOptions('xsSumProj', document.getElementById('xsSumProj').value||p, {noStock:true});
     xsProjOptions('xsRcProj', document.getElementById('xsRcProj').value||p, {noStock:true});
     xsProjOptions('xsJrProj', document.getElementById('xsJrProj').value||p, {noStock:true});
+    xsProjOptions('xsPtProj', document.getElementById('xsPtProj').value||xsPtDefaultProj()||p, {noStock:true});
     var a=document.getElementById('xsSumA'), b=document.getElementById('xsSumB');
     if(!a.value) a.value=xsMonthStart(); if(!b.value) b.value=todayYMD();
     var rd=document.getElementById('xsRcDate'); if(!rd.value) rd.value=todayYMD();
@@ -11293,7 +11367,7 @@ function xsSub(k){
   document.querySelectorAll('#tp10 .xs-subtab').forEach(function(b){ b.classList.toggle('active', b.dataset.xs===k); });
   document.querySelectorAll('#tp10 .xs-pane').forEach(function(p){ p.style.display = (p.id==='xs-'+k)?'':'none'; });
   if(!XS.loaded) return;
-  if(k==='sum') xsDrawSum(); if(k==='rc') xsDrawRc(); if(k==='jr'){ xsDrawJr(); var jb=document.getElementById('xsJmBody'); if(jb && !jb.children.length) xsJmAdd(); } if(k==='book') xsDrawBook(); if(k==='dep') xsDrawDep();
+  if(k==='sum') xsDrawSum(); if(k==='rc') xsDrawRc(); if(k==='jr'){ xsDrawJr(); var jb=document.getElementById('xsJmBody'); if(jb && !jb.children.length) xsJmAdd(); } if(k==='book') xsDrawBook(); if(k==='dep') xsDrawDep(); if(k==='pt') xsDrawPt();
 }
 
 /* ══════════ สรุปรวมทุกแหล่ง ══════════ */
@@ -11659,9 +11733,9 @@ function xsDrawDep(){
   var rows=(XS.dep||[]).slice().sort(function(a,b){ return (a.date<b.date)?1:(a.date>b.date?-1:0); });
   document.getElementById('xsDepBody').innerHTML = rows.length ? rows.map(function(d){
     var v=!!d.void, sid=String(d.id||''), okId=/^[\w-]+$/.test(sid), per=(+d.kiu>0)?xsN((+d.amount||0)/(+d.kiu)):'-';
-    return '<tr'+(v?' style="opacity:.55;text-decoration:line-through" title="ยกเลิกแล้ว: '+xsEsc(d.voidWhy||'')+'"':'')+'><td>'+xsTh(d.date)+'</td><td>'+xsEsc(d.sup||'')+'</td><td>'+xsEsc(d.project||'')+'</td><td class="r">'+xsN(d.amount)+'</td><td class="r">'+(+d.kiu>0?xsN(d.kiu):'-')+'</td><td class="r">'+per+'</td><td>'+xsEsc(d.acct||'')+'</td><td>'+xsEsc(d.note||'')+((d.hist&&d.hist.length)?' <span class="badge-warn" title="แก้ไขแล้ว '+d.hist.length+' ครั้ง">แก้ไขแล้ว</span>':'')+'</td>'
+    return '<tr'+(v?' style="opacity:.55;text-decoration:line-through" title="ยกเลิกแล้ว: '+xsEsc(d.voidWhy||'')+'"':'')+'><td>'+xsTh(d.date)+'</td><td>'+xsEsc(d.sup||'')+'</td><td>'+xsEsc(d.project||'')+'</td><td class="r">'+xsN(d.amount)+'</td><td class="r">'+(+d.kiu>0?xsN(d.kiu):'-')+'</td><td class="r">'+per+'</td><td>'+(d.fund?'🤝 '+xsEsc(d.fund):'<span style="color:var(--muted)">เงินร้าน</span>')+'</td><td>'+xsEsc(d.acct||'')+'</td><td>'+xsEsc(d.note||'')+((d.hist&&d.hist.length)?' <span class="badge-warn" title="แก้ไขแล้ว '+d.hist.length+' ครั้ง">แก้ไขแล้ว</span>':'')+'</td>'
       +'<td style="text-align:right;white-space:nowrap">'+(v?'<span style="font-size:12px;color:var(--muted);text-decoration:none">ยกเลิกแล้ว</span>':!okId?'<span style="font-size:12px;color:#c0392b">รหัสรายการผิดรูปแบบ</span>':'<button class="btn-edit-cust" onclick="xsDepEdit(\''+sid+'\')">แก้ไข</button> <button class="btn-red" onclick="xsDepVoid(\''+sid+'\')">ยกเลิก</button>')+'</td></tr>';
-  }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มี</td></tr>';
+  }).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มี</td></tr>';
 }
 function xsDepLists(){
   var sups={}; xsExt('jr').forEach(function(x){ if(x.sup) sups[String(x.sup).trim()]=1; }); (XS.dep||[]).forEach(function(d){ if(d.sup) sups[String(d.sup).trim()]=1; });
@@ -11687,6 +11761,7 @@ function xsDepEdit(id){
   document.getElementById('xsDepKiu').value = d ? (d.kiu||'') : '';
   document.getElementById('xsDepAcct').value = d ? (d.acct||'') : '';
   document.getElementById('xsDepNote').value = d ? (d.note||'') : '';
+  xsDepFundOpts(d ? (d.fundPid||'') : '');
   xsDepCalc();
   var f=document.getElementById('xsDepForm'); f.style.display='block'; f.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
@@ -11702,6 +11777,13 @@ function xsDepSave(){
   var sup=(document.getElementById('xsDepSup').value||'').trim(), proj=(document.getElementById('xsDepProj').value||'').trim();
   var amt=xsR2(parseFloat(document.getElementById('xsDepAmt').value)||0), kiu=xsR2(parseFloat(document.getElementById('xsDepKiu').value)||0);
   var acct=(document.getElementById('xsDepAcct').value||'').trim(), note=(document.getElementById('xsDepNote').value||'').trim();
+  var fundPid=document.getElementById('xsDepFund').value||'', fundP=fundPid?xsPtPartner(proj,fundPid):null, fund=fundP?fundP.name:'';
+  var origD=id?(XS.dep||[]).filter(function(x){ return x.id===id; })[0]:null;
+  if(fundPid && !fundP){
+    if(origD && origD.fundPid===fundPid && String(origD.project||'').trim()===proj){ fund=origD.fund||''; }
+    else { alert('ไม่พบหุ้นส่วนที่เลือกในโครงการ "'+proj+'" — เลือกใหม่'); xsDepFundOpts(''); return; }
+  }
+  if(XS.ptErr && origD && origD.fundPid && fundPid!==origD.fundPid){ alert('โหลดข้อมูลหุ้นส่วนไม่สำเร็จ — รีเฟรชหน้าก่อนเปลี่ยนเจ้าของเงินมัดจำ'); return; }
   if(!date){ alert('ใส่วันที่โอน'); return; }
   if(!sup){ alert('กรอกชื่อท่า'); return; }
   if(!proj){ alert('กรอกโครงการ'); return; }
@@ -11716,7 +11798,7 @@ function xsDepSave(){
     var dup=(XS.dep||[]).filter(function(x){ return !x.void && x.date===date && String(x.sup||'').trim()===sup && xsR2(x.amount)===amt; });
     if(dup.length) warn+='\n• ⚠️ มีมัดจำ '+sup+' วันที่ '+xsTh(date)+' ยอด '+xsN(amt)+' อยู่แล้ว — ระวังบันทึกซ้ำ';
   }
-  if(!confirm((id?'แก้ไข':'บันทึก')+'เงินมัดจำ\n'+sup+' → '+proj+'\n'+xsN(amt)+' บาท'+(kiu>0?' · '+xsN(kiu)+' คิว ('+xsN(amt/kiu)+' บาท/คิว)':'')+'\nวันที่โอน '+xsTh(date)+warn+'\n\nยืนยัน?')) return;
+  if(!confirm((id?'แก้ไข':'บันทึก')+'เงินมัดจำ\n'+sup+' → '+proj+'\n'+xsN(amt)+' บาท'+(kiu>0?' · '+xsN(kiu)+' คิว ('+xsN(amt/kiu)+' บาท/คิว)':'')+'\nวันที่โอน '+xsTh(date)+'\nเงินของ: '+(fund||'ร้าน')+warn+'\n\nยืนยัน?')) return;
   var now=new Date().toISOString(), who=xsWho();
   XS.depBusy=true;
   xsDepWrite(function(rows){
@@ -11726,16 +11808,16 @@ function xsDepSave(){
         if(x.id!==id) return x;
         if(x.void) throw new Error('รายการนี้เพิ่งถูกยกเลิก');
         hit=true;
-        var prev={date:x.date,sup:x.sup,project:x.project,amount:x.amount,kiu:x.kiu,acct:x.acct,note:x.note};
+        var prev={date:x.date,sup:x.sup,project:x.project,amount:x.amount,kiu:x.kiu,acct:x.acct,note:x.note,fund:x.fund||'',fundPid:x.fundPid||''};
         var y={}; Object.keys(x).forEach(function(k){ y[k]=x[k]; });
-        y.date=date; y.sup=sup; y.project=proj; y.amount=amt; y.kiu=kiu; y.acct=acct; y.note=note;
+        y.date=date; y.sup=sup; y.project=proj; y.amount=amt; y.kiu=kiu; y.acct=acct; y.note=note; y.fund=fund; y.fundPid=fundPid;
         y.hist=(x.hist||[]).concat([{prev:prev, by:who, at:now}]); y.editBy=who; y.editAt=now;
         return y;
       });
       if(!hit) throw new Error('ไม่พบรายการ (อาจถูกแก้จากเครื่องอื่น)');
       return next;
     }
-    return rows.concat([{id:'d'+date.replace(/-/g,'')+Math.random().toString(36).slice(2,7), date:date, sup:sup, project:proj, amount:amt, kiu:kiu, acct:acct, note:note, by:who, at:now}]);
+    return rows.concat([{id:'d'+date.replace(/-/g,'')+Math.random().toString(36).slice(2,7), date:date, sup:sup, project:proj, amount:amt, kiu:kiu, acct:acct, note:note, fund:fund, fundPid:fundPid, by:who, at:now}]);
   }).then(function(){
     XS.depBusy=false;
     toast(id?'✅ แก้ไขเงินมัดจำแล้ว':'✅ บันทึกเงินมัดจำแล้ว'); xsDepCancel(); xsDepProjRefresh();
@@ -11754,6 +11836,297 @@ function xsDepVoid(id){
     return next;
   }).then(function(){ toast('ยกเลิกรายการแล้ว'); if(XS.depId===id) xsDepCancel(); xsDepProjRefresh(); xsDrawDep(); })
     .catch(function(e){ alert('ยกเลิกไม่สำเร็จ: '+e.message); });
+}
+
+/* ══════════ หุ้นส่วนโครงการ (27 ต.ค. 69) ══════════
+   ที่เก็บ: os_config/ext_partner {map:{<ชื่อโครงการ>:{sell,sand,freight,vat:'full'|'claim',partners:[{id,name,share}],
+            funds:[{id,date,pid,type:'in'|'ret',amount,note,by,at,void,voidWhy,voidBy,voidAt}], costs:[{id,date,label,amount,note,by,at,void,...}], hist:[], by, at}}}
+   ทุกอย่างกรองด้วยชื่อโครงการตรงตัว (ext_sand.project / ext_deposit.project)
+   กำไร/คิว ตามข้อตกลง = ขาย − ค่าทราย − ค่าขนส่ง − VAT · VAT เต็ม = ขาย×7/107 · หักภาษีซื้อ = ขาย×7/107 − ค่าทราย×7/107
+   ตามที่บันทึกจริง = คิวส่งจริง×ราคาขาย − ค่าทรายจริง (kiu×buy) − ค่าเที่ยวในแถวซื้อทราย − ค่าใช้จ่ายอื่นที่บันทึก − VAT
+   เงินหุ้นส่วน: ลงเงิน = Σ in · ใช้วางมัดจำ = Σ มัดจำ (โครงการเดียวกัน, fundPid ตรง, ไม่ยกเลิก) · เหลือ = ลง − ใช้
+                 ทุนคืนทั้งก้อนตอนจบโครงการ → ทุนค้างคืน = ลง − คืนแล้ว
+   อ่านอย่างเดียวจาก ext_sand / ext_deposit / invoices · ไม่เขียนแท็บ 8 · ยกเลิก = void ไม่ลบ */
+function xsSafeId(s){ s=String(s||''); return /^[\w-]+$/.test(s) ? s : ''; }
+function xsNewId(p){ return p+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function xsPtCfg(proj){ var m=XS.pt||{}; return (proj && Object.prototype.hasOwnProperty.call(m,proj)) ? m[proj] : null; }
+function xsPtPartner(proj,pid){ var c=xsPtCfg(proj); return (c && pid) ? ((c.partners||[]).filter(function(x){ return x.id===pid; })[0]||null) : null; }
+function xsPtDefaultProj(){ var ks=Object.keys(XS.pt||{}); return ks.length ? ks[0] : ''; }
+function xsPtVatK(sell,sand,mode){ var v=sell*7/107; if(mode==='claim') v-=sand*7/107; return v; }
+function xsPtBadName(proj){ return !proj || proj==='__proto__' || proj==='constructor' || proj==='prototype'; }
+function xsPtWrite(proj, mut){
+  if(xsPtBadName(proj)) return Promise.reject(new Error('ชื่อโครงการนี้ใช้กับหุ้นส่วนไม่ได้'));
+  return db.runTransaction(function(tx){
+    return tx.get(xsRef('ext_partner')).then(function(d){
+      var map=(d.exists && d.data().map && typeof d.data().map==='object') ? d.data().map : {};
+      var cur=Object.prototype.hasOwnProperty.call(map,proj) ? JSON.parse(JSON.stringify(map[proj])) : null;
+      var next=mut(cur); if(!next) throw new Error('ยกเลิก');
+      var nm={}; Object.keys(map).forEach(function(k){ if(!xsPtBadName(k)) Object.defineProperty(nm,k,{value:map[k],enumerable:true,writable:true,configurable:true}); });
+      Object.defineProperty(nm,proj,{value:next,enumerable:true,writable:true,configurable:true});
+      tx.set(xsRef('ext_partner'), {map:nm, updatedAt:new Date().toISOString(), updatedBy:xsWho()});
+      return nm;
+    });
+  }).then(function(nm){ XS.pt=nm; return nm; });
+}
+function xsPtReload(){
+  return xsRef('ext_partner').get().then(function(d){ XS.pt=(d.exists && d.data().map && typeof d.data().map==='object') ? d.data().map : {}; XS.ptErr=''; xsDrawPt(); })
+    .catch(function(e){ console.warn('[หุ้นส่วน] โหลดใหม่ไม่ได้', e); });
+}
+/* ตัวเลขทั้งหมดของโครงการ */
+function xsPtCalc(proj){
+  var c=xsPtCfg(proj); if(!c) return null;
+  var o={kiu:0, trips:0, sandAmt:0, frAmt:0, noPriceKiu:0, other:0, billed:0};
+  xsExt('jr',proj).forEach(function(x){ var k=+x.kiu||0, t=+x.trips||0; o.kiu+=k; o.trips+=t; o.sandAmt+=k*(+x.buy||0); o.frAmt+=t*(+x.freight||0); if(!(+x.buy>0)) o.noPriceKiu+=k; });
+  (c.costs||[]).forEach(function(x){ if(!x.void) o.other+=(+x.amount||0); });
+  XS.invs.forEach(function(v){ if(v.customer===proj && v.status!=='cancelled') o.billed+=(+v.grandTotal||0); });
+  var sell=+c.sell||0, sand=+c.sand||0, fr=+c.freight||0;
+  o.sell=sell; o.sand=sand; o.fr=fr; o.vatMode=(c.vat==='claim'?'claim':'full');
+  o.vatK=xsPtVatK(sell,sand,o.vatMode); o.perK=sell-sand-fr-o.vatK; o.est=o.perK*o.kiu;
+  o.rev=o.kiu*sell; o.vatAct=o.rev*7/107-(o.vatMode==='claim'?o.sandAmt*7/107:0);
+  o.act=o.rev-o.sandAmt-o.frAmt-o.other-o.vatAct;
+  var ps=(c.partners||[]), tot=ps.reduce(function(a,x){ return a+(+x.share>0?+x.share:0); },0);
+  o.depShop=0; o.depFund=0; o.depOrphan=0;
+  o.rows=ps.map(function(pp){ return {id:pp.id, name:pp.name, share:+pp.share||0, pct:tot>0?(+pp.share||0)/tot:0, inAmt:0, retAmt:0, used:0}; });
+  var byId={}; o.rows.forEach(function(r){ byId[r.id]=r; });
+  (c.funds||[]).forEach(function(f){ if(f.void) return; var r=byId[f.pid]; if(!r) return; if(f.type==='ret') r.retAmt+=(+f.amount||0); else r.inAmt+=(+f.amount||0); });
+  (XS.dep||[]).forEach(function(d){ if(d.void || String(d.project||'').trim()!==proj) return; var r=d.fundPid?byId[d.fundPid]:null; if(r){ r.used+=(+d.amount||0); o.depFund+=(+d.amount||0); } else if(d.fundPid) o.depOrphan+=(+d.amount||0); else o.depShop+=(+d.amount||0); });
+  o.rows.forEach(function(r){ r.left=xsR2(r.inAmt-r.used); r.owe=xsR2(r.inAmt-r.retAmt); r.shEst=xsR2(o.est*r.pct); r.shAct=xsR2(o.act*r.pct); });
+  o.totShare=tot;
+  return o;
+}
+function xsDrawPt(){
+  var proj=document.getElementById('xsPtProj').value, c=xsPtCfg(proj), kpi=document.getElementById('xsPtKpi');
+  var body=document.getElementById('xsPtBody'), note=document.getElementById('xsPtNote'), pf=document.getElementById('xsPtProfit');
+  if(XS.ptErr){ kpi.innerHTML=''; body.innerHTML='<tr><td colspan="9" style="text-align:center;color:#c0392b;padding:24px">⚠️ โหลดข้อมูลหุ้นส่วนไม่สำเร็จ ('+xsEsc(XS.ptErr)+') — กดรีเฟรชหน้าอีกครั้ง อย่าเพิ่งบันทึก</td></tr>'; note.textContent=''; pf.innerHTML=''; document.getElementById('xsPtFundBody').innerHTML=''; document.getElementById('xsPtCostBody').innerHTML=''; return; }
+  if(!proj || !c){
+    kpi.innerHTML=''; pf.innerHTML='';
+    body.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">'+(proj?'โครงการ "'+xsEsc(proj)+'" ยังไม่ได้ตั้งหุ้นส่วน — กด ⚙️ ตั้งค่าหุ้นส่วน / สูตรกำไร':'เลือกโครงการ')+'</td></tr>';
+    note.textContent=''; document.getElementById('xsPtFundBody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">—</td></tr>'; document.getElementById('xsPtCostBody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:16px">—</td></tr>';
+    return;
+  }
+  var o=xsPtCalc(proj);
+  kpi.innerHTML=
+     '<div class="kpi-card"><div class="kpi-label">ส่งแล้ว (ทรายซื้อท่าอื่น)</div><div class="kpi-val">'+xsN(o.kiu)+'</div><div class="kpi-unit">คิว · '+o.trips+' เที่ยว</div></div>'
+    +'<div class="kpi-card"><div class="kpi-label">กำไร/คิว ตามข้อตกลง</div><div class="kpi-val" style="color:var(--text)">'+xsN(o.perK)+'</div><div class="kpi-unit">บาท ('+(o.vatMode==='claim'?'หัก VAT ซื้อคืน':'หัก VAT เต็ม')+')</div></div>'
+    +'<div class="kpi-card"><div class="kpi-label">กำไรรวม ตามข้อตกลง</div><div class="kpi-val">'+xsN(o.est)+'</div><div class="kpi-unit">บาท</div></div>'
+    +'<div class="kpi-card"><div class="kpi-label">กำไรรวม ตามที่บันทึกจริง</div><div class="kpi-val" style="color:'+(o.act<0?'#c0392b':'var(--text)')+'">'+xsN(o.act)+'</div><div class="kpi-unit">บาท</div></div>';
+  var T={inAmt:0,used:0,left:0,retAmt:0,owe:0,shEst:0,shAct:0};
+  body.innerHTML = o.rows.length ? o.rows.map(function(r){
+    T.inAmt+=r.inAmt; T.used+=r.used; T.left+=r.left; T.retAmt+=r.retAmt; T.owe+=r.owe; T.shEst+=r.shEst; T.shAct+=r.shAct;
+    return '<tr><td><b>'+xsEsc(r.name)+'</b></td><td class="r">'+xsN(r.pct*100)+'% <span style="color:var(--muted);font-size:12px">('+xsN(r.share,0)+' ส่วน)</span></td>'
+      +'<td class="r gold" style="font-weight:700">'+xsN(r.shEst)+'</td><td class="r"'+(r.shAct<0?' style="color:#c0392b"':'')+'>'+xsN(r.shAct)+'</td>'
+      +'<td class="r">'+(r.inAmt?xsN(r.inAmt):'-')+'</td><td class="r">'+(r.used?xsN(r.used):'-')+'</td>'
+      +'<td class="r"'+(r.left<0?' style="color:#c0392b;font-weight:700"':'')+'>'+(r.inAmt||r.used?xsN(r.left):'-')+'</td>'
+      +'<td class="r">'+(r.retAmt?xsN(r.retAmt):'-')+'</td><td class="r" style="font-weight:700">'+(r.inAmt?xsN(r.owe):'-')+'</td></tr>';
+  }).join('')+'<tr class="xs-tot"><td>รวม</td><td class="r">'+(o.totShare>0?'100%':'-')+'</td><td class="r gold">'+xsN(T.shEst)+'</td><td class="r">'+xsN(T.shAct)+'</td><td class="r">'+xsN(T.inAmt)+'</td><td class="r">'+xsN(T.used)+'</td><td class="r">'+xsN(T.left)+'</td><td class="r">'+xsN(T.retAmt)+'</td><td class="r">'+xsN(T.owe)+'</td></tr>'
+    : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">ยังไม่มีหุ้นส่วน — กด ⚙️ ตั้งค่า</td></tr>';
+  var w=[];
+  if(XS.depErr) w.push('🚨 โหลดข้อมูลมัดจำไม่สำเร็จ — ยอด "ใช้วางมัดจำแล้ว" และ "เงินเหลือ" ยังไม่ถูกต้อง กดรีเฟรชหน้า');
+  if(o.depShop) w.push('💰 มัดจำโครงการนี้ที่เป็น "เงินร้าน" '+xsN(o.depShop)+' บาท (ไม่นับเป็นเงินหุ้นส่วน)');
+  if(o.depOrphan) w.push('🚨 มัดจำ '+xsN(o.depOrphan)+' บาท ผูกกับหุ้นส่วนที่ไม่อยู่ในรายชื่อแล้ว — เปิดแก้มัดจำนั้นแล้วเลือกเจ้าของเงินใหม่');
+  if(o.noPriceKiu) w.push('⚠️ ทรายซื้อ '+xsN(o.noPriceKiu)+' คิว ยังไม่ใส่ราคาซื้อ — ค่าทรายจริงยังไม่ครบ');
+  if(o.kiu && !o.frAmt && !o.other) w.push('⚠️ ยังไม่มีค่าขนส่งจริงที่บันทึก — กำไร "ตามที่บันทึกจริง" จะสูงเกินจริงจนกว่าจะบันทึกค่าขนส่งในการ์ดค่าใช้จ่ายด้านล่าง');
+  o.rows.forEach(function(r){ if(r.left<0) w.push('🚨 '+xsEsc(r.name)+' ใช้วางมัดจำเกินเงินที่ลง '+xsN(-r.left)+' บาท'); });
+  if(o.totShare<=0 && o.rows.length) w.push('⚠️ ยังไม่ได้ใส่จำนวนส่วนของหุ้นส่วน');
+  note.innerHTML=w.join('<br>');
+  pf.innerHTML='<div class="xs-split"><div style="flex:1 1 50%;min-width:0"><div style="font-weight:700;margin-bottom:6px">ตามข้อตกลง (ต่อคิว)</div><table><tbody>'
+    +'<tr><td>ราคาขาย (รวม VAT)</td><td class="r">'+xsN(o.sell)+'</td></tr>'
+    +'<tr><td>ค่าทราย (รวม VAT)</td><td class="r">−'+xsN(o.sand)+'</td></tr>'
+    +'<tr><td>ค่าขนส่ง (ประมาณ)</td><td class="r">−'+xsN(o.fr)+'</td></tr>'
+    +'<tr><td>กำไรขั้นต้น</td><td class="r">'+xsN(o.sell-o.sand-o.fr)+'</td></tr>'
+    +'<tr><td>VAT '+(o.vatMode==='claim'?'(ขาย − ซื้อค่าทราย)':'ขาย (7/107)')+'</td><td class="r">−'+xsN(o.vatK)+'</td></tr>'
+    +'<tr class="xs-tot"><td>กำไร/คิว</td><td class="r gold">'+xsN(o.perK)+'</td></tr>'
+    +'<tr class="xs-tot"><td>× '+xsN(o.kiu)+' คิว</td><td class="r gold">'+xsN(o.est)+'</td></tr>'
+    +'</tbody></table></div><div style="flex:1 1 50%;min-width:0"><div style="font-weight:700;margin-bottom:6px">ตามที่บันทึกจริง</div><table><tbody>'
+    +'<tr><td>รายได้ ('+xsN(o.kiu)+' คิว × '+xsN(o.sell)+')</td><td class="r">'+xsN(o.rev)+'</td></tr>'
+    +'<tr><td>ค่าทรายจริง (ราคาซื้อในแถวซื้อทราย)</td><td class="r">−'+xsN(o.sandAmt)+'</td></tr>'
+    +'<tr><td>ค่าเที่ยวในแถวซื้อทราย</td><td class="r">−'+xsN(o.frAmt)+'</td></tr>'
+    +'<tr><td>ค่าใช้จ่ายอื่นที่บันทึก</td><td class="r">−'+xsN(o.other)+'</td></tr>'
+    +'<tr><td>VAT '+(o.vatMode==='claim'?'(ขาย − ซื้อค่าทราย)':'ขาย')+'</td><td class="r">−'+xsN(o.vatAct)+'</td></tr>'
+    +'<tr class="xs-tot"><td>กำไร</td><td class="r gold">'+xsN(o.act)+'</td></tr>'
+    +'<tr><td style="color:var(--muted)">วางบิลแล้ว (ใบแจ้งหนี้โครงการนี้)</td><td class="r" style="color:var(--muted)">'+xsN(o.billed)+'</td></tr>'
+    +'</tbody></table></div></div>';
+  var nameOf={}; (c.partners||[]).forEach(function(pp){ nameOf[pp.id]=pp.name; });
+  var fs=(c.funds||[]).slice().sort(function(a,b){ return (a.date<b.date)?1:(a.date>b.date?-1:0); });
+  document.getElementById('xsPtFundBody').innerHTML = fs.length ? fs.map(function(f){
+    var v=!!f.void, sid=xsSafeId(f.id);
+    return '<tr'+(v?' style="opacity:.55;text-decoration:line-through" title="ยกเลิกแล้ว: '+xsEsc(f.voidWhy||'')+'"':'')+'><td>'+xsTh(f.date)+'</td><td>'+xsEsc(nameOf[f.pid]||'(หุ้นส่วนถูกลบ)')+'</td><td>'+(f.type==='ret'?'↩️ คืนทุน':'⬇️ ลงเงิน')+'</td><td class="r">'+xsN(f.amount)+'</td><td>'+xsEsc(f.note||'')+'</td><td style="font-size:12px;color:var(--muted)">'+xsEsc(f.by||'')+'</td>'
+      +'<td style="text-align:right">'+(v?'<span style="font-size:12px;color:var(--muted)">ยกเลิกแล้ว</span>':sid?'<button class="btn-red" onclick="xsPtVoid(\'funds\',\''+sid+'\')">ยกเลิก</button>':'')+'</td></tr>';
+  }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">ยังไม่มี</td></tr>';
+  var cs=(c.costs||[]).slice().sort(function(a,b){ return (a.date<b.date)?1:(a.date>b.date?-1:0); });
+  document.getElementById('xsPtCostBody').innerHTML = cs.length ? cs.map(function(x){
+    var v=!!x.void, sid=xsSafeId(x.id);
+    return '<tr'+(v?' style="opacity:.55;text-decoration:line-through" title="ยกเลิกแล้ว: '+xsEsc(x.voidWhy||'')+'"':'')+'><td>'+xsTh(x.date)+'</td><td>'+xsEsc(x.label||'')+'</td><td class="r">'+xsN(x.amount)+'</td><td>'+xsEsc(x.note||'')+'</td><td style="font-size:12px;color:var(--muted)">'+xsEsc(x.by||'')+'</td>'
+      +'<td style="text-align:right">'+(v?'<span style="font-size:12px;color:var(--muted)">ยกเลิกแล้ว</span>':sid?'<button class="btn-red" onclick="xsPtVoid(\'costs\',\''+sid+'\')">ยกเลิก</button>':'')+'</td></tr>';
+  }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:16px">ยังไม่มี</td></tr>';
+}
+/* ── ตั้งค่าโครงการ ── */
+function xsPtPRow(pp){
+  var tr=document.createElement('tr'); tr.dataset.pid=xsSafeId(pp&&pp.id)||'';
+  tr.innerHTML='<td><input type="text" class="xpt-n" placeholder="เช่น ผู้ว่าฯ" oninput="xsPtCfgCalc()"></td>'
+    +'<td class="r"><input type="number" class="xpt-s" min="0" step="1" style="width:80px;min-width:80px;text-align:right" oninput="xsPtCfgCalc()"></td>'
+    +'<td class="r xpt-p">–</td><td style="text-align:right"><button class="btn-red" onclick="this.closest(\'tr\').remove();xsPtCfgCalc()">ลบ</button></td>';
+  tr.querySelector('.xpt-n').value=(pp&&pp.name)||''; tr.querySelector('.xpt-s').value=(pp&&pp.share!=null)?pp.share:1;
+  return tr;
+}
+function xsPtPAdd(){ document.getElementById('xsPtPBody').appendChild(xsPtPRow(null)); xsPtCfgCalc(); }
+function xsPtEditCfg(){
+  if(XS.ptErr){ alert('โหลดข้อมูลหุ้นส่วนไม่สำเร็จ — กรุณารีเฟรชหน้าก่อน'); return; }
+  var proj=document.getElementById('xsPtProj').value; if(!proj){ alert('เลือกโครงการก่อน'); return; }
+  var c=xsPtCfg(proj);
+  var act=(typeof crActive==='function')?crActive(proj):[], sp=act[0];
+  XS.ptCfgFor={proj:proj, rev:c?(+c.rev||0):-1};
+  document.getElementById('xsPtCfgName').textContent='"'+proj+'"';
+  document.getElementById('xsPtSell').value = c ? (c.sell||'') : (sp?(+sp.v||''):'');
+  document.getElementById('xsPtSand').value = c ? (c.sand||'') : '';
+  document.getElementById('xsPtFr').value = c ? (c.freight||'') : '';
+  document.getElementById('xsPtVat').value = (c && c.vat==='claim') ? 'claim' : 'full';
+  var b=document.getElementById('xsPtPBody'); b.innerHTML='';
+  var ps=c ? (c.partners||[]) : [{id:'', name:'เรา (ธนเศรษฐ์ศิริ)', share:1}];
+  ps.forEach(function(pp){ b.appendChild(xsPtPRow(pp)); });
+  xsPtCfgCalc();
+  var f=document.getElementById('xsPtCfgForm'); f.style.display='block'; f.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function xsPtCfgCancel(){ XS.ptCfgFor=null; var f=document.getElementById('xsPtCfgForm'); if(f) f.style.display='none'; }
+function xsPtCloseForms(){ xsPtCfgCancel(); XS.ptFormProj=''; ['xsPtFundForm','xsPtCostForm'].forEach(function(id){ var f=document.getElementById(id); if(f) f.style.display='none'; }); }
+function xsPtCfgRead(){
+  function num(id){ var v=document.getElementById(id).value; if(String(v).trim()==='') return 0; var n=parseFloat(v); return isFinite(n)?xsR2(n):NaN; }
+  var sell=num('xsPtSell'), sand=num('xsPtSand'), fr=num('xsPtFr');
+  var vat=document.getElementById('xsPtVat').value==='claim'?'claim':'full';
+  var ps=[]; document.querySelectorAll('#xsPtPBody tr').forEach(function(tr){ ps.push({tr:tr, id:tr.dataset.pid||'', name:(tr.querySelector('.xpt-n').value||'').trim(), share:parseFloat(tr.querySelector('.xpt-s').value)}); });
+  return {sell:sell, sand:sand, freight:fr, vat:vat, ps:ps};
+}
+function xsPtCfgCalc(){
+  var r=xsPtCfgRead(), tot=r.ps.reduce(function(a,x){ return a+(x.share>0?x.share:0); },0);
+  r.ps.forEach(function(x){ x.tr.querySelector('.xpt-p').textContent = (tot>0 && x.share>0) ? xsN(x.share/tot*100)+'%' : '–'; });
+  var vk=xsPtVatK(r.sell,r.sand,r.vat), per=r.sell-r.sand-r.freight-vk;
+  document.getElementById('xsPtCfgCalcOut').innerHTML = (r.sell>0 && isFinite(per)) ? ('กำไรขั้นต้น '+xsN(r.sell-r.sand-r.freight)+' − VAT '+xsN(vk)+' = <b>กำไร '+xsN(per)+' บาท/คิว</b>'
+    +(tot>0?' · '+r.ps.filter(function(x){return x.share>0;}).map(function(x){ return xsEsc(x.name||'?')+' '+xsN(per*x.share/tot); }).join(' · '):'')) : '';
+}
+function xsPtCfgSave(){
+  if(XS.ptErr){ alert('โหลดข้อมูลหุ้นส่วนไม่สำเร็จ — กรุณารีเฟรชหน้าก่อน'); return; }
+  if(XS.ptBusy) return;
+  if(XS.depErr){ alert('โหลดข้อมูลมัดจำไม่สำเร็จ — กรุณารีเฟรชหน้าก่อนแก้หุ้นส่วน'); return; }
+  var proj=document.getElementById('xsPtProj').value; if(!proj){ alert('เลือกโครงการก่อน'); return; }
+  var F=XS.ptCfgFor; if(!F || F.proj!==proj){ alert('โครงการที่เลือกเปลี่ยนไปแล้ว — เปิดฟอร์มตั้งค่าใหม่'); xsPtCfgCancel(); return; }
+  var r=xsPtCfgRead();
+  if(![r.sell,r.sand,r.freight].every(function(v){ return isFinite(v) && v>=0; })){ alert('ราคาขาย / ค่าทราย / ค่าขนส่ง ต้องเป็นตัวเลขไม่ติดลบ'); return; }
+  if(!(r.sell>0)){ alert('ใส่ราคาขาย/คิว'); return; }
+  if(!r.ps.length){ alert('ต้องมีหุ้นส่วนอย่างน้อย 1 คน'); return; }
+  var names=Object.create(null), bad='';
+  r.ps.forEach(function(x){ if(!x.name) bad='มีแถวที่ยังไม่ใส่ชื่อหุ้นส่วน'; else if(names[x.name]) bad='ชื่อหุ้นส่วนซ้ำ: '+x.name; else if(!(isFinite(x.share) && x.share>0)) bad='จำนวนส่วนของ '+x.name+' ต้องมากกว่า 0'; names[x.name]=1; });
+  if(bad){ alert(bad); return; }
+  var tot=r.ps.reduce(function(a,x){ return a+x.share; },0), per=r.sell-r.sand-r.freight-xsPtVatK(r.sell,r.sand,r.vat);
+  if(!confirm('บันทึกการตั้งค่าโครงการ "'+proj+'"\nขาย '+xsN(r.sell)+' · ทราย '+xsN(r.sand)+' · ขนส่ง '+xsN(r.freight)+' · '+(r.vat==='claim'?'หัก VAT ซื้อคืน':'หัก VAT เต็ม')+'\n= กำไร '+xsN(per)+' บาท/คิว\n\nหุ้นส่วน:\n'+r.ps.map(function(x){ return '• '+x.name+' '+xsN(x.share,0)+' ส่วน ('+xsN(x.share/tot*100)+'%)'; }).join('\n')+'\n\nยืนยัน?')) return;
+  var now=new Date().toISOString(), who=xsWho();
+  XS.ptBusy=true;
+  xsPtWrite(proj, function(cur){
+    if((cur?(+cur.rev||0):-1)!==F.rev) throw new Error('มีคนแก้การตั้งค่าโครงการนี้จากเครื่องอื่นระหว่างนี้ — ปิดฟอร์มแล้วเปิดใหม่');
+    var c=cur||{partners:[], funds:[], costs:[], hist:[], by:who, at:now, rev:0};
+    var keep={}; r.ps.forEach(function(x){ if(x.id) keep[x.id]=1; });
+    var used={}; (c.funds||[]).forEach(function(f){ if(!f.void) used[f.pid]=1; });
+    (XS.dep||[]).forEach(function(d){ if(!d.void && d.fundPid && String(d.project||'').trim()===proj) used[d.fundPid]=1; });
+    (c.partners||[]).forEach(function(pp){ if(!keep[pp.id] && used[pp.id]) throw new Error('ลบ "'+pp.name+'" ไม่ได้ เพราะมีเงินลง/มัดจำผูกอยู่ — ยกเลิกรายการเงินของคนนี้ก่อน'); });
+    var known={}; (c.partners||[]).forEach(function(pp){ known[pp.id]=1; });
+    r.ps.forEach(function(x){ if(x.id && !known[x.id]) throw new Error('ข้อมูลหุ้นส่วนเปลี่ยนจากเครื่องอื่น — ปิดฟอร์มแล้วเปิดใหม่'); });
+    var prev={sell:c.sell, sand:c.sand, freight:c.freight, vat:c.vat, partners:c.partners||[]};
+    c.hist=(c.hist||[]).concat(cur?[{prev:prev, by:who, at:now}]:[]);
+    c.sell=r.sell; c.sand=r.sand; c.freight=r.freight; c.vat=r.vat;
+    c.partners=r.ps.map(function(x){ return {id:x.id||xsNewId('p'), name:x.name, share:x.share}; });
+    c.editBy=who; c.editAt=now; c.rev=(+c.rev||0)+1;
+    return c;
+  }).then(function(){ XS.ptBusy=false; toast('✅ บันทึกการตั้งค่าหุ้นส่วนแล้ว'); xsPtCfgCancel(); xsDrawPt(); })
+    .catch(function(e){ XS.ptBusy=false; alert('บันทึกไม่สำเร็จ: '+e.message); if(/เครื่องอื่น/.test(e.message)){ xsPtCfgCancel(); xsPtReload(); } });
+}
+/* ── เงินลง / คืนทุน ── */
+function xsPtFundOpen(){
+  if(XS.ptErr){ alert('โหลดข้อมูลหุ้นส่วนไม่สำเร็จ — กรุณารีเฟรชหน้าก่อน'); return; }
+  var proj=document.getElementById('xsPtProj').value, c=xsPtCfg(proj);
+  if(!c || !(c.partners||[]).length){ alert('ตั้งหุ้นส่วนของโครงการนี้ก่อน (⚙️ ตั้งค่า)'); return; }
+  document.getElementById('xsPtFWho').innerHTML=(c.partners||[]).map(function(pp){ return '<option value="'+xsEsc(xsSafeId(pp.id))+'">'+xsEsc(pp.name)+'</option>'; }).join('');
+  XS.ptFormProj=proj; document.getElementById('xsPtCostForm').style.display='none';
+  document.getElementById('xsPtFDate').value=todayYMD(); document.getElementById('xsPtFType').value='in';
+  document.getElementById('xsPtFAmt').value=''; document.getElementById('xsPtFNote').value='';
+  var f=document.getElementById('xsPtFundForm'); f.style.display='block'; f.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function xsPtFundClose(){ document.getElementById('xsPtFundForm').style.display='none'; }
+function xsPtFundSave(){
+  if(XS.ptErr || XS.ptBusy) return;
+  var proj=document.getElementById('xsPtProj').value, pid=document.getElementById('xsPtFWho').value, pp=xsPtPartner(proj,pid);
+  if(!proj || XS.ptFormProj!==proj){ alert('โครงการที่เลือกเปลี่ยนไปแล้ว — เปิดฟอร์มใหม่'); xsPtCloseForms(); return; }
+  var date=document.getElementById('xsPtFDate').value, type=document.getElementById('xsPtFType').value==='ret'?'ret':'in';
+  var amt=xsR2(parseFloat(document.getElementById('xsPtFAmt').value)), note=(document.getElementById('xsPtFNote').value||'').trim();
+  if(!pp){ alert('เลือกหุ้นส่วน'); return; } if(!date){ alert('ใส่วันที่'); return; }
+  if(!(isFinite(amt) && amt>0)){ alert('ใส่จำนวนเงิน'); return; }
+  var o=xsPtCalc(proj), row=o.rows.filter(function(x){ return x.id===pid; })[0]||{inAmt:0,retAmt:0};
+  var warn = (type==='ret' && row.retAmt+amt>row.inAmt+0.001) ? '\n⚠️ คืนทุนรวมจะเกินเงินที่ลง ('+xsN(row.inAmt)+')' : '';
+  if(!confirm((type==='ret'?'คืนทุน':'ลงเงิน')+' — '+pp.name+'\nโครงการ "'+proj+'"\n'+xsN(amt)+' บาท · '+xsTh(date)+warn+'\n\nยืนยัน?')) return;
+  var now=new Date().toISOString(), who=xsWho();
+  XS.ptBusy=true;
+  xsPtWrite(proj, function(cur){
+    if(!cur) throw new Error('ไม่พบการตั้งค่าโครงการ');
+    if(!(cur.partners||[]).some(function(x){ return x.id===pid; })) throw new Error('หุ้นส่วนคนนี้ถูกลบจากเครื่องอื่น');
+    cur.funds=(cur.funds||[]).concat([{id:xsNewId('f'), date:date, pid:pid, type:type, amount:amt, note:note, by:who, at:now}]);
+    return cur;
+  }).then(function(){ XS.ptBusy=false; toast('✅ บันทึกแล้ว'); xsPtFundClose(); xsDrawPt(); })
+    .catch(function(e){ XS.ptBusy=false; alert('บันทึกไม่สำเร็จ: '+e.message); });
+}
+/* ── ค่าใช้จ่ายอื่นของโครงการ ── */
+function xsPtCostOpen(){
+  if(XS.ptErr){ alert('โหลดข้อมูลหุ้นส่วนไม่สำเร็จ — กรุณารีเฟรชหน้าก่อน'); return; }
+  var proj=document.getElementById('xsPtProj').value; if(!xsPtCfg(proj)){ alert('ตั้งหุ้นส่วนของโครงการนี้ก่อน (⚙️ ตั้งค่า)'); return; }
+  XS.ptFormProj=proj; document.getElementById('xsPtFundForm').style.display='none';
+  document.getElementById('xsPtCDate').value=todayYMD(); document.getElementById('xsPtCLabel').value=''; document.getElementById('xsPtCAmt').value=''; document.getElementById('xsPtCNote').value='';
+  var f=document.getElementById('xsPtCostForm'); f.style.display='block'; f.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function xsPtCostClose(){ document.getElementById('xsPtCostForm').style.display='none'; }
+function xsPtCostSave(){
+  if(XS.ptErr || XS.ptBusy) return;
+  var proj=document.getElementById('xsPtProj').value;
+  if(!proj || XS.ptFormProj!==proj){ alert('โครงการที่เลือกเปลี่ยนไปแล้ว — เปิดฟอร์มใหม่'); xsPtCloseForms(); return; }
+  var date=document.getElementById('xsPtCDate').value, label=(document.getElementById('xsPtCLabel').value||'').trim();
+  var amt=xsR2(parseFloat(document.getElementById('xsPtCAmt').value)), note=(document.getElementById('xsPtCNote').value||'').trim();
+  if(!date){ alert('ใส่วันที่'); return; } if(!label){ alert('ใส่รายการ'); return; }
+  if(!(isFinite(amt) && amt>0)){ alert('ใส่จำนวนเงิน'); return; }
+  if(!confirm('บันทึกค่าใช้จ่ายโครงการ "'+proj+'"\n'+label+' '+xsN(amt)+' บาท · '+xsTh(date)+'\n(ไม่เข้าแท็บ 8 รายจ่าย)\n\nยืนยัน?')) return;
+  var now=new Date().toISOString(), who=xsWho();
+  XS.ptBusy=true;
+  xsPtWrite(proj, function(cur){
+    if(!cur) throw new Error('ไม่พบการตั้งค่าโครงการ');
+    cur.costs=(cur.costs||[]).concat([{id:xsNewId('c'), date:date, label:label, amount:amt, note:note, by:who, at:now}]);
+    return cur;
+  }).then(function(){ XS.ptBusy=false; toast('✅ บันทึกค่าใช้จ่ายแล้ว'); xsPtCostClose(); xsDrawPt(); })
+    .catch(function(e){ XS.ptBusy=false; alert('บันทึกไม่สำเร็จ: '+e.message); });
+}
+function xsPtVoid(kind,id){
+  if(XS.ptErr || XS.ptBusy) return;
+  if(kind!=='funds' && kind!=='costs') return;
+  var proj=document.getElementById('xsPtProj').value, c=xsPtCfg(proj); if(!c) return;
+  var x=(c[kind]||[]).filter(function(y){ return y.id===id; })[0]; if(!x || x.void) return;
+  var why=prompt('ยกเลิกรายการ '+xsN(x.amount)+' บาท ('+xsTh(x.date)+')\nรายการจะไม่ถูกลบ แต่ไม่นับในยอด\n\nใส่เหตุผล:','');
+  if(why===null) return; why=String(why).trim(); if(!why){ alert('ต้องใส่เหตุผล'); return; }
+  var now=new Date().toISOString(), who=xsWho();
+  XS.ptBusy=true;
+  xsPtWrite(proj, function(cur){
+    if(!cur) throw new Error('ไม่พบการตั้งค่าโครงการ');
+    var hit=false;
+    cur[kind]=(cur[kind]||[]).map(function(y){ if(y.id!==id) return y; if(y.void) throw new Error('ยกเลิกไปแล้ว'); hit=true; var z={}; Object.keys(y).forEach(function(k){ z[k]=y[k]; }); z.void=true; z.voidWhy=why; z.voidBy=who; z.voidAt=now; return z; });
+    if(!hit) throw new Error('ไม่พบรายการ');
+    return cur;
+  }).then(function(){ XS.ptBusy=false; toast('ยกเลิกรายการแล้ว'); xsDrawPt(); })
+    .catch(function(e){ XS.ptBusy=false; alert('ยกเลิกไม่สำเร็จ: '+e.message); });
+}
+/* ── ช่อง "เงินของใคร" ในฟอร์มมัดจำ (รายชื่อหุ้นส่วนของโครงการที่พิมพ์) ── */
+function xsDepFundOpts(sel){
+  var el=document.getElementById('xsDepFund'); if(!el) return;
+  var cur=(sel!=null)?sel:el.value, proj=(document.getElementById('xsDepProj').value||'').trim(), c=xsPtCfg(proj);
+  var orig=XS.depId?(XS.dep||[]).filter(function(x){ return x.id===XS.depId; })[0]:null;
+  var ps=((c&&c.partners)||[]), has=function(id){ return ps.some(function(pp){ return pp.id===id; }); };
+  var keep=(orig && orig.fundPid && xsSafeId(orig.fundPid) && !has(orig.fundPid) && String(orig.project||'').trim()===proj) ? '<option value="'+xsEsc(orig.fundPid)+'">⚠️ '+xsEsc(orig.fund||'หุ้นส่วนเดิม')+' (ไม่พบในรายชื่อหุ้นส่วนโครงการนี้)</option>' : '';
+  el.innerHTML='<option value="">เงินร้าน (ไม่ใช่เงินหุ้นส่วน)</option>'+ps.map(function(pp){ var id=xsSafeId(pp.id); return id?'<option value="'+xsEsc(id)+'">🤝 '+xsEsc(pp.name)+'</option>':''; }).join('')+keep;
+  var ok=!cur || has(cur) || (keep && orig.fundPid===cur); if(cur && ok) el.value=cur;
+  var hint=document.getElementById('xsDepCalcOut');
+  if(!ok && hint){ hint.innerHTML='<span style="color:#c0392b">⚠️ เจ้าของเงินที่เลือกไว้ไม่ใช่หุ้นส่วนของโครงการ "'+xsEsc(proj)+'" — ช่อง "เงินของใคร" กลับเป็นเงินร้าน เลือกใหม่ก่อนบันทึก</span>'; }
 }
 
 /* ══════════ สมุดรายชื่อลูกค้า ══════════ */
@@ -12124,6 +12497,7 @@ function xsJrPriceSave(){
     {g:'💸 รายจ่าย', lv:1, open:1, kids:[
       {g:'ต้นทุนทราย', lv:2, open:1, kids:[
         ['ซื้อทรายท่าอื่น',{t:10,s:'jr'},ADM,'อัปไฟล์สรุปเที่ยว'],
+        ['มัดจำท่าทราย',{t:10,s:'dep'},ADM,'เงินจ่ายท่าล่วงหน้า · หักจากทรายที่ซื้อ'],
         ['น้ำมัน',{t:7},0,'เรือ / แม็กโคร / รถ'],
         {g:'เงินเดือน', lv:3, open:0, kids:[
           ['บันทึกเวลาทำงาน',{t:6,p:'att'},0],
@@ -12145,6 +12519,7 @@ function xsJrPriceSave(){
     ]},
     {g:'📒 บัญชี 👑', lv:1, open:1, adm:ADM, kids:[
       ['สรุปผู้บริหาร',{t:4},ADM,'กำไร / ขาดทุน'],
+      ['หุ้นส่วนโครงการ',{t:10,s:'pt'},ADM,'ใครลงเงิน · เหลือ · ส่วนแบ่งกำไร'],
       ['ค่าแรงรวมรายเดือน',{t:6,p:'sum'},ADM]
     ]}
   ];
