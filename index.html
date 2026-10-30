@@ -1329,6 +1329,7 @@ select{color-scheme:light;}
             <button class="att-btn" id="attBtnFull"  onclick="setQuickType('full')">✅ เต็มวัน</button>
             <button class="att-btn" id="attBtnHalf"  onclick="setQuickType('half')">🌗 ครึ่งวัน</button>
             <button class="att-btn" id="attBtnHours" onclick="setQuickType('hours')">⏱ รายชั่วโมง</button>
+            <button class="btn btn-gold" style="margin-left:6px;" onclick="apOpen()">📷 ลงเวลาด้วยรูป</button>
           </div>
           <div id="attHoursRow" style="display:none;align-items:center;gap:6px;">
             <span style="font-size:12px;color:var(--text-secondary);">ชั่วโมง:</span>
@@ -2045,6 +2046,12 @@ select{color-scheme:light;}
         มีประกันสังคม (หัก 875 บาท รอบสิ้นเดือน)
       </label>
     </div>
+    <div class="form-row" id="fPhotoAttRow">
+      <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="fPhotoAtt" style="width:16px;height:16px;cursor:pointer;" checked>
+        ต้องลงเวลาด้วยรูป (ไม่ติ๊ก = ไม่ขึ้นในหน้าถ่ายรูป · ลงแบบติ๊กชื่อ · ไม่หักสาย)
+      </label>
+    </div>
     <div class="form-row" id="specialRoleSection">
       <label class="form-label">งานพิเศษ (optional)</label>
       <div id="specialRoleList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
@@ -2523,7 +2530,7 @@ async function prLoadWithdrawals(ym) {
   }
 }
 
-async function prSaveAttRecord(empId, date, type, hours, specialWork) {
+async function prSaveAttRecord(empId, date, type, hours, specialWork, extra) {
   const ym = date.slice(0, 7);
   const key = date + '_' + empId;
   const data = {
@@ -2533,14 +2540,22 @@ async function prSaveAttRecord(empId, date, type, hours, specialWork) {
     updatedAt: new Date().toISOString(),
     updatedBy: typeof curEmail !== 'undefined' ? curEmail : 'admin'
   };
+  // แก้ไขรายการ → ไม่ทำเวลาเข้างาน/รูป/สายหาย (ลงเวลาด้วยรูป 30 ต.ค. 69)
+  const old = prAttendance[key] || {};
+  ['checkIn','checkInSrc','checkInAt','checkInOrig','lateMin','lateWaive','photoId','photoAt'].forEach(k => { if (old[k] !== undefined) data[k] = old[k]; });
+  if (extra) Object.keys(extra).forEach(k => { if (extra[k] !== undefined) data[k] = extra[k]; });
   prAttendance[key] = data;
-  await prDb().collection('attendance').doc(key).set(data);
+  // merge: ถ้าเครื่องนี้โหลดข้อมูลไว้ก่อนอีกเครื่องแนบรูป จะไม่ลบเวลาเข้างาน/รูปทิ้ง
+  await prDb().collection('attendance').doc(key).set(data, { merge: true });
 }
 
 async function prDeleteAttRecord(empId, date) {
   const key = date + '_' + empId;
+  let photoId = (prAttendance[key] || {}).photoId;
+  try { const cur = await prDb().collection('attendance').doc(key).get(); if (cur.exists && cur.data().photoId) photoId = cur.data().photoId; } catch (e) {}
   delete prAttendance[key];
   await prDb().collection('attendance').doc(key).delete();
+  if (photoId) { try { await prDb().collection('att_photos').doc(photoId).delete(); } catch (e) { console.warn('att_photos delete', e); } }
 }
 
 async function prSaveEmployee(emp) {
@@ -2825,6 +2840,44 @@ function empRateOn(emp, dateYMD) {
   return r || 0;
 }
 
+// ── หักมาสาย (30 ต.ค. 69 · ลงเวลาด้วยรูป) ──
+// เข้างาน 08:00 ไม่มีเผื่อ · ครบชั่วโมงหักค่าแรงรายชั่วโมง · เศษนาทีละ 1 ฿ (เศษไม่เกินค่าแรง 1 ชม.)
+// เช่น ค่าแรง 50/ชม.: สาย 10 น.=10 · 59 น.=50 · 61 น.=51 · 125 น.=105
+// หักเฉพาะวันที่ลง "เต็มวัน" · ยกเว้นได้ (lateWaive) · ไม่เกินค่าแรงของวันนั้น · คนขับวิ่งเที่ยวไม่หัก
+const ATT_START_MIN = 8 * 60;
+function attLateMinOf(hhmm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || ''));
+  if (!m) return 0;
+  return Math.max(0, (+m[1]) * 60 + (+m[2]) - ATT_START_MIN);
+}
+function attLateDeduct(emp, dateYMD, rec, dayUnit) {
+  if (!emp || !rec || rec.type !== 'full' || rec.lateWaive || prIsTrip(emp)) return 0;
+  const min = +rec.lateMin || 0;
+  if (min <= 0) return 0;
+  if (dayUnit == null) {
+    const rt = empRateOn(emp, dateYMD);
+    dayUnit = emp.type === 'daily' ? rt : rt / daysInMonth(dateYMD.slice(0, 7));
+  }
+  if (!(dayUnit > 0)) return 0;
+  const hourly = dayUnit / 8;
+  // ครบชั่วโมง → หักเป็นชั่วโมง · เศษนาทีที่เหลือ นาทีละ 1 ฿ (แต่ไม่เกินค่าแรง 1 ชม.)
+  const d = Math.floor(min / 60) * hourly + Math.min((min % 60) * 1, hourly);
+  return Math.min(d, dayUnit);
+}
+function attCiBadge(emp, date, rec, compact) {
+  if (!rec || !rec.type) return '';
+  let h = '';
+  if (rec.checkIn) {
+    const m = +rec.lateMin || 0, d = attLateDeduct(emp, date, rec);
+    h += m > 0
+      ? `<span class="att-ci late">🕗 ${attEsc(rec.checkIn)} · สาย ${m} นาที${d > 0 ? ' −' + fmtBaht(d) + ' ฿' : (rec.lateWaive ? ' (ยกเว้น)' : '')}</span>`
+      : `<span class="att-ci">🕗 ${attEsc(rec.checkIn)}</span>`;
+  }
+  if (attSafeId(rec.photoId)) h += `<button type="button" class="att-ci-ph" onclick="apView('${attSafeId(rec.photoId)}')" title="ดูรูป">📷</button>`;
+  else if (!compact && !(emp && emp.noPhotoAtt)) h += '<span class="att-ci nop">ไม่มีรูป</span>';
+  return h;
+}
+
 function calcEarned(emp, dateYMD, raw) {   // raw=true → ไม่ปัดเศษ (ใช้ตอนรวมทั้งงวด)
   if (prIsTrip(emp)) return 0;
   const rec = prAttendance[dateYMD + '_' + emp.id];
@@ -2841,6 +2894,7 @@ function calcEarned(emp, dateYMD, raw) {   // raw=true → ไม่ปัดเ
     else if (rec.type === 'half')   base = rate / days / 2;
     else if (rec.type === 'hours')  base = (rate / days) * ((rec.hours || 0) / 8);
   }
+  base -= attLateDeduct(emp, dateYMD, rec);
   let special = 0;
   if (rec.specialWork) rec.specialWork.forEach(sw => { special += sw.amount || 0; });
   return raw ? (base + special) : Math.round((base + special) * 100) / 100;
@@ -2892,6 +2946,7 @@ async function computeMonthLabor(ym){
         else if(rec.type==='half') base=rt/days/2;
         else if(rec.type==='hours') base=(rt/days)*((rec.hours||0)/8);
       }
+      base-=attLateDeduct(emp, ym+'-'+String(d).padStart(2,'0'), rec);
       var special=0;
       if(rec.specialWork) rec.specialWork.forEach(function(sw){ special+=sw.amount||0; });
       total += (base+special);
@@ -3156,6 +3211,8 @@ var attSpSel = {};      // { empId: { roleName: true } } — เฉพาะช�
 var attSpChk = {};      // { empId: true } — ติ๊กชื่อไว้ (ยังไม่บันทึก)
 var attSpDate = null;
 function attSpChecked(empId) { return !!attSpChk[empId]; }
+// photoId ใส่ใน onclick ได้เฉพาะรหัสตัวอักษร/ตัวเลข (กันหลุดออกจากสตริง JS)
+function attSafeId(t) { const s = String(t == null ? '' : t); return /^[A-Za-z0-9_-]{1,64}$/.test(s) ? s : ''; }
 function attEsc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function attSpIsOn(empId, name) { return !!(attSpSel[empId] && attSpSel[empId][name]); }
 function attChkChanged(empId) {
@@ -3294,7 +3351,7 @@ function renderAttList() {
           <div class="emp-avatar-sm">${emp.nickname.charAt(0)}</div>
           <div>
             <span style="font-size:14px;font-weight:700;">${emp.nickname}</span>
-            <span style="font-size:12px;font-weight:700;color:${typeColor};margin-left:8px;background:${typeColor}22;padding:2px 8px;border-radius:4px;">${typeLabel}${hoursText}</span>
+            <span style="font-size:12px;font-weight:700;color:${typeColor};margin-left:8px;background:${typeColor}22;padding:2px 8px;border-radius:4px;">${typeLabel}${hoursText}</span>${attCiBadge(emp, date, rec)}
             ${emp.specialRoles && emp.specialRoles.length > 0 ? '<span style="font-size:11px;color:var(--accent-purple);margin-left:6px;">🌙 งานพิเศษ</span>' : ''}
           </div>
         </div>
@@ -3337,6 +3394,18 @@ function openAttEditModal(empId, date) {
       <input type="number" id="aeHours" class="form-input" value="${curH}" min="0.5" max="16" step="0.5" style="width:100px;">
     </div>
     ${specialHtml ? '<div class="form-row"><label class="form-label">งานพิเศษ</label>' + specialHtml + '</div>' : ''}
+    <div class="form-row">
+      <label class="form-label">เวลาเข้างาน <span style="font-weight:400;color:var(--text-muted);font-size:11px;">(เข้า 08:00 · หักสายเฉพาะเต็มวัน)</span></label>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <input type="time" id="aeCheckIn" class="form-input" value="${attEsc(rec.checkIn || '')}" style="width:130px;">
+        ${attSafeId(rec.photoId) ? `<button type="button" class="att-ci-ph" style="margin:0;font-size:13px;padding:5px 9px;" onclick="apView('${attSafeId(rec.photoId)}')">📷 ดูรูป</button>` : ''}
+        ${rec.checkInSrc === 'gallery' ? '<span style="font-size:11px;color:var(--text-muted);">รูปจากคลัง · กรอกเวลาเอง</span>' : ''}
+        ${rec.checkInOrig ? `<span style="font-size:11px;color:#b45309;">แก้จากเวลาเดิม ${attEsc(rec.checkInOrig)}</span>` : ''}
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;margin-top:8px;">
+        <input type="checkbox" id="aeLateWaive" ${rec.lateWaive ? 'checked' : ''} style="width:15px;height:15px;"> ยกเว้นหักสายวันนี้
+      </label>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-secondary" onclick="document.getElementById('attEditOverlay').remove()">ยกเลิก</button>
       <button class="btn btn-primary" onclick="saveAttEdit('${empId}','${date}',${(emp.specialRoles||[]).length})">💾 บันทึก</button>
@@ -3365,8 +3434,21 @@ async function saveAttEdit(empId, date, numSpecial) {
       sw.push({ name: emp.specialRoles[i].name, amount: emp.specialRoles[i].ratePerDay });
     }
   }
+  // เวลาเข้างาน / ยกเว้นหักสาย
+  const old = prAttendance[date + '_' + empId] || {};
+  const ciEl = document.getElementById('aeCheckIn'), wvEl = document.getElementById('aeLateWaive');
+  const extra = {};
+  if (ciEl) {
+    const ci = ciEl.value || '';
+    if (ci !== (old.checkIn || '')) {
+      extra.checkIn = ci || null;
+      extra.lateMin = ci ? attLateMinOf(ci) : 0;
+      if (old.checkIn && !old.checkInOrig) extra.checkInOrig = old.checkIn;
+    }
+  }
+  if (wvEl) extra.lateWaive = !!wvEl.checked;
   try {
-    await prSaveAttRecord(empId, date, type, hours, sw);
+    await prSaveAttRecord(empId, date, type, hours, sw, extra);
     ov.remove();
     renderAttList();
     renderEmpCheckList();
@@ -4062,7 +4144,7 @@ function openEmpDetail(empId, ym){
     const r = prAttendance[ds+'_'+empId];
     if(!r) continue;
     const sp = (r.specialWork||[]).map(x=>x.name+' '+fmtBaht(x.amount)+'฿').join(', ');
-    daily += `<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${isoToBE(ds)}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${_typeLabel(r)}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);color:var(--accent-purple);">${sp||'–'}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono);">${fmtBaht(calcEarned(emp,ds))} ฿</td></tr>`;
+    daily += `<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${isoToBE(ds)}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${_typeLabel(r)}${attCiBadge(emp, ds, r, true)}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);color:var(--accent-purple);">${sp||'–'}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono);">${fmtBaht(calcEarned(emp,ds))} ฿</td></tr>`;
   }
   const monthWds = prWithdrawals.filter(w=>w.empId===empId && w.month===ym).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   const wdList = monthWds.length ? monthWds.map(w=>`<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${isoToBE(w.date)}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${w.period==='1-15'?'รอบ1':'รอบ2'}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);">${w.kind==='settle'?'<span style="color:var(--accent-green);">จ่ายปิดงวด</span>':'เบิกล่วงหน้า'}</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono);">${fmtBaht(w.amount)} ฿</td></tr>`).join('') : '<tr><td colspan="4" style="padding:8px;color:var(--text-secondary);">— ไม่มีรายการ —</td></tr>';
@@ -4210,6 +4292,7 @@ function openEmpModal(id) {
     document.getElementById('fRateFrom').value = todayYMD();
     document.getElementById('fRateHist').innerHTML = empRateHistText(emp);
     document.getElementById('fSocial').checked = emp.socialSecurity;
+    document.getElementById('fPhotoAtt').checked = !emp.noPhotoAtt;
     setEmpType(emp.type);
     (emp.specialRoles || []).forEach(sr => addSpecialRoleField(sr.name, sr.ratePerDay));
   } else {
@@ -4221,6 +4304,7 @@ function openEmpModal(id) {
     document.getElementById('fRate').dataset.orig = '';
     document.getElementById('fRateHist').innerHTML = '';
     document.getElementById('fSocial').checked = false;
+    document.getElementById('fPhotoAtt').checked = true;
     setEmpType('daily');
   }
 }
@@ -4247,6 +4331,8 @@ function setEmpType(type) {
   document.getElementById('rateLabel').textContent = type === 'daily' ? 'อัตราค่าแรง (บาท/วัน) *' : type === 'trip' ? 'วงเงินเบิกต่อเดือน (บาท) * — รายได้จริงคิดในโปรแกรมรุ่งชัย · เบิกเกินวงเงินจะแจ้ง Telegram' : 'เงินเดือน (บาท/เดือน) *';
   const rcRow = document.getElementById('fRcEmpRow');
   if (rcRow) { rcRow.style.display = type === 'trip' ? '' : 'none'; if (type === 'trip') rcFillEmpSelect(); }
+  const paRow = document.getElementById('fPhotoAttRow');
+  if (paRow) paRow.style.display = type === 'trip' ? 'none' : '';
 }
 
 // รายชื่อคนขับจากรุ่งชัย → ช่องเลือกในทะเบียนพนักงาน (สร้างด้วย DOM ไม่ต่อ HTML จากชื่อ)
@@ -4323,6 +4409,9 @@ async function saveEmployee() {
     specialRoles, active: true
   };
   if (rateHistory.length) emp.rateHistory = rateHistory;
+  // ไม่ต้องลงเวลาด้วยรูป (30 ต.ค. 69) · เก็บเฉพาะตอนไม่ติ๊ก → พนักงานเดิมยังขึ้นในหน้าถ่ายรูปเหมือนเดิม
+  // (คนขับวิ่งเที่ยวซ่อนช่องนี้ แต่ยังเก็บค่าไว้ ถ้าสลับกลับเป็นรายวัน/รายเดือนจะได้ไม่หาย)
+  if (!document.getElementById('fPhotoAtt').checked) emp.noPhotoAtt = true;
   // จับคู่คนขับรุ่งชัย (เฉพาะคนขับวิ่งเที่ยว) · ช่องยังโหลดไม่เสร็จ = คงค่าเดิมไว้ ไม่ล้าง
   if (prEditEmpType === 'trip') {
     const rcSel = document.getElementById('fRcEmp');
@@ -12991,7 +13080,8 @@ html.mb #empModalOverlay .type-toggle .type-btn{flex:1;}
     var att=el('div','mbx','');
     att.id='mbpAtt';
     att.innerHTML=
-      '<div class="mb-p-card">'
+      '<button type="button" class="mb-p-btn" style="margin-bottom:12px;" onclick="apOpen()"><span>📷 ลงเวลาด้วยรูป</span></button>'
+      + '<div class="mb-p-card">'
       + '<span class="mb-p-lb">วันที่</span>'
       + '<div class="mb-p-in" id="mbpDateBox"><span id="mbpDateTxt">เลือกวันที่</span>'+S(I.cal,19)+'<input type="date" id="mbpDate"></div>'
       + '<div class="mb-p-seg" id="mbpSeg">'
@@ -13187,6 +13277,7 @@ html.mb #empModalOverlay .type-toggle .type-btn{flex:1;}
       + '<div class="mb-p-kv"><span>ประเภท</span><b>'+typeTxt(r)+'</b></div>'
       + '<div class="mb-p-kv"><span>ชั่วโมง</span><b>'+hoursOf(r)+'</b></div>'
       + '<div class="mb-p-kv"><span>งานพิเศษ</span><b>'+(sp?esc(sp):'–')+'</b></div>'
+      + (r.checkIn||r.photoId ? '<div class="mb-p-kv"><span>เข้างาน</span><b>'+esc(r.checkIn||'–')+((+r.lateMin||0)>0?' · สาย '+(+r.lateMin)+' นาที'+(attLateDeduct(e,date,r)>0?' −'+fb(attLateDeduct(e,date,r))+' ฿':''):'')+(attSafeId(r.photoId)?' <button type="button" class="att-ci-ph" onclick="apView(\''+attSafeId(r.photoId)+'\')">📷</button>':'')+'</b></div>' : '')
       + '<div class="mb-p-kv big last"><span>ค่าแรงวันนี้</span><b>'+fb(w)+' ฿</b></div></div>'
       + '<button class="mb-shbtn pri" data-a="edit">แก้ไข</button>'
       + '<button class="mb-shbtn red" data-a="del">ลบรายการนี้</button>'
@@ -14582,6 +14673,7 @@ html.mb #tp4.own-full #mbOwn{margin-bottom:14px;}
           var rt=(typeof empRateOn==='function')?empRateOn(e, P.ym+'-'+String(d).padStart(2,'0')):(e.rate||0);
           var unit=(e.type==='daily')?rt:(rt/days);
           var base=r.type==='full'?unit:r.type==='half'?unit/2:r.type==='hours'?unit*((r.hours||0)/8):0, sp=0;
+          if(typeof attLateDeduct==='function') base-=attLateDeduct(e, P.ym+'-'+String(d).padStart(2,'0'), r, unit);
           (r.specialWork||[]).forEach(function(s){ sp+=s.amount||0; });
           earned+=(base+sp);
         }
@@ -14711,6 +14803,7 @@ html.mb #tp4.own-full #mbOwn{margin-bottom:14px;}
     if(locked) return; locked=true;
     try{ if(typeof mbClose==='function') mbClose(); }catch(e){}
     try{ if(typeof mbMenuClose==='function') mbMenuClose(); }catch(e){}
+    try{ document.querySelectorAll('.ap-mask').forEach(function(m){ m.remove(); }); }catch(e){}
     try{ if(typeof doLogout==='function') doLogout(); else firebase.auth().signOut(); }catch(e){}
     // ล้างข้อมูลบนจอทั้งหมด → เริ่มที่หน้าใส่รหัส (รีโหลดครั้งเดียว กันวนถ้าออกจากระบบไม่สำเร็จ)
     var once=false; try{ once=sessionStorage.getItem('thn_lockReload')==='1'; }catch(e){}
@@ -14735,5 +14828,298 @@ html.mb #tp4.own-full #mbOwn{margin-bottom:14px;}
   setInterval(function(){ if(appOn() && Date.now()-Math.max(last,rd())>idleMs()) lock(); }, 60000);
 })();
 </script>
+<style id="ap-css">
+/* ── 30 ต.ค.69 · ลงเวลาด้วยรูป (แทนเครื่องลงเวลา) ── */
+.ap-mask{position:fixed;inset:0;background:rgba(15,23,30,.45);z-index:9000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px}
+.ap-box{background:#fff;border-radius:16px;width:100%;max-width:780px;box-shadow:0 10px 40px rgba(0,0,0,.25);overflow:hidden;color:#1a1d1f}
+.ap-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid #e6eaed}
+.ap-hd h3{margin:0;font-size:17px}
+.ap-sub{font-size:12.5px;color:#5f6b76;margin-top:2px}
+.ap-x{border:0;background:#f0f2f4;border-radius:10px;width:40px;height:40px;font-size:18px;cursor:pointer}
+.ap-rule{margin:12px 18px 4px;padding:9px 12px;border-radius:10px;background:#fdf3e7;border:1px solid #f3ddbc;color:#8a5a12;font-size:13px;line-height:1.6}
+.ap-list{padding:4px 18px 18px}
+.ap-row{border-bottom:1px solid #f0f2f4;padding:12px 0}
+.ap-top{display:flex;align-items:center;gap:10px 12px;flex-wrap:wrap}
+.ap-nm{font-size:16px;font-weight:700;min-width:90px}
+.ap-st{font-size:13px;color:#5f6b76;flex:1;min-width:150px;line-height:1.5}
+.ap-st b{color:#0f7b3f}
+.ap-late{color:#b45309;font-weight:700}
+.ap-btns{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.ap-b{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:10px;border:1px solid #cfd6dc;background:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:#1a1d1f}
+.ap-b.pri{background:#0f7b3f;border-color:#0f7b3f;color:#fff}
+.ap-b:disabled{opacity:.45;cursor:not-allowed}
+.ap-pane{margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;background:#f6f8f9;border:1px solid #e6eaed;border-radius:12px;padding:12px}
+.ap-pane img{width:170px;max-height:220px;object-fit:cover;border-radius:10px;border:1px solid #dfe4e8;background:#fff}
+.ap-f{display:flex;flex-direction:column;gap:8px;flex:1;min-width:210px;font-size:14px}
+.ap-f input[type=time]{font-size:22px;padding:6px 10px;border:1px solid #cfd6dc;border-radius:8px;width:160px;font-family:inherit}
+.ap-big{font-size:24px;font-weight:700}
+.ap-calc{font-size:14px;font-weight:600}
+.ap-calc.ok{color:#0f7b3f}.ap-calc.late{color:#b45309}
+.ap-warn{color:#b42318;font-size:13px;font-weight:600}
+.ap-view{max-width:96vw;max-height:84vh;border-radius:12px;display:block;margin:auto}
+.att-ci{font-size:12px;margin-left:8px;color:#5f6b76;white-space:nowrap}
+.att-ci.late{color:#b45309;font-weight:700}
+.att-ci.nop{color:#9aa4ad;font-weight:400}
+.att-ci-ph{background:none;border:1px solid var(--border,#dfe4e8);border-radius:5px;cursor:pointer;font-size:12px;padding:2px 6px;margin-left:6px}
+</style>
+<script id="ap-js">
+/* ============================================================
+   ลงเวลาด้วยรูป (30 ต.ค. 2569) — แทนเครื่องลงเวลา
+   - แอดมินถ่าย/แนบรูปพนักงานรายคน → ระบบลง "เต็มวัน" + เก็บเวลาเข้างานให้
+   - 📷 ถ่ายรูป: เวลา = เวลาตอนถ่าย (ใช้ได้เฉพาะวันนี้ แก้ไม่ได้ในหน้านี้)
+   - 🖼️ คลังรูป: แอดมินกรอกเวลาเข้างานเอง (ชม.:นาที)
+   - หักสาย: ดู attLateDeduct() — เข้า 08:00 ไม่มีเผื่อ · หักเฉพาะวันเต็มวัน
+   - รูปย่อ 900px JPEG 0.6 + ประทับชื่อ/วัน/เวลา → att_photos (ลบอัตโนมัติ > 6 เดือน)
+   - กันรูปซ้ำ: ลายนิ้วมือไฟล์ต้นฉบับ (SHA-256)
+   - ไม่ทับรายการที่ลงด้วยรูปแล้ว · รายการติ๊กชื่อเดิม (ไม่มีรูป) แนบรูปเพิ่มได้
+   ============================================================ */
+(function(){
+  var PHOTO_KEEP_DAYS=183, cleaned=false, pend=null, pickFor=null, saving=false;
+  var RULE_MSG='ยังไม่ได้เปิดสิทธิ์เก็บรูปลงเวลา (att_photos) ใน Firestore rules — ยังไม่มีอะไรถูกบันทึก แจ้งเจ้าของระบบ';
+  function $(id){ return document.getElementById(id); }
+  function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function thIso(ms){ return new Date(ms+7*3600*1000).toISOString(); }      // เวลาไทย (เหมือน todayYMD)
+  function hhmmOf(ms){ return thIso(ms).slice(11,16); }
+  function ymdOf(ms){ return thIso(ms).slice(0,10); }
+  function curDate(){ var a=$('attDate'); return (a&&a.value)||todayYMD(); }
+  function by(){ return (typeof curEmail!=='undefined'&&curEmail)||'admin'; }
+  function empOf(id){ return (prEmployees||[]).find(function(e){ return e.id===id; }); }
+  // คนที่ตั้ง "ไม่ต้องลงเวลาด้วยรูป" ไม่ขึ้นในรายการ (ยกเว้นวันนั้นแนบรูปไว้แล้ว ให้ยังดูรูปได้)
+  function emps(){ var d=curDate(); return (prEmployees||[]).filter(function(e){ if(!e.active || prIsTrip(e)) return false; if(!e.noPhotoAtt) return true; var r=prAttendance[d+'_'+e.id]; return !!(r && attSafeId(r.photoId)); }); }
+  function isPerm(err){ return /permission/i.test(String(err&&err.message||err)); }
+  function sha256(buf){ try{ if(window.crypto&&crypto.subtle) return crypto.subtle.digest('SHA-256',buf).then(function(h){ return Array.from(new Uint8Array(h)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join(''); }); }catch(e){} return Promise.resolve(''); }
+  // ย่อรูป (ด้านยาวสุด 900px) + ประทับข้อความมุมล่างซ้าย (ถ้ามี)
+  function shrink(src, label, q){
+    return new Promise(function(res){
+      var img=new Image();
+      img.onload=function(){
+        try{
+          var M=900, w=img.naturalWidth, h=img.naturalHeight, s=Math.min(1, M/Math.max(w,h));
+          var c=document.createElement('canvas'); c.width=Math.max(1,Math.round(w*s)); c.height=Math.max(1,Math.round(h*s));
+          var g=c.getContext('2d'); g.drawImage(img,0,0,c.width,c.height);
+          if(label){
+            var fs=Math.max(14,Math.round(c.width/32)), pad=Math.round(fs*0.5);
+            g.font='bold '+fs+'px sans-serif'; var tw=g.measureText(label).width;
+            g.fillStyle='rgba(0,0,0,.6)'; g.fillRect(0,c.height-fs-pad*2,Math.min(c.width,tw+pad*2),fs+pad*2);
+            g.fillStyle='#fff'; g.textBaseline='bottom'; g.fillText(label,pad,c.height-pad);
+          }
+          res(c.toDataURL('image/jpeg',q||0.6));
+        }catch(e){ res(null); }
+      };
+      img.onerror=function(){ res(null); };
+      img.src=src;
+    });
+  }
+  function lateLine(emp,date,rec){
+    var m=+rec.lateMin||0; if(!m) return '';
+    var d=attLateDeduct(emp,date,rec);
+    return 'สาย '+m+' นาที'+(d>0?' · หัก '+fmtBaht(d)+' ฿':(rec.lateWaive?' (ยกเว้น)':(rec.type!=='full'?' (ไม่ใช่เต็มวัน ไม่หัก)':'')));
+  }
+
+  // ── หน้าต่างหลัก ──
+  window.apOpen=function(){
+    var a=$('attDate');
+    if(a && !a.value){ a.value=todayYMD(); if(typeof attDateChanged==='function') attDateChanged(); }
+    var old=$('apMask'); if(old) old.remove();
+    pend=null; pickFor=null;
+    var m=document.createElement('div'); m.className='ap-mask'; m.id='apMask';
+    m.innerHTML='<div class="ap-box">'
+      + '<div class="ap-hd"><div><h3>📷 ลงเวลาด้วยรูป</h3><div class="ap-sub" id="apSub"></div></div><button class="ap-x" onclick="apClose()" title="ปิด">✕</button></div>'
+      + '<div class="ap-rule">เข้างาน <b>08:00</b> ไม่มีเผื่อ · สายครบชั่วโมงหักค่าแรงรายชั่วโมง · เศษนาทีละ 1 ฿ (เศษไม่เกินค่าแรง 1 ชม.) · หักเฉพาะวันที่ลง <b>เต็มวัน</b><br>'
+      + '📷 <b>ถ่ายรูป</b> = ใช้เวลาตอนถ่ายจริง · 🖼️ <b>คลังรูป</b> = ต้องกรอกเวลาที่มาถึงเอง (เจ้าของเห็นว่ากรอกเอง)</div>'
+      + '<div class="ap-list" id="apList"><div class="ap-sub" style="padding:14px 0">กำลังโหลด…</div></div>'
+      + '<input type="file" id="apCam" accept="image/*" capture="environment" style="display:none" onchange="apFile(this)">'
+      + '<input type="file" id="apGal" accept="image/*" style="display:none" onchange="apFile(this)">'
+      + '</div>';
+    m.addEventListener('click',function(ev){ if(ev.target===m && !pend) apClose(); });
+    document.body.appendChild(m);
+    var date=curDate();
+    var pe=(prEmployees&&prEmployees.length)?Promise.resolve():(typeof prLoadEmployees==='function'?prLoadEmployees():Promise.resolve());
+    pe.then(function(){ return prLoadAttendance(date.slice(0,7)); }).then(render, render);
+    cleanup();
+  };
+  window.apClose=function(){
+    if(pend && !confirm('ยังไม่ได้บันทึกรูปของ '+((empOf(pend.empId)||{}).nickname||'')+' — ปิดเลยไหม?')) return;
+    pend=null; var m=$('apMask'); if(m) m.remove(); refreshPage();
+  };
+  function refreshPage(){
+    try{ if(typeof renderAttList==='function') renderAttList(); if(typeof renderEmpCheckList==='function') renderEmpCheckList(); }catch(e){}
+    try{ var md=$('mbpDate'); if(md && md.value && document.documentElement.classList.contains('mb')) md.dispatchEvent(new Event('input')); }catch(e){}
+  }
+
+  function render(){
+    var box=$('apList'); if(!box) return;
+    var date=curDate(), today=(date===todayYMD());
+    var sub=$('apSub'); if(sub) sub.textContent='วันที่ '+isoToBE(date)+(today?' (วันนี้)':' — ไม่ใช่วันนี้: ถ่ายสดไม่ได้ ใช้คลังรูปแล้วกรอกเวลา');
+    var list=emps();
+    if(!list.length){ box.innerHTML='<div class="ap-sub" style="padding:14px 0">ไม่มีพนักงาน</div>'; return; }
+    box.innerHTML=list.map(function(e){
+      var rec=prAttendance[date+'_'+e.id], st, btns='';
+      var cam='<button class="ap-b pri" onclick="apPick(\''+e.id+'\',\'camera\')"'+(today?'':' disabled title="ถ่ายสดได้เฉพาะวันนี้"')+'>📷 ถ่ายรูป</button>';
+      var gal='<button class="ap-b" onclick="apPick(\''+e.id+'\',\'gallery\')">🖼️ คลังรูป</button>';
+      if(rec && rec.type && rec.photoId){
+        var lt=lateLine(e,date,rec);
+        st='<b>✓ ลงแล้ว</b> · เข้างาน '+esc(rec.checkIn||'–')+(rec.checkInSrc==='gallery'?' (กรอกเวลาเอง)':'')+(lt?' · <span class="ap-late">'+esc(lt)+'</span>':' · ตรงเวลา');
+        btns=attSafeId(rec.photoId)?'<button class="ap-b" onclick="apView(\''+attSafeId(rec.photoId)+'\')">ดูรูป</button>':'';
+      }else if(rec && rec.type){
+        st='ลงแล้วแบบติ๊กชื่อ ('+esc(rec.type==='full'?'เต็มวัน':rec.type==='half'?'ครึ่งวัน':'รายชั่วโมง')+') · ยังไม่มีรูป';
+        btns=cam+gal;
+      }else{ st='ยังไม่ลงเวลา'; btns=cam+gal; }
+      if(pend && pend.empId===e.id) btns='';
+      return '<div class="ap-row"><div class="ap-top"><div class="ap-nm">'+esc(e.nickname)+'</div><div class="ap-st">'+st+'</div><div class="ap-btns">'+btns+'</div></div>'
+        + ((pend && pend.empId===e.id)?paneHtml(e,rec):'')+'</div>';
+    }).join('');
+    if(pend) apCalc();
+  }
+  function paneHtml(e,rec){
+    var p=pend, t;
+    if(p.src==='camera'){
+      t='<div>เวลาเข้างาน</div><div class="ap-big">'+esc(p.time)+'</div><div class="ap-sub">เวลาตอนถ่ายรูป</div>';
+    }else{
+      t='<div>เวลาเข้างาน <span class="ap-warn">*</span></div>'
+        + '<input type="time" id="apTime" value="'+esc(p.time)+'" oninput="apTimeIn(this)">'
+        + '<div class="ap-sub">รูปจากคลัง — กรอกเวลาที่พนักงานมาถึงจริง'+(p.fileTime?' · เวลาในไฟล์รูป: '+esc(p.fileTime):'')+'</div>';
+    }
+    return '<div class="ap-pane"><img src="'+esc(p.base)+'" alt="">'
+      + '<div class="ap-f">'+t
+      + '<div id="apCalc" class="ap-calc"></div>'
+      + (p.dup?'<div class="ap-warn">⚠️ '+esc(p.dup)+'</div>':'')
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px"><button class="ap-b pri" id="apSaveBtn" onclick="apSave()"'+((p.dup||saving)?' disabled':'')+'>💾 บันทึกเข้างาน</button>'
+      + '<button class="ap-b" onclick="apCancel()">ยกเลิก</button></div>'
+      + '</div></div>';
+  }
+  window.apTimeIn=function(inp){ if(pend){ pend.time=inp.value||''; apCalc(); } };
+  window.apCalc=function(){
+    var el=$('apCalc'); if(!el||!pend) return;
+    var e=empOf(pend.empId); if(!e){ el.textContent=''; return; }
+    var t=pend.time;
+    if(!/^\d{2}:\d{2}$/.test(t||'')){ el.className='ap-calc'; el.textContent='กรอกเวลาเพื่อดูยอดหักสาย'; return; }
+    var rec=prAttendance[pend.date+'_'+e.id];
+    var test={type:(rec&&rec.type)||'full', lateMin:attLateMinOf(t)};
+    if(!test.lateMin){ el.className='ap-calc ok'; el.textContent='✓ ตรงเวลา ไม่หัก'; return; }
+    var d=attLateDeduct(e,pend.date,test);
+    el.className='ap-calc late';
+    el.textContent='สาย '+test.lateMin+' นาที → '+(d>0?'หัก '+fmtBaht(d)+' ฿':'ไม่หัก (วันนี้ไม่ได้ลงเต็มวัน)');
+  };
+  window.apCancel=function(){ pend=null; render(); };
+
+  // ── เลือกรูป ──
+  window.apPick=function(empId, src){
+    if(pend){ toast('บันทึกหรือยกเลิกรูปที่ค้างอยู่ก่อน'); return; }
+    if(src==='camera' && curDate()!==todayYMD()){ toast('ถ่ายสดได้เฉพาะวันนี้ — ใช้ "คลังรูป" แล้วกรอกเวลา'); return; }
+    pickFor={empId:empId, src:src};
+    var inp=$(src==='camera'?'apCam':'apGal'); if(!inp) return;
+    inp.value=''; inp.click();
+  };
+  window.apFile=function(inp){
+    var f=inp.files&&inp.files[0], p=pickFor; pickFor=null;
+    if(!f||!p) return;
+    var at=Date.now();
+    if(!/^image\//.test(f.type||'image/')){ toast('เลือกไฟล์รูปเท่านั้น'); return; }
+    toast('กำลังย่อรูป…');
+    var br=new FileReader();
+    br.onerror=function(){ toast('อ่านไฟล์รูปไม่ได้'); };
+    br.onload=function(){
+      sha256(br.result).then(function(hx){
+        var dr=new FileReader();
+        dr.onload=function(){
+          shrink(dr.result,null,0.85).then(function(small){
+            if(!small){ toast('เปิดรูปนี้ไม่ได้ ลองรูปอื่น'); return; }
+            var date=curDate(), ft='';
+            if(p.src==='camera'){
+              if(ymdOf(at)!==date){ toast('⚠️ ข้ามวันแล้ว — ปิดแล้วเปิดหน้าลงเวลาใหม่'); return; }
+              if(f.lastModified && at-f.lastModified>120000){ p.src='gallery'; toast('รูปนี้ไม่ได้ถ่ายตอนนี้ — ต้องกรอกเวลาเข้างานเอง',5000); }
+            }
+            if(f.lastModified && ymdOf(f.lastModified)===date) ft=hhmmOf(f.lastModified);
+            pend={empId:p.empId, date:date, src:p.src, base:small, fpRaw:hx||'', time:(p.src==='camera'?hhmmOf(at):''), fileTime:ft, at:new Date(at).toISOString(), dup:''};
+            render(); checkDup(pend);
+            if(p.src==='gallery'){ var ti=$('apTime'); if(ti) ti.focus(); }
+          });
+        };
+        dr.readAsDataURL(f);
+      });
+    };
+    br.readAsArrayBuffer(f);
+  };
+  // รูปซ้ำ = เคยใช้ลงเวลาแล้ว (ข้ามรูปกำพร้าที่รายการลงเวลาถูกลบไปแล้ว)
+  function checkDup(p){
+    if(!p.fpRaw) return;
+    prDb().collection('att_photos').where('fpRaw','==',p.fpRaw).limit(5).get().then(function(s){
+      return Promise.all(s.docs.map(function(d){
+        var x=d.data();
+        return prDb().collection('attendance').doc(x.attKey||'-').get().then(function(a){
+          return (a.exists && a.data().photoId===d.id)?x:null;
+        }).catch(function(){ return null; });
+      }));
+    }).then(function(found){
+      if(pend!==p) return;
+      var x=(found||[]).filter(Boolean)[0];
+      if(x){ var e=empOf(x.empId); p.dup='รูปนี้เคยใช้ลงเวลาแล้ว: '+(e?e.nickname:x.empId)+' วันที่ '+isoToBE(x.date)+' — ใช้ซ้ำไม่ได้'; render(); }
+    }).catch(function(err){
+      if(pend!==p) return;
+      if(isPerm(err)){ p.dup=RULE_MSG; render(); }
+    });
+  }
+
+  // ── บันทึก (รูป + ลงเวลา เป็น batch เดียว) ──
+  window.apSave=async function(){
+    var p=pend; if(!p) return;
+    var emp=empOf(p.empId); if(!emp) return;
+    if(p.dup){ toast('⚠️ '+p.dup); return; }
+    var t=p.time;
+    if(!/^\d{2}:\d{2}$/.test(t||'')){ toast('⚠️ กรอกเวลาเข้างาน (ชั่วโมง:นาที)'); var ti=$('apTime'); if(ti) ti.focus(); return; }
+    if(p.date!==curDate()){ toast('วันที่เปลี่ยนไปแล้ว — เริ่มใหม่'); pend=null; render(); return; }
+    if(p.date!==ymdOf(Date.now()) && p.src==='camera'){ toast('⚠️ ข้ามวันแล้ว — ถ่ายใหม่'); pend=null; render(); return; }
+    if(saving) return; saving=true;
+    var btn=$('apSaveBtn'); if(btn) btn.disabled=true;
+    toast('⏳ กำลังบันทึก…');
+    try{
+      var key=p.date+'_'+emp.id, aref=prDb().collection('attendance').doc(key);
+      var cur=await aref.get(), old=cur.exists?cur.data():null;
+      if(old && old.photoId){ prAttendance[key]=old; pend=null; render(); toast('ℹ️ '+emp.nickname+' ลงเวลาด้วยรูปไว้แล้ว'); return; }
+      var img=await shrink(p.base, emp.nickname+' · '+isoToBE(p.date)+' · '+t+(p.src==='gallery'?' (กรอกเวลาเอง)':''), 0.6);
+      if(!img) throw new Error('ย่อรูปไม่สำเร็จ');
+      var now=new Date().toISOString(), lateMin=attLateMinOf(t);
+      var phRef=prDb().collection('att_photos').doc();
+      var data=old?Object.assign({},old):{empId:emp.id, date:p.date, month:p.date.slice(0,7), type:'full', hours:null, specialWork:[]};
+      Object.assign(data,{checkIn:t, checkInSrc:p.src, checkInAt:now, lateMin:lateMin, photoId:phRef.id, updatedAt:now, updatedBy:by()});
+      if(p.src==='camera') data.photoAt=p.at;
+      var b=prDb().batch();
+      b.set(phRef,{date:p.date, month:p.date.slice(0,7), empId:emp.id, attKey:key, img:img, fpRaw:p.fpRaw, src:p.src, checkIn:t, by:by(), createdAt:now});
+      b.set(aref,data);
+      await b.commit();
+      prAttendance[key]=data; pend=null; render(); refreshPage();
+      toast('✅ '+emp.nickname+' เข้างาน '+t+(lateMin?' · สาย '+lateMin+' นาที':' · ตรงเวลา'));
+    }catch(e){
+      toast('❌ บันทึกไม่สำเร็จ: '+(isPerm(e)?RULE_MSG:String(e&&e.message||e)), 6000);
+    }finally{ saving=false; var b2=$('apSaveBtn'); if(b2) b2.disabled=!!(pend&&pend.dup); }
+  };
+
+  // ── ดูรูป ──
+  window.apView=function(photoId){
+    if(!attSafeId(photoId)) return;
+    toast('กำลังโหลดรูป…');
+    prDb().collection('att_photos').doc(photoId).get().then(function(d){
+      if(!d.exists){ toast('ไม่พบรูป (อาจถูกลบอัตโนมัติเพราะเกิน 6 เดือน)'); return; }
+      var x=d.data(), e=empOf(x.empId);
+      var ov=document.createElement('div'); ov.className='ap-mask'; ov.style.zIndex='9100'; ov.style.alignItems='center';
+      ov.onclick=function(){ ov.remove(); };
+      ov.innerHTML='<div><img class="ap-view" src="'+esc(x.img)+'" alt=""><div style="text-align:center;color:#fff;margin-top:8px;font-size:14px">'
+        + esc((e?e.nickname:'')+' · '+isoToBE(x.date)+' · เข้างาน '+(x.checkIn||'–')+(x.src==='gallery'?' (กรอกเวลาเอง)':' (ถ่ายสด)'))+' · แตะเพื่อปิด</div></div>';
+      document.body.appendChild(ov);
+    }).catch(function(err){ toast('❌ โหลดรูปไม่ได้: '+(isPerm(err)?RULE_MSG:err.message)); });
+  };
+
+  // ── ลบรูปเก่าเกิน 6 เดือน (ครั้งเดียวต่อการเปิดแอป · รายการลงเวลายังอยู่) ──
+  function cleanup(){
+    if(cleaned) return; cleaned=true;
+    var cut=ymdOf(Date.now()-PHOTO_KEEP_DAYS*86400000);
+    prDb().collection('att_photos').where('date','<',cut).limit(30).get().then(function(s){
+      if(s.empty) return; var b=prDb().batch(); s.docs.forEach(function(d){ b.delete(d.ref); }); return b.commit();
+    }).catch(function(e){ console.warn('att_photos cleanup',e); });
+  }
+})();
+</script>
+
 </body>
 </html>
