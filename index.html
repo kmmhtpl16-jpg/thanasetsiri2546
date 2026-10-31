@@ -7592,9 +7592,15 @@ function prSlipShrink(file){
 }
 function prSlipPick(date){
   if(typeof curRole!=='undefined' && curRole!=='admin'){ toast('❌ เฉพาะเจ้าของ/CFO ที่แนบสลิปได้'); return; }
-  var inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.multiple=true;
+  /* iPhone (Safari): ช่องเลือกไฟล์ที่ไม่ได้อยู่ในหน้า → เลือกรูปแล้วเงียบ (onchange ไม่ทำงาน) — ต้องแปะไว้ในหน้าก่อนกด (31 ต.ค.69) */
+  var old=document.getElementById('slipFileInp'); if(old) old.remove();
+  var inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.multiple=true; inp.id='slipFileInp';
+  inp.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;';
+  document.body.appendChild(inp);
   inp.onchange=async function(){
-    var files=[].slice.call(inp.files||[]); if(!files.length) return;
+    var files=[].slice.call(inp.files||[]);
+    // ไม่ลบช่องทันที (ไฟล์บน iPhone อาจอ่านไม่ได้ถ้าลบก่อน) — กดแนบครั้งถัดไปค่อยลบของเก่า
+    if(!files.length) return;
     toast('⏳ กำลังย่อและบันทึกสลิป '+files.length+' ใบ…');
     var ok=0;
     for(var i=0;i<files.length;i++){
