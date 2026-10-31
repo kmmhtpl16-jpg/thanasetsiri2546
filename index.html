@@ -3053,6 +3053,7 @@ async function renderPayHistory() {
         </tbody>
       </table>
       ${prSlipBox(date)}
+      ${[...new Set(rows.filter(w=>w.kind==='settle').map(w=>prCycSlipKey(w.month, w.period)))].map(k=>prSlipBox(k, '🧾 สลิปจ่ายปิด'+_slipLbl(k))).join('')}
     </div>`;
   });
 
@@ -3937,6 +3938,7 @@ async function renderCycleSummary(){
   await prLoadAttendance(ym);
   await prLoadWithdrawals(ym);
   await prLoadSettlements(ym);
+  await prLoadSlips(ym);
 
   const rows = cycleBuildRows(ym, period);
   const periodLabel = period==='1-15' ? 'รอบที่ 1 (1–15)' : 'รอบที่ 2 (16–สิ้นเดือน)';
@@ -4024,6 +4026,9 @@ async function renderCycleSummary(){
         </table>
       </div>
     </div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);margin-top:14px;overflow:hidden;">
+      ${prSlipBox(prCycSlipKey(ym, period), '🧾 สลิปโอนจ่ายงวดนี้ — แนบได้เลย ไม่ต้องรอปิดงวด')}
+    </div>
     ${settleBar}`;
 }
 
@@ -4042,7 +4047,8 @@ async function settleCycle(){
   const rows = cycleBuildRows(ym, period).filter(r=> r.pending>0);
   if(!rows.length){ toast('⚠️ ไม่มียอดรอรับให้จ่าย'); return; }
   const total = rows.reduce((s,r)=> s + r.pending, 0);
-  if(!confirm('ยืนยันจ่ายยอดรอรับ '+periodLabel+'\nรวม '+fmtBaht(total)+' ฿ ('+rows.length+' คน)\n\nระบบจะบันทึกการจ่ายและปิดงวด — ยอดรอรับจะเป็น 0 และกันการจ่ายซ้ำ')) return;
+  const _ns=(prSlips[prCycSlipKey(ym,period)]||[]).length;
+  if(!confirm('ยืนยันจ่ายยอดรอรับ '+periodLabel+'\nรวม '+fmtBaht(total)+' ฿ ('+rows.length+' คน)\n'+(_ns?'สลิปที่แนบไว้ '+_ns+' ใบ':'⚠️ ยังไม่ได้แนบสลิปงวดนี้')+'\n\nระบบจะบันทึกการจ่ายและปิดงวด — ยอดรอรับจะเป็น 0 และกันการจ่ายซ้ำ')) return;
   toast('⏳ กำลังบันทึกการจ่าย...');
   try{
     // เขียนแบบ batch = สำเร็จทั้งหมดหรือไม่ทำเลย (กันค้างครึ่งทางแล้วกดซ้ำกลายเป็นจ่ายซ้อน)
@@ -7548,9 +7554,20 @@ async function prLoadSlips(ym){
   try{
     const snap=await prDb().collection('wd_slips').where('month','==',ym).get();
     prSlips={}; prSlipsYm=ym;
-    snap.docs.forEach(d=>{ const x={id:d.id,...d.data()}; (prSlips[x.date]=prSlips[x.date]||[]).push(x); });
+    snap.docs.forEach(d=>{ const x={id:d.id,...d.data()}; const k=x.cycle||x.date; (prSlips[k]=prSlips[k]||[]).push(x); });
     Object.keys(prSlips).forEach(k=>prSlips[k].sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||''))));
   }catch(e){ console.warn('wd_slips',e); prSlips={}; prSlips.__err=e.message||String(e); }
+}
+/* สลิปจ่ายตามงวด (31 ต.ค.69) — แนบได้ก่อนกดปิดงวด · key = cyc_YYYY-MM_period · เก็บใน wd_slips ช่อง cycle */
+function prCycSlipKey(ym,per){ return 'cyc_'+ym+'_'+per; }
+function _slipIsCyc(k){ return /^cyc_\d{4}-\d{2}_/.test(String(k)); }
+function _slipLbl(k){
+  if(_slipIsCyc(k)){ var p=String(k).split('_'); return 'งวด '+(p[2]==='1-15'?'รอบ 1':'รอบ 2')+' · '+p[1]; }
+  return (typeof isoToBE==='function'?isoToBE(k):k);
+}
+function _slipRefresh(){
+  var c=document.getElementById('pr-cyc');
+  if(c && c.classList.contains('active') && typeof renderCycleSummary==='function') renderCycleSummary(); else renderPayHistory();
 }
 function prSlipShrink(file){
   return new Promise(function(res,rej){
@@ -7583,12 +7600,15 @@ function prSlipPick(date){
     for(var i=0;i<files.length;i++){
       try{
         var r=await prSlipShrink(files[i]);
-        await prDb().collection('wd_slips').add({date:date, month:date.slice(0,7), img:r.img, w:r.w, h:r.h, bytes:r.bytes,
+        var _hm=(document.getElementById('payHistMonth')||{}).value; // สลิปอยู่เดือนเดียวกับหน้าประวัติที่เปิด (จ่ายปิดงวดต้นเดือนถัดไปก็ยังเห็น)
+        var _cy=_slipIsCyc(date);
+        if(_cy) _hm=String(date).split('_')[1];
+        await prDb().collection('wd_slips').add({date:(_cy?todayYMD():date), month:(/^\d{4}-\d{2}$/.test(_hm||'')?_hm:date.slice(0,7)), cycle:(_cy?date:''), img:r.img, w:r.w, h:r.h, bytes:r.bytes,
           createdAt:new Date().toISOString(), createdBy:(typeof curEmail!=='undefined'?curEmail:'')});
         ok++;
       }catch(e){ toast('❌ '+(e.message||e)+(String(e.message||'').indexOf('ermission')>=0?' (ต้องเพิ่มสิทธิ์ wd_slips ใน Firebase rules)':'')); break; }
     }
-    if(ok){ toast('✅ แนบสลิป '+ok+' ใบแล้ว'); renderPayHistory(); }
+    if(ok){ toast('✅ แนบสลิป '+ok+' ใบแล้ว'); _slipRefresh(); }
   };
   inp.click();
 }
@@ -7598,7 +7618,7 @@ function prSlipView(date,i){
   ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);display:flex;flex-direction:column;';
   ov.innerHTML='<div style="display:flex;gap:8px;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 8px;color:#fff;font:600 15px sans-serif">'
     +'<button type="button" data-x="1" style="height:42px;border:0;border-radius:10px;padding:0 14px;background:rgba(255,255,255,.2);color:#fff;font:600 15px sans-serif">✕ ปิด</button>'
-    +'<span style="flex:1">สลิป '+(i+1)+'/'+prSlips[date].length+' · '+(typeof isoToBE==='function'?isoToBE(date):date)+'</span>'
+    +'<span style="flex:1">สลิป '+(i+1)+'/'+prSlips[date].length+' · '+_slipLbl(date)+'</span>'
     +(typeof curRole==='undefined'||curRole==='admin'?'<button type="button" data-del="1" style="height:42px;border:0;border-radius:10px;padding:0 14px;background:#c0392b;color:#fff;font:600 14px sans-serif">🗑️ ลบ</button>':'')
     +'</div><div style="flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;align-items:flex-start;justify-content:center;padding:8px"><img src="'+s.img+'" style="max-width:100%;height:auto;background:#fff"></div>';
   document.body.appendChild(ov);
@@ -7606,7 +7626,7 @@ function prSlipView(date,i){
   var del=ov.querySelector('[data-del]');
   if(del) del.onclick=function(){
     if(!confirm('ลบสลิปใบนี้?')) return;
-    prDb().collection('wd_slips').doc(s.id).delete().then(function(){ ov.remove(); toast('🗑️ ลบสลิปแล้ว'); renderPayHistory(); }).catch(function(e){ toast('❌ '+e.message); });
+    prDb().collection('wd_slips').doc(s.id).delete().then(function(){ ov.remove(); toast('🗑️ ลบสลิปแล้ว'); _slipRefresh(); }).catch(function(e){ toast('❌ '+e.message); });
   };
 }
 function _slipFile(s,i,date){
@@ -7617,18 +7637,19 @@ async function prSlipShare(date){
   var list=prSlips[date]||[]; if(!list.length) return;
   var files=list.map(function(s,i){ return _slipFile(s,i,date); });
   try{
-    if(navigator.canShare && navigator.canShare({files:files})){ await navigator.share({files:files, title:'สลิปเบิกเงิน '+date}); return; }
+    if(navigator.canShare && navigator.canShare({files:files})){ await navigator.share({files:files, title:(_slipIsCyc(date)?'สลิปจ่ายเงินเดือน ':'สลิปเบิกเงิน ')+_slipLbl(date)}); return; }
   }catch(e){ if(e && e.name==='AbortError') return; }
   /* เครื่องที่แชร์หลายไฟล์ไม่ได้ (เช่น คอม) → ดาวน์โหลดทีละใบ */
   files.forEach(function(f,i){ setTimeout(function(){ var a=document.createElement('a'); a.href=URL.createObjectURL(f); a.download=f.name; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500); }, i*400); });
   toast('⬇️ ดาวน์โหลดสลิป '+files.length+' ใบ');
 }
 /* กล่องสลิปของวันนั้น (ใช้ทั้งจอคอมและมือถือ) */
-function prSlipBox(date){
+function prSlipBox(date, title){
   if(prSlips.__err) return '<div class="slp-box"><div class="slp-err">อ่านสลิปไม่ได้: '+prSlips.__err+(String(prSlips.__err).indexOf('ermission')>=0?' — ต้องเพิ่มสิทธิ์ wd_slips ใน Firebase rules':'')+'</div></div>';
   var list=prSlips[date]||[], adm=(typeof curRole==='undefined'||curRole==='admin');
   if(!list.length && !adm) return '';
   return '<div class="slp-box">'
+    +(title?'<div style="font-weight:700;font-size:13px;margin-bottom:8px;">'+title+'</div>':'')
     +(list.length?'<div class="slp-grid">'+list.map(function(s,i){ return '<button type="button" class="slp-th" onclick="prSlipView(\''+date+'\','+i+')"><img src="'+s.img+'" alt="สลิป '+(i+1)+'" loading="lazy"></button>'; }).join('')+'</div>':'')
     +'<div class="slp-act">'
     +(adm?'<button type="button" class="slp-btn" onclick="prSlipPick(\''+date+'\')">📎 แนบสลิป</button>':'')
@@ -13258,7 +13279,11 @@ html.mb #empModalOverlay .type-toggle .type-btn{flex:1;}
     tb.innerHTML='<table class="mb-p-t"><colgroup><col style="width:27%"><col style="width:31%"><col style="width:16%"><col style="width:26%"></colgroup>'
       + '<thead><tr><th>ชื่อ</th><th>ประเภท</th><th class="r">ชม.</th><th class="r">ค่าแรง</th></tr></thead><tbody>'
       + rows.map(function(x){
-          return '<tr class="tap" data-id="'+esc(x.e.id)+'"><td><b>'+esc(x.e.nickname)+'</b></td>'
+          var ci=(x.r.checkIn||attSafeId(x.r.photoId))
+            ? '<div class="mut" style="font-size:12px;margin-top:2px;white-space:nowrap;">'+(x.r.checkIn?'เข้า '+esc(x.r.checkIn):'')+((+x.r.lateMin||0)>0?' <span style="color:#c0392b;">สาย '+(+x.r.lateMin)+'น.</span>':'')
+              +(attSafeId(x.r.photoId)?' <button type="button" class="att-ci-ph" style="margin:0 0 0 2px;padding:2px 6px;" onclick="event.stopPropagation();apView(\''+attSafeId(x.r.photoId)+'\')">📷</button>':'')+'</div>'
+            : '';
+          return '<tr class="tap" data-id="'+esc(x.e.id)+'"><td><b>'+esc(x.e.nickname)+'</b>'+ci+'</td>'
             + '<td class="mut">'+typeTxt(x.r)+(spTotal(x.r)>0?' +พิเศษ':'')+'</td>'
             + '<td class="r">'+hoursOf(x.r)+'</td><td class="r">'+fb(x.w)+'</td></tr>';
         }).join('')
@@ -13498,6 +13523,7 @@ html.mb #empModalOverlay .type-toggle .type-btn{flex:1;}
       foot.innerHTML='<div class="mb-p-warn">จ่ายแล้วกด "ยืนยัน" ระบบจะบันทึกการจ่าย '+fb(cash)+' ฿ แล้วล็อกงวดนี้ · ยอดรอรับเป็น 0 กันจ่ายซ้ำ</div>'
         +'<div style="margin-top:12px;"><button type="button" class="mb-p-btn" data-a="settle">'+S(J.check,19)+'ยืนยันจ่าย &amp; ปิดงวดนี้</button></div>';
     }
+    if(typeof prSlipBox==='function') foot.insertAdjacentHTML('afterbegin','<div class="mb-p-card" style="margin-bottom:12px;">'+prSlipBox(prCycSlipKey(ym,per),'🧾 สลิปโอนจ่ายงวดนี้ — แนบได้เลย ไม่ต้องรอปิดงวด')+'</div>');
     var bs=foot.querySelector('[data-a="settle"]'); if(bs) bs.onclick=function(){ if(typeof settleCycle==='function') settleCycle(); };
     var bu=foot.querySelector('[data-a="unsettle"]'); if(bu) bu.onclick=function(){ if(typeof unsettleCycle==='function') unsettleCycle(); };
     transform('cycContent');
@@ -13569,7 +13595,10 @@ html.mb #empModalOverlay .type-toggle .type-btn{flex:1;}
               return '<tr><td><b>'+esc(e?e.nickname:'–')+'</b> <span class="mut mb-p-lite">'+(w.period==='1-15'?'รอบ 1':'รอบ 2')+'</span></td>'
                 + '<td class="r">'+fb(w.amount)+'</td><td class="mut">'+esc(String(w.recordedBy||'').replace('@sand.local',''))+'</td></tr>';
             }).join('')
-        +   '</tbody></table>'+(typeof prSlipBox==='function'?prSlipBox(d):'')+'</div></div>';
+        +   '</tbody></table>'+(typeof prSlipBox==='function'?prSlipBox(d):'')
+        +   (typeof prCycSlipKey==='function'?rows.filter(function(w){ return w.kind==='settle'; }).map(function(w){ return prCycSlipKey(w.month,w.period); })
+              .filter(function(k,i,a){ return a.indexOf(k)===i; }).map(function(k){ return prSlipBox(k,'🧾 สลิปจ่ายปิด'+_slipLbl(k)); }).join(''):'')
+        +   '</div></div>';
     }).join('');
     [].forEach.call(box.querySelectorAll('.mb-p-day'), function(c){
       c.querySelector('.mb-p-dayh').onclick=function(){ c.classList.toggle('open'); };
