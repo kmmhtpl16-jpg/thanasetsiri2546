@@ -2235,6 +2235,45 @@ async function prWdDelete(id){
     renderWdPanel();
   } catch(e) { toast('❌ ' + e.message); }
 }
+// แก้ยอดเบิก (แอดมินหน้าท่า + เจ้าของ) — เก็บประวัติการแก้ใน editLog + แจ้ง Telegram ทุกครั้ง · 7 พ.ย. 69
+async function prWdUpdateAmount(id, newAmt, skipConfirm){
+  const w = prWithdrawals.find(x => x.fsId === id); if (!w) { toast('❌ ไม่พบรายการเบิกนี้ (ลองรีเฟรช)'); return false; }
+  newAmt = Math.round((parseFloat(newAmt) || 0) * 100) / 100;
+  const old = +w.amount || 0;
+  if (!(newAmt > 0)) { toast('⚠️ ใส่ยอดมากกว่า 0 (ถ้าจะยกเลิกทั้งรายการ ให้เจ้าของกดลบ)'); return false; }
+  if (Math.abs(newAmt - old) < 0.005) { toast('ยอดเท่าเดิม ไม่ได้แก้'); return false; }
+  const emp = (typeof prEmployees!=='undefined' ? prEmployees : []).find(e => e.id === w.empId);
+  const nm = (emp && emp.nickname) || w.empName || w.empId || '';
+  const dTxt = w.date ? isoToBE(w.date) : '-';
+  if (!skipConfirm && !confirm('แก้ยอดเบิก ' + nm + ' (วันที่ ' + dTxt + ')\nจาก ' + fmtBaht(old) + ' ฿ เป็น ' + fmtBaht(newAmt) + ' ฿ ?')) return false;
+  let over = !!w.isOverdrawn, R = null;
+  try {
+    if (emp) {
+      if (prIsTrip(emp)) await rcEnsureEarnings(w.month);
+      R = prWdRef(emp, w.month, w.period);
+      over = prWdOver(Object.assign({}, R, { taken: R.taken - old }), newAmt);
+    }
+  } catch (e) { console.warn('prWdUpdateAmount over-check', e); }
+  const by = String(typeof curEmail!=='undefined' ? curEmail : 'admin');
+  const log = (Array.isArray(w.editLog) ? w.editLog : []).concat([{ from: old, to: newAmt, at: new Date().toISOString(), by: by }]);
+  try {
+    await prDb().collection('withdrawals').doc(id).update({ amount: newAmt, isOverdrawn: over, editedAt: new Date().toISOString(), editedBy: by, editLog: log });
+  } catch (e) { toast('❌ แก้ไม่สำเร็จ: ' + e.message); return false; }
+  w.amount = newAmt; w.isOverdrawn = over; w.editLog = log;
+  const diff = newAmt - old;
+  let overTxt = '';
+  if (over && R) overTxt = '\n🚨 หลังแก้ ' + nm + ' เบิกรวม ' + fmtBaht(R.taken - old + newAmt) + ' ฿ เกิน' + (R.trip && R.rc ? 'กติกา 50% (รายได้ถึงวันนี้ ' + fmtBaht(R.earnX) + ' ฿)' : (R.trip ? 'วงเงิน ' : 'ค่าแรงงวด ') + fmtBaht(R.ref) + ' ฿');
+  tgNotify('✏️ <b>แก้ยอดเบิกเงินเดือน</b>\n• ' + nm + ' วันที่ ' + dTxt + ': ' + fmtBaht(old) + ' → <b>' + fmtBaht(newAmt) + ' ฿</b> (' + (diff > 0 ? 'เพิ่ม ' : 'ลด ') + fmtBaht(Math.abs(diff)) + ' ฿)' + overTxt + '\nแก้โดย ' + by.replace('@sand.local',''));
+  toast('✅ แก้ยอดเบิก ' + nm + ' เป็น ' + fmtBaht(newAmt) + ' ฿ แล้ว');
+  try { await renderWdPanel(); } catch (e) { console.warn(e); }
+  return true;
+}
+function prWdEdit(id){
+  const w = prWithdrawals.find(x => x.fsId === id); if (!w) return;
+  const v = prompt('แก้ยอดเบิก (เดิม ' + fmtBaht(+w.amount || 0) + ' ฿) — ใส่ยอดที่ถูกต้อง', String(+w.amount || 0));
+  if (v === null) return;
+  prWdUpdateAmount(id, String(v).replace(/,/g, ''));
+}
 function tgNotify(text){
   try{
     return fetch('/api/notify', {
@@ -3588,7 +3627,7 @@ async function renderWdPanel() {
                 <td style="padding:5px 8px;color:var(--text-primary);">${w.date || '-'}</td>
                 <td style="padding:5px 8px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent-amber);">${fmtBaht(w.amount)} ฿</td>
                 <td style="padding:5px 8px;color:var(--text-secondary);">${(w.recordedBy || '').replace('@sand.local','')}</td>
-                <td style="padding:5px 8px;color:var(--accent-red);">${w.isOverdrawn ? '⚠️ เกินค่าแรง' : ''}${(curRole==='admin'&&w.fsId)?`<button title="ลบรายการเบิกนี้" onclick="prWdDelete('${w.fsId}')" style="float:right;background:none;border:1px solid #fca5a5;border-radius:5px;color:#dc2626;cursor:pointer;font-size:11px;padding:2px 8px;">🗑️ ลบ</button>`:''}</td>
+                <td style="padding:5px 8px;color:var(--accent-red);">${w.isOverdrawn ? '⚠️ เกินค่าแรง' : ''}${(w.editLog&&w.editLog.length)?`<span style="color:var(--text-secondary);"> (แก้แล้ว)</span>`:''}${(curRole==='admin'&&w.fsId)?`<button title="ลบรายการเบิกนี้" onclick="prWdDelete('${w.fsId}')" style="float:right;background:none;border:1px solid #fca5a5;border-radius:5px;color:#dc2626;cursor:pointer;font-size:11px;padding:2px 8px;">🗑️ ลบ</button>`:''}${w.fsId?`<button title="แก้ยอดเบิกนี้" onclick="prWdEdit('${w.fsId}')" style="float:right;margin-right:6px;background:none;border:1px solid var(--border);border-radius:5px;color:var(--text-secondary);cursor:pointer;font-size:11px;padding:2px 8px;">✏️ แก้</button>`:''}</td>
               </tr>`).join('')}
               <tr style="background:var(--bg-surface);">
                 <td style="padding:5px 8px;font-weight:700;color:var(--text-secondary);">รวม</td>
@@ -13435,7 +13474,7 @@ html.mb #empModalOverlay .type-toggle .type-btn{flex:1;}
   function wdHist(ym,per){
     var rows=WD().filter(function(w){ return w.month===ym && w.period===per; })
       .sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
-    $('mbpWdHistSub').textContent = rows.length? (rows.length+' ครั้ง') : '';
+    $('mbpWdHistSub').textContent = rows.length? (rows.length+' ครั้ง · แตะรายการเพื่อแก้ยอด') : '';
     var tb=$('mbpWdHist');
     if(!rows.length){ tb.innerHTML='<div class="mb-p-empty">ยังไม่มีรายการเบิกในรอบนี้</div>'; return; }
     var tot=rows.reduce(function(s,w){ return s+(w.amount||0); },0);
@@ -13443,11 +13482,35 @@ html.mb #empModalOverlay .type-toggle .type-btn{flex:1;}
       + '<thead><tr><th>วันที่</th><th>ชื่อ</th><th class="r">จำนวน</th><th>โดย</th></tr></thead><tbody>'
       + rows.map(function(w){
           var e=empOf(w.empId);
-          return '<tr><td>'+(w.date?w.date.slice(8,10)+'/'+w.date.slice(5,7):'–')+'</td>'
-            + '<td><b>'+esc(e?e.nickname:'–')+'</b></td><td class="r">'+fb(w.amount)+'</td>'
+          return '<tr'+(w.fsId?' data-wid="'+esc(w.fsId)+'" style="cursor:pointer;"':'')+'><td>'+(w.date?w.date.slice(8,10)+'/'+w.date.slice(5,7):'–')+'</td>'
+            + '<td><b>'+esc(e?e.nickname:'–')+'</b>'+((w.editLog&&w.editLog.length)?' <span class="mut" style="font-size:11px;">แก้แล้ว</span>':'')+'</td><td class="r">'+fb(w.amount)+' <span class="mut">✏️</span></td>'
             + '<td class="mut">'+esc(String(w.recordedBy||'').replace('@sand.local',''))+'</td></tr>';
         }).join('')
       + '<tr class="sum"><td colspan="2"><b>รวม</b></td><td class="r">'+fb(tot)+'</td><td></td></tr></tbody></table>';
+    [].forEach.call(tb.querySelectorAll('tr[data-wid]'), function(tr){
+      tr.onclick=function(){ wdEditSheet(tr.dataset.wid); };
+    });
+  }
+  // แก้ยอดเบิกที่บันทึกไปแล้ว (แอดมิน/เจ้าของ) · 7 พ.ย. 69
+  function wdEditSheet(id){
+    var w=WD().filter(function(x){ return x.fsId===id; })[0]; if(!w) return;
+    var e=empOf(w.empId);
+    var sh=openSheet(
+      '<div class="mb-p-sh"><div class="mb-p-sht">แก้ยอดเบิก</div>'
+      + '<div class="mb-p-shs">'+esc(e?e.nickname:'–')+' · '+(w.date?be(w.date):'–')+' · เดิม '+fb(w.amount)+' ฿</div>'
+      + '<div class="mb-p-hrs" style="display:flex;margin-top:12px;"><span class="mb-p-lb0">ยอดที่ถูกต้อง</span>'
+      +   '<div class="mb-p-in mb-p-grow"><input class="sh" type="number" inputmode="decimal" id="mbpWdEditIn" min="0" value="'+(+w.amount||0)+'"><b class="mb-p-cur">฿</b></div></div>'
+      + '<div class="mb-p-shs" style="margin-top:8px;">ยอดจะถูกแก้ทับรายการเดิม (ไม่บวกเพิ่ม) และแจ้ง Telegram ให้เจ้าของ</div>'
+      + '</div>'
+      + '<button class="mb-shbtn pri" data-a="save">บันทึกยอดใหม่</button>'
+      + '<button class="mb-shbtn" data-a="cancel">ยกเลิก</button>');
+    if(!sh) return;
+    sh.querySelector('[data-a="cancel"]').onclick=MB.close;
+    sh.querySelector('[data-a="save"]').onclick=function(){
+      var v=sh.querySelector('#mbpWdEditIn').value;
+      MB.close();
+      if(typeof prWdUpdateAmount==='function') prWdUpdateAmount(id, v, true);
+    };
   }
   function wdNote(){
     if(!built) return;
