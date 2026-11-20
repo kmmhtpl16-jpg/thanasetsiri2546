@@ -50,6 +50,12 @@ export async function onRequestPost(context) {
       } catch (e) { res.errors.push(t.seq + ': ' + ((e && e.message) || e)); }
     }
 
+    // รายงานตัว (21 พ.ย. 69): บันทึกเวลาไทย HH:MM ลง app_meta/scale_runs_YYYY-MM-DD.times
+    // นับเมื่อ "ส่งถึงจริง" = รอบไม่มีตั๋วใหม่ (tickets: []) หรือรับตั๋วได้อย่างน้อย 1 ใบ
+    // ส่งมาแต่บันทึกไม่ได้สักใบ = ไม่นับ → สรุปประจำวันขึ้นว่าขาดรอบ
+    const runLogged = (list.length === 0 || accepted.length > 0)
+      ? await logRun(idToken, String((body && body.station) || '').slice(0, 40)) : false;
+
     // เลขตั๋วกระโดด (ตั๋วหาย/ถูกลบ)
     const meta = await getDoc(idToken, 'app_meta', 'scale_sync').catch(function () { return null; });
     let maxSeq = meta ? (fval(meta, 'maxSeq') || 0) : 0;
@@ -82,10 +88,30 @@ export async function onRequestPost(context) {
       if (msgs.length > 8) { send[7] += '\n… ยังมีอีก ' + (msgs.length - 8) + ' ข้อความที่ไม่ได้ส่ง (ประวัติแก้/ยกเลิกอยู่ใน scale_edits)'; tgOk = false; }
       for (const m of send) { if (!(await tgSend(env.TELEGRAM_BOT_TOKEN, GROUP_CHAT_ID, m))) tgOk = false; }
     }
-    return json({ ok: true, created: res.created, updated: res.updated, unchanged: res.unchanged, skipped: res.skipped, alerts: alerts.length, telegramOk: tgOk, accepted: accepted, rejected: rejected.slice(0, 50), errors: res.errors.slice(0, 10) });
+    return json({ ok: true, runLogged: runLogged, created: res.created, updated: res.updated, unchanged: res.unchanged, skipped: res.skipped, alerts: alerts.length, telegramOk: tgOk, accepted: accepted, rejected: rejected.slice(0, 50), errors: res.errors.slice(0, 10) });
   } catch (e) {
     return json({ ok: false, error: String((e && e.message) || e) }, 500);
   }
+}
+
+// ---------- รายงานตัว ----------
+// เขียนแบบ atomic ผ่าน :commit + appendMissingElements → ส่งพร้อมกันหลายคำขอก็ไม่ทับกัน (นาทีเดียวกันนับครั้งเดียว)
+// ล้ม = ไม่ทำให้การส่งตั๋วล้ม คืน false ให้ตัวส่งเขียน log
+async function logRun(idToken, station) {
+  try {
+    const bkk = new Date(Date.now() + 7 * 3600 * 1000).toISOString();   // เวลาไทย (UTC+7 ไม่มีเวลาออมแสง)
+    const day = bkk.slice(0, 10), hm = bkk.slice(11, 16);
+    const name = `projects/${FB_PROJECT}/databases/(default)/documents/app_meta/scale_runs_${day}`;
+    const r = await fetch(`${FS}:commit`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+      body: JSON.stringify({ writes: [{
+        update: { name: name, fields: { date: str(day), lastAt: str(new Date().toISOString()), lastStation: str(station) } },
+        updateMask: { fieldPaths: ['date', 'lastAt', 'lastStation'] },
+        updateTransforms: [{ fieldPath: 'times', appendMissingElements: { values: [str(hm)] } }]
+      }] })
+    });
+    return r.ok;
+  } catch (e) { return false; }
 }
 
 // ---------- ตั๋ว 1 ใบ ----------

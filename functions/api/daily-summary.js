@@ -6,6 +6,8 @@
 //   3) เลิกกลืน error — ถ้าอ่าน Firestore ไม่ได้ จะขึ้น ⚠️ บอกสาเหตุจริงในข้อความ
 //   4) โหมดตรวจ: ?debug=1  → ไม่ส่ง Telegram คืน JSON ให้ดูว่าแต่ละ collection ได้กี่แถว/error อะไร
 //   5) ย้อนวันได้: ?date=2026-09-08
+// v3 (21 พ.ย. 2569): สรุปแบบสั้น — แสดงเฉพาะบรรทัดที่มีข้อมูล · ไม่มีอะไร = "วันนี้ไม่มีรายการ"
+//   + บรรทัด "ตาชั่งส่งข้อมูล N/3 รอบ" จาก app_meta/scale_runs_<วันที่> (เขียนโดย /api/scale-sync)
 // ============================================================
 
 const GROUP_CHAT_ID = '-5450363615';
@@ -172,82 +174,116 @@ async function buildSummary(idToken, today) {
   const expTot = exTot + wdTot + feTot;
   const netCash = Math.round((received - expTot) * 100) / 100;
 
+  // ── สรุปแบบสั้น (21 พ.ย. 2569): แสดงเฉพาะบล็อก/บรรทัดที่มีข้อมูล ไม่แสดงบรรทัดที่เป็น 0 ──
+  const blocks = [];
+  if (weigh.length > 0) {
+    const b = ['⚖️ <b>น้ำหนักขายวันนี้</b>'];
+    b.push('  🚚 เที่ยวชั่ง: ' + weigh.length + ' เที่ยว · ' + fmtL(kgTot) + ' กก.');
+    Object.keys(byProd).forEach(function (p) {
+      b.push('  · ' + esc(p) + ': ' + fmt(byProd[p].q) + ' คิว (' + byProd[p].n + ' เที่ยว)');
+    });
+    if (dedTot > 0) b.push('  ➖ หักทรายเปียก: ' + fmt(dedTot) + ' คิว');
+    b.push('  รวมสุทธิ: <b>' + fmt(netQTot) + ' คิว</b> (≈ ' + fmt(netQTot * TON_PER_CUBIC) + ' ตัน)');
+    blocks.push(b);
+  }
+  if (sandRev !== 0 || dirtTot !== 0 || noPrice > 0) {
+    const b = ['💰 <b>รายได้วันนี้</b>'];
+    if (sandRev !== 0) b.push('  ⛏️ ขายทราย: ' + fmt(sandRev) + ' ฿');
+    if (sandCredit > 0) b.push('     · ลงบัญชี ' + fmt(sandCredit));
+    if (dirtTot !== 0) b.push('  🧱 ขายดิน/อื่น: ' + fmt(dirtTot) + ' ฿');
+    if (osCash > 0) b.push('     · เงินสด ' + fmt(osCash));
+    if (osTrans > 0) b.push('     · โอน ' + fmt(osTrans));
+    if (osCredit > 0) b.push('     · ลงบัญชี ' + fmt(osCredit));
+    if (totalRev !== 0) b.push('  รวมรายได้: <b>' + fmt(totalRev) + ' ฿</b>');
+    if (received !== 0) b.push('  💵 เงินเข้าจริง: ' + fmt(received) + ' ฿');
+    if (osCredit + sandCredit > 0) b.push('  📒 ค้างชำระ: ' + fmt(osCredit + sandCredit) + ' ฿');
+    if (noPrice > 0) b.push('  ⚠️ ใบชั่งยังไม่ใส่ราคา: <b>' + noPrice + '/' + weigh.length + ' ใบ</b> — ยอดขายจริงสูงกว่านี้');
+    blocks.push(b);
+  }
+  if (feN > 0 || fin.length > 0 || fout.length > 0) {   // มีรายการ = แสดง (แม้ลิตรเป็น 0)
+    const b = ['⛽ <b>น้ำมันวันนี้</b>'];
+    if (feN > 0) {
+      b.push('  🚛 ค่าน้ำมันรถ: ' + fmtL(feL) + ' ล. / ' + fmt(feTot) + ' ฿ (' + feN + ' ครั้ง)');
+      Object.keys(byPlate).sort(function (a, c) { return byPlate[c].b - byPlate[a].b; }).forEach(function (p) {
+        b.push('     · ' + esc(p) + ' ' + fmtL(byPlate[p].l) + ' ล. / ' + fmt(byPlate[p].b) + ' ฿');
+      });
+    }
+    if (fin.length > 0) b.push('  🛢️ รับน้ำมันเข้า: ' + fmtL(fiL) + ' ล. / ' + fmt(fiB) + ' ฿');
+    if (fout.length > 0) b.push('  🔻 เบิกออกใช้งาน: ' + fmtL(foL) + ' ล.');
+    blocks.push(b);
+  }
+  if (exN > 0 || wdN > 0 || feN > 0) {
+    const b = ['💸 <b>รายจ่ายวันนี้</b>'];
+    if (exN > 0) b.push('  🧾 รายจ่ายทั่วไป: ' + fmt(exTot) + ' ฿ (' + exN + ' รายการ)');
+    if (wdN > 0) b.push('  👷 เบิกเงินเดือน: ' + fmt(wdTot) + ' ฿ (' + wdN + ' รายการ)');
+    if (feN > 0) b.push('  ⛽ ค่าน้ำมันรถ: ' + fmt(feTot) + ' ฿ (' + feN + ' ครั้ง)');
+    b.push('  รวมรายจ่าย: <b>' + fmt(expTot) + ' ฿</b>');
+    blocks.push(b);
+  }
+  if (received !== 0 || expTot !== 0) {
+    blocks.push(['📈 <b>คงเหลือ (เงินเข้าจริง − รายจ่าย): ' + (netCash >= 0 ? '+' : '') + fmt(netCash) + ' ฿</b>']);
+  }
+
+  // ── ตาชั่งรายงานตัว (เริ่ม 21/11/2569) — อ่านก่อนตัดสินว่า "ไม่มีรายการ" เพราะอ่านพลาดต้องเข้า ERRS ──
+  const scale = await scaleRunsLine(idToken, today);
+
   const L = [];
   L.push('📊 <b>สรุปประจำวัน ' + beDate(today) + '</b>');
-  L.push('━━━━━━━━━━━━');
-
-  // ⬇️ บล็อกใหม่: น้ำหนักขาย
-  L.push('⚖️ <b>น้ำหนักขายวันนี้</b>');
-  L.push('  🚚 เที่ยวชั่ง: ' + weigh.length + ' เที่ยว · ' + fmtL(kgTot) + ' กก.');
-  Object.keys(byProd).forEach(function (p) {
-    L.push('  · ' + p + ': ' + fmt(byProd[p].q) + ' คิว (' + byProd[p].n + ' เที่ยว)');
-  });
-  if (dedTot > 0) L.push('  ➖ หักทรายเปียก: ' + fmt(dedTot) + ' คิว');
-  L.push('  รวมสุทธิ: <b>' + fmt(netQTot) + ' คิว</b> (≈ ' + fmt(netQTot * TON_PER_CUBIC) + ' ตัน)');
-  L.push('');
-
-  L.push('💰 <b>รายได้วันนี้</b>');
-  L.push('  ⛏️ ขายทราย: ' + fmt(sandRev) + ' ฿');
-  if (sandCredit > 0) L.push('     · ลงบัญชี ' + fmt(sandCredit));
-  L.push('  🧱 ขายดิน/อื่น: ' + fmt(dirtTot) + ' ฿');
-  if (osCash > 0) L.push('     · เงินสด ' + fmt(osCash));
-  if (osTrans > 0) L.push('     · โอน ' + fmt(osTrans));
-  if (osCredit > 0) L.push('     · ลงบัญชี ' + fmt(osCredit));
-  L.push('  รวมรายได้: <b>' + fmt(totalRev) + ' ฿</b>');
-  L.push('  💵 เงินเข้าจริง: ' + fmt(received) + ' ฿');
-  L.push('  📒 ค้างชำระ: ' + fmt(osCredit + sandCredit) + ' ฿');
-  if (noPrice > 0) L.push('  ⚠️ ใบชั่งยังไม่ใส่ราคา: <b>' + noPrice + '/' + weigh.length + ' ใบ</b> — ยอดขายจริงสูงกว่านี้');
-  L.push('');
-
-  // ⬇️ บล็อกใหม่: น้ำมัน
-  L.push('⛽ <b>น้ำมันวันนี้</b>');
-  if (feN === 0) L.push('  🚛 ค่าน้ำมันรถ: — ไม่มีรายการ —');
-  else {
-    L.push('  🚛 ค่าน้ำมันรถ: ' + fmtL(feL) + ' ล. / ' + fmt(feTot) + ' ฿ (' + feN + ' ครั้ง)');
-    Object.keys(byPlate).sort(function (a, b) { return byPlate[b].b - byPlate[a].b; }).forEach(function (p) {
-      L.push('     · ' + p + ' ' + fmtL(byPlate[p].l) + ' ล. / ' + fmt(byPlate[p].b) + ' ฿');
-    });
+  if (blocks.length) {
+    L.push('━━━━━━━━━━━━');
+    blocks.forEach(function (b, i) { if (i) L.push(''); b.forEach(function (x) { L.push(x); }); });
+  } else if (!ERRS.length) {
+    L.push('วันนี้ไม่มีรายการ');   // อ่านพลาด (ERRS) ห้ามขึ้นบรรทัดนี้ — จะเข้าใจผิดว่าไม่มีรายการจริง
   }
-  if (fiL > 0) L.push('  🛢️ รับน้ำมันเข้า: ' + fmtL(fiL) + ' ล. / ' + fmt(fiB) + ' ฿');
-  if (foL > 0) L.push('  🔻 เบิกออกใช้งาน: ' + fmtL(foL) + ' ล.');
-  L.push('');
 
-  L.push('💸 <b>รายจ่ายวันนี้</b>');
-  L.push('  🧾 รายจ่ายทั่วไป: ' + fmt(exTot) + ' ฿ (' + exN + ' รายการ)');
-  L.push('  👷 เบิกเงินเดือน: ' + fmt(wdTot) + ' ฿ (' + wdN + ' รายการ)');
-  L.push('  ⛽ ค่าน้ำมันรถ: ' + fmt(feTot) + ' ฿ (' + feN + ' ครั้ง)');
-  L.push('  รวมรายจ่าย: <b>' + fmt(expTot) + ' ฿</b>');
-  L.push('━━━━━━━━━━━━');
-  L.push('📈 <b>คงเหลือ (เงินเข้าจริง − รายจ่าย): ' + (netCash >= 0 ? '+' : '') + fmt(netCash) + ' ฿</b>');
-
-  // ⬇️ กันเคส "ศูนย์เงียบ"
-  const emptyAll = (weigh.length === 0 && obills.length === 0 && exN === 0 && wdN === 0 && feN === 0 && fin.length === 0);
-  let out_latest = null;
-  if (emptyAll && !ERRS.length) {
-    try {
-      const last = await runQuery(idToken, { from: [{ collectionId: 'weighings' }], orderBy: [{ field: { fieldPath: 'date' }, direction: 'DESCENDING' }], limit: 1 });
-      out_latest = last.length ? fval(last[0], 'date') : null;
-    } catch (e) { /* ไม่สำคัญ ข้ามได้ */ }
-  }
+  // ท้ายข้อความ (บรรทัดตาชั่ง + คำเตือนอ่านพลาด) ต้องไม่ถูกตัดทิ้ง → กันที่ไว้ แล้วตัดเฉพาะส่วนบนที่ขอบบรรทัด
+  const T = [];
+  if (scale.line) { T.push(''); T.push(scale.line); }
   if (ERRS.length) {
-    L.push('');
-    L.push('⚠️ <b>อ่านข้อมูลไม่สำเร็จ — ตัวเลขข้างบนไม่ครบ</b>');
-    ERRS.slice(0, 6).forEach(function (e) { L.push('   • ' + e); });
-  } else if (emptyAll) {
-    L.push('');
-    // 30 ก.ย. 2569: เดิมโทษ security rules ซึ่งผิด — อ่านได้ปกติแต่ไม่มีรายการของวันนี้บน server
-    L.push('⚠️ <b>วันนี้ยังไม่มีรายการขาย/รายจ่าย/น้ำมันขึ้นระบบ</b>');
-    L.push('   (บอทอ่านข้อมูลได้ปกติ ไม่มี error) ถ้าบันทึกแล้วแต่ไม่ขึ้น ให้เปิดแอปบนเครื่องที่บันทึกตอนมีเน็ตเพื่อ sync');
-    if (out_latest) L.push('   เที่ยวชั่งล่าสุดในระบบ: ' + beDate(out_latest) + ' — ถ้าเก่า แปลว่ายังไม่ได้นำเข้าไฟล์ตาชั่ง');
+    T.push('');
+    T.push('⚠️ <b>อ่านข้อมูลไม่สำเร็จ — ตัวเลข' + (blocks.length ? 'ข้างบน' : '') + 'ไม่ครบ</b>');
+    // จำกัดขนาด: 6 ข้อ × 100 ตัวอักษร (escape แล้วยาวสุด ~3,000) ท้ายข้อความไม่เกินที่กันไว้
+    ERRS.slice(0, 6).forEach(function (e) { T.push('   • ' + esc(String(e).slice(0, 100))); });
+    if (ERRS.length > 6) T.push('   • … อีก ' + (ERRS.length - 6) + ' ข้อ');
   }
+  const tail = T.join('\n');
+  let head = L.join('\n');
+  const room = 3950 - tail.length;
+  if (head.length > room) { head = head.slice(0, room); head = head.slice(0, Math.max(0, head.lastIndexOf('\n'))) + '\n… (ตัดบางรายการ ดูเต็มในแอป)'; }
 
   return {
-    text: L.join('\n'),
+    text: tail ? head + '\n' + tail : head,   // tail ขึ้นต้นด้วยบรรทัดว่างอยู่แล้ว
     counts: {
       weighings: weigh.length, os_bills: obills.length, expenses: exN, withdrawals: wdN,
-      fuel_expense: feN, fuel_in: fin.length, fuel_out: fout.length, deductions: deds.length
+      fuel_expense: feN, fuel_in: fin.length, fuel_out: fout.length, deductions: deds.length,
+      scaleRuns: scale.times
     }
   };
+}
+
+// ---------- ตาชั่งส่งข้อมูลกี่รอบ (app_meta/scale_runs_YYYY-MM-DD.times = ["09:00", …] เวลาไทย) ----------
+const SCALE_FROM = '2026-11-21';
+const SCALE_SLOTS = [
+  { label: '09:00', from: '08:30', to: '11:59' },
+  { label: '12:00', from: '12:00', to: '16:59' },
+  { label: '17:00', from: '17:00', to: '23:59' }   // ถึงก่อนส่งสรุป (สรุปส่ง 18:00 รอบที่ส่งหลังสรุปไม่ทันนับ)
+];
+async function scaleRunsLine(idToken, today) {
+  if (today < SCALE_FROM) return { line: '', times: null };
+  let doc;
+  try { doc = await getDoc(idToken, 'app_meta', 'scale_runs_' + today); }
+  catch (e) { ERRS.push('รอบตาชั่ง → ' + ((e && e.message) || e)); return { line: '', times: null }; }
+  const times = [];
+  const arr = doc && doc.fields && doc.fields.times && doc.fields.times.arrayValue && doc.fields.times.arrayValue.values;
+  (arr || []).forEach(function (v) { if (v && typeof v.stringValue === 'string' && /^\d{2}:\d{2}$/.test(v.stringValue)) times.push(v.stringValue); });
+  const missing = SCALE_SLOTS.filter(function (s) {
+    return !times.some(function (t) { return t >= s.from && t <= s.to; });
+  }).map(function (s) { return s.label; });
+  const n = SCALE_SLOTS.length - missing.length;
+  const line = missing.length
+    ? '⚠️ ตาชั่งส่งข้อมูล ' + n + '/3 รอบ — ขาดรอบ ' + missing.join(', ') + ' (เช็กว่าคอมเครื่องชั่งเปิดอยู่)'
+    : '⚖️ ตาชั่งส่งข้อมูล 3/3 รอบ';
+  return { line: line, times: times };
 }
 
 // ---------- รหัสแอดมิน (28 ก.ย. 2569) ----------
@@ -287,12 +323,22 @@ async function setDoc(idToken, coll, id, fields) {
   });
   if (!r.ok) throw new Error('write fail ' + r.status);
 }
+// ส่ง Telegram (21 พ.ย. 69): ตัดยาวที่ขอบบรรทัด (ไม่ตัดกลางแท็ก/entity) · HTML ถูกปฏิเสธ → ส่งซ้ำแบบข้อความธรรมดา
+// ส่งไม่สำเร็จทั้งสองแบบ = throw → ไม่บันทึก lastSent (รอบหน้าส่งใหม่ได้)
 async function tgSend(token, chatId, text) {
-  await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 4000), parse_mode: 'HTML', disable_web_page_preview: true })
-  });
+  let t = text;
+  if (t.length > 4000) { t = t.slice(0, 3990); t = t.slice(0, Math.max(0, t.lastIndexOf('\n'))) + '\n…'; }
+  const send = function (payload) {
+    return fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    }).then(function (r) { return r.ok; }).catch(function () { return false; });
+  };
+  if (await send({ chat_id: chatId, text: t, parse_mode: 'HTML', disable_web_page_preview: true })) return;
+  const plain = t.replace(/<\/?b>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  if (await send({ chat_id: chatId, text: plain, disable_web_page_preview: true })) return;
+  throw new Error('telegram send fail');
 }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function fmt(n) { return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtL(n) { return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 1 }); }
 function beDate(ymd) { const p = ymd.split('-'); return parseInt(p[2]) + '/' + p[1] + '/' + (parseInt(p[0]) + 543); }
