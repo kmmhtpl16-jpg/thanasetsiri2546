@@ -44,28 +44,48 @@ async function handle(context) {
     // กันคนนอกเรียกก่อนเวลาแล้วสรุปออกก่อน + รอบเย็นถูกข้าม
     if (plain && bkkHM() < OPEN_AT) return json({ ok: true, skipped: 'too early' });
     const idToken = await login();
-    // จองสิทธิ์ส่งของวันนี้ (มีเงื่อนไข) → เรียกพร้อมกันหลายทาง ส่งได้ทางเดียว · วันละไม่เกิน 1 ครั้ง (ไม่มีจองซ้ำ)
+    // จองสิทธิ์ส่งของวันนี้ (มีเงื่อนไข) → เรียกพร้อมกันหลายทาง ส่งได้ทางเดียว · ส่งถึงแล้ว = ไม่ส่งอีก
     // force (แอดมิน) ไม่แตะตัวจดนี้เลย → ไม่รบกวนรอบปกติ
-    let claimUT = null;
+    let claim = null;
     if (plain) {
-      claimUT = await claimDay(idToken, today);
-      if (!claimUT) return json({ ok: true, skipped: 'already sent ' + today });
+      claim = await claimDay(idToken, today);
+      if (claim.skip) return json({ ok: true, skipped: claim.skip + ' ' + today });   // already sent / in progress
+      if (claim.exhausted) return json({ ok: false, skipped: 'gave up after ' + MAX_TRIES + ' tries ' + today + ' (admin force needed)' });
     }
-    let sendStarted = false;
+    // 20 พ.ย. 69 (คุณหลิงสั่ง "ถ้ายังไม่ส่ง ให้ส่งซ้ำ"): Telegram ไม่มีทางให้บอทเช็กย้อนหลังว่าข้อความถึงไหม
+    //   ตอบ ok = ถึงแน่ · ตอบปฏิเสธ = ไม่ถึงแน่ · เน็ตหลุด/ไม่มีคำตอบ = ไม่รู้ → ส่งซ้ำ 1 ครั้งพร้อมป้าย 🔁
+    //   ยังไม่สำเร็จ → คืนสิทธิ์ให้รอบถัดไป (ตัวตั้งเวลา/เปิดแอป) ส่งใหม่ และจดผลไว้ใน app_meta/notify_daily.sendStatus
+    //   ตัวจดใน app_meta/notify_daily: sentDay = วันที่ส่งถึงแน่ · maybeDay = วันที่เคย "ไม่รู้ผล" (ติดป้าย 🔁 จนกว่าจะส่งถึง)
+    //   tries = "<วันที่>:<จำนวนรอบ>" สูงสุด MAX_TRIES รอบ/วัน กันส่งซ้ำไม่จบ · ทุกรอบส่ง Telegram ได้ไม่เกิน 2 ข้อความที่อาจถึงกลุ่ม
+    let out;
     try {
-      const out = await buildSummary(idToken, today);
-      if (debug) return json({ ok: true, date: today, errors: ERRS, counts: out.counts, text: out.text });
-      sendStarted = true;
-      await tgSend(token, GROUP_CHAT_ID, out.text);
+      out = await buildSummary(idToken, today);
     } catch (e) {
-      // คืนสิทธิ์เฉพาะเมื่อแน่ใจว่าไม่มีข้อความออกไป (ยังไม่เริ่มส่ง หรือ Telegram ปฏิเสธชัดเจนทั้งสองแบบ)
-      // ผลไม่แน่นอน (เน็ตหลุดระหว่างส่ง) = ไม่คืน → วันนั้นอาจไม่มีสรุป ดีกว่าส่งซ้ำ
-      if (claimUT && (!sendStarted || (e && e.definite))) {
-        await patchMeta(idToken, { lastSent: { stringValue: '' } }, claimUT).catch(function () {});
-      }
+      if (claim) await finishMeta(idToken, { lastSent: { stringValue: '' }, sendStatus: { stringValue: 'failed-build ' + today }, sendTriedAt: { stringValue: new Date().toISOString() } }, claim.ut);
       throw e;
     }
-    if (claimUT) await patchMeta(idToken, { sentAt: { stringValue: new Date().toISOString() } }, claimUT).catch(function () {});
+    if (debug) return json({ ok: true, date: today, errors: ERRS, counts: out.counts, text: out.text });
+    const RETRY_TAG = '🔁 <b>ส่งซ้ำ</b> — รอบก่อนไม่แน่ใจว่าถึงกลุ่ม (ถ้าเห็นสรุปวันนี้ 2 ข้อความ ใช้อันนี้)\n';
+    let res = await tgSend(token, GROUP_CHAT_ID, (claim && claim.prevUnknown ? RETRY_TAG : '') + out.text);
+    let status = res.outcome === 'ok' ? (claim && claim.prevUnknown ? 'sent-retry' : 'sent') : res.outcome;
+    let unknownSeen = res.outcome === 'unknown';
+    if (res.outcome === 'unknown') {
+      await new Promise(function (r) { setTimeout(r, 3000); });
+      res = await tgSend(token, GROUP_CHAT_ID, RETRY_TAG + out.text);
+      status = res.outcome === 'ok' ? 'sent-retry' : (res.outcome === 'rejected' ? 'unknown-then-rejected' : 'unknown');
+    }
+    if (claim) {
+      const now = new Date().toISOString();
+      const f = { sendStatus: { stringValue: status + ' ' + today }, sendTriedAt: { stringValue: now } };
+      if (res.outcome === 'ok') {
+        f.sentDay = { stringValue: today }; f.sentAt = { stringValue: now }; f.sentMsgId = { integerValue: String(res.msgId || 0) };
+      } else {
+        f.lastSent = { stringValue: '' };   // ยังไม่ถึง/ไม่รู้ → คืนสิทธิ์ ให้รอบถัดไป (ตัวตั้งเวลา/เปิดแอป) ส่งใหม่
+        if (unknownSeen) f.maybeDay = { stringValue: today };   // อาจถึงแล้ว → รอบถัดไปติดป้าย 🔁 (ไม่ถูกล้างด้วยผลแบบอื่น)
+      }
+      await finishMeta(idToken, f, claim.ut);   // เขียนไม่ได้ → จองค้าง → เกิน 15 นาทีรอบถัดไปส่งแทนพร้อมป้าย 🔁
+    }
+    if (res.outcome !== 'ok') return json({ ok: false, error: 'telegram ' + status, errors: ERRS }, 500);
     return json({ ok: true, sent: today, errors: ERRS.length });   // 28 ก.ย.: ไม่คืนตัวเลขให้คนนอกเห็น
   } catch (e) {
     return json({ ok: false, error: String((e && e.message) || e), errors: ERRS }, 500);
@@ -76,28 +96,57 @@ function bkkDate() { return new Date(Date.now() + 7 * 3600 * 1000).toISOString()
 function bkkHM() { return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(11, 16); }
 const OPEN_AT = '18:00';
 
-// จองสิทธิ์ส่งของวัน: คืน updateTime ของการจอง (ใช้เป็นเงื่อนไขตอนคืนสิทธิ์/จดส่งเสร็จ) · null = ส่งไปแล้ว/มีคนจองก่อน
-// lastSent === วันนี้ = ข้ามเสมอ (รวมข้อมูลจากเวอร์ชันเก่าที่ไม่มี claimedAt)
+// จองสิทธิ์ส่งของวัน: คืน { ut: updateTime ของการจอง (เงื่อนไขตอนจดผล), prevUnknown: ต้องติดป้าย 🔁 } · null = ไม่ต้องส่ง
+const MAX_TRIES = 6;                 // จองได้ไม่เกิน 6 รอบ/วัน
+const STALE_MS = 15 * 60 * 1000;     // จองค้างเกิน 15 นาทีโดยไม่มีผล (ถูกตัดกลางทาง/จดผลไม่สำเร็จ) = ส่งแทนได้
 async function claimDay(idToken, today) {
   const meta = await getDoc(idToken, 'app_meta', 'notify_daily');   // อ่านไม่ได้ = throw (ไม่เดาว่ายังไม่ส่ง)
-  const last = meta ? (fval(meta, 'lastSent') || '') : '';
-  if (last >= today) return null;   // ส่ง/จองวันนี้แล้ว หรือมีวันที่ใหม่กว่า (คำขอที่ค้างข้ามเที่ยงคืน) → ห้ามถอยตัวจด
+  const g = function (k) { return meta ? (fval(meta, k) || '') : ''; };
+  const last = g('lastSent');
+  if (g('sentDay') === today) return { skip: 'already sent' };   // ส่งถึงแน่แล้ว
+  if (last > today) return { skip: 'newer day claimed' };        // คำขอค้างข้ามเที่ยงคืน → ห้ามถอยตัวจด
+  let stale = false;
+  if (last === today) {
+    // จองไว้แต่ยังไม่ส่งถึง: รอผลถ้ายังไม่เกิน 15 นาที · ข้อมูลเวอร์ชันเก่า (ไม่มี claimedAt) ถือว่าส่งแล้ว
+    const c = g('claimedAt'), s = g('sentAt');
+    if (!c || (s && s >= c)) return { skip: 'already sent' };   // เวอร์ชันก่อน (f5949b4) จด sentAt หลังส่งถึง ไม่มี sentDay
+    if (!(Date.now() - Date.parse(c) > STALE_MS)) return { skip: 'in progress' };
+    stale = true;
+  }
+  const tm = /^(\d{4}-\d{2}-\d{2}):(\d+)$/.exec(g('tries'));
+  const n = (tm && tm[1] === today) ? +tm[2] : 0;
+  if (n >= MAX_TRIES) return { exhausted: true };   // ลองครบแล้ววันนี้ → หยุด (แอดมินสั่ง force ได้)
   const pre = meta && meta.updateTime
     ? 'currentDocument.updateTime=' + encodeURIComponent(meta.updateTime)
     : 'currentDocument.exists=false';
-  const r = await fetch(`${FS}/app_meta/notify_daily?updateMask.fieldPaths=lastSent&updateMask.fieldPaths=claimedAt&${pre}`, {
+  const fields = { lastSent: { stringValue: today }, claimedAt: { stringValue: new Date().toISOString() }, tries: { stringValue: today + ':' + (n + 1) } };
+  if (stale) fields.maybeDay = { stringValue: today };   // รับช่วงจองค้าง = รอบนั้นอาจส่งถึงแล้ว → ป้าย 🔁 ติดไปจนส่งถึง
+  const mask = Object.keys(fields).map(function (k) { return 'updateMask.fieldPaths=' + k; }).join('&');
+  const r = await fetch(`${FS}/app_meta/notify_daily?${mask}&${pre}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
-    body: JSON.stringify({ fields: { lastSent: { stringValue: today }, claimedAt: { stringValue: new Date().toISOString() } } })
+    body: JSON.stringify({ fields: fields })
   });
   let j = null;
   try { j = await r.json(); } catch (e) { /* ignore */ }
   if (r.ok) {
     if (!j || !j.updateTime) throw new Error('claim: no updateTime');
-    return j.updateTime;
+    // เคยไม่รู้ผลวันนี้ หรือรับช่วงจากการจองที่ค้าง (ไม่รู้ว่ารอบนั้นส่งไปหรือยัง) → ติดป้าย 🔁
+    return { ut: j.updateTime, prevUnknown: stale || g('maybeDay') === today };
   }
   const st = (j && j.error && j.error.status) || '';
-  if (r.status === 409 || st === 'FAILED_PRECONDITION' || st === 'ALREADY_EXISTS' || st === 'ABORTED') return null;   // มีคนจองก่อน
+  if (r.status === 409 || st === 'FAILED_PRECONDITION' || st === 'ALREADY_EXISTS' || st === 'ABORTED') return { skip: 'in progress' };   // มีคนจองตัดหน้า
   throw new Error('claim fail ' + r.status + ' ' + st);
+}
+// จดผลรอบนี้: ลองซ้ำ 3 ครั้ง (เน็ต/ฐานข้อมูลสะดุด) · ยังไม่ได้ = ปล่อยให้ "จองค้าง" ไปรับช่วงเกิน 15 นาที
+async function finishMeta(idToken, fields, ut) {
+  for (let i = 0; i < 3; i++) {
+    try { await patchMeta(idToken, fields, ut); return true; }
+    catch (e) {
+      if (/write fail (400|409)/.test(String(e && e.message))) return false;   // ไม่ใช่การจองของเราแล้ว ลองซ้ำไม่มีประโยชน์
+      await new Promise(function (r) { setTimeout(r, 500 * (i + 1)); });
+    }
+  }
+  return false;
 }
 // เขียนตัวจดแบบมีเงื่อนไข: แก้ได้เฉพาะเมื่อยังเป็นการจองของเราเอง (updateTime ตรง)
 async function patchMeta(idToken, fields, updateTime) {
@@ -300,7 +349,7 @@ async function buildSummary(idToken, today) {
   }
   const tail = T.join('\n');
   let head = L.join('\n');
-  const room = 3950 - tail.length;
+  const room = 3800 - tail.length;   // เผื่อป้าย 🔁 ส่งซ้ำ (~100 ตัวอักษร) ไม่ให้ tgSend ตัดท้ายทิ้ง
   if (head.length > room) { head = head.slice(0, room); head = head.slice(0, Math.max(0, head.lastIndexOf('\n'))) + '\n… (ตัดบางรายการ ดูเต็มในแอป)'; }
 
   return {
@@ -380,19 +429,28 @@ async function setDoc(idToken, coll, id, fields) {
 async function tgSend(token, chatId, text) {
   let t = text;
   if (t.length > 4000) { t = t.slice(0, 3990); t = t.slice(0, Math.max(0, t.lastIndexOf('\n'))) + '\n…'; }
-  // ผล: 'ok' | 'rejected' (Telegram ตอบปฏิเสธชัดเจน = ไม่มีข้อความออก) | 'unknown' (เน็ตหลุด/ไม่รู้ผล)
+  // คืน { outcome: 'ok' (ถึงแน่ + msgId) | 'rejected' (Telegram ปฏิเสธชัดเจน = ไม่ถึงแน่) | 'unknown' (เน็ตหลุด/5xx ไม่รู้ผล) }
   const send = function (payload) {
     return fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-    }).then(function (r) { return r.ok ? 'ok' : (r.status >= 500 ? 'unknown' : 'rejected'); }).catch(function () { return 'unknown'; });
+    }).then(async function (r) {
+      if (r.ok) {
+        // ถึงแน่ = Telegram ตอบ ok:true เท่านั้น · 2xx แต่อ่านคำตอบไม่ได้/ไม่ใช่ ok:true = ไม่รู้ผล
+        let j = null; try { j = await r.json(); } catch (e) { /* ignore */ }
+        if (j && j.ok === true) return { outcome: 'ok', msgId: (j.result && j.result.message_id) || 0 };
+        return { outcome: 'unknown' };
+      }
+      // ปฏิเสธแน่ = Telegram ตอบเองว่า ok:false (มี error_code) และไม่ใช่ 5xx/408/429 · นอกนั้น (ตัวกลางตอบ/อ่านไม่ได้) = ไม่รู้ผล
+      let j = null; try { j = await r.json(); } catch (e) { /* ignore */ }
+      if (r.status < 500 && r.status !== 408 && r.status !== 429 && j && j.ok === false && j.error_code) return { outcome: 'rejected' };
+      return { outcome: 'unknown' };
+    }).catch(function () { return { outcome: 'unknown' }; });
   };
   const r1 = await send({ chat_id: chatId, text: t, parse_mode: 'HTML', disable_web_page_preview: true });
-  if (r1 === 'ok') return;
-  if (r1 === 'unknown') { const e = new Error('telegram send unknown'); e.definite = false; throw e; }   // ไม่ลองซ้ำ กันส่งซ้ำ
+  if (r1.outcome !== 'rejected') return r1;   // ok หรือ unknown (unknown ให้ผู้เรียกตัดสินส่งซ้ำพร้อมป้าย)
+  // HTML ถูกปฏิเสธ (ไม่ถึงแน่) → ลองแบบข้อความธรรมดา
   const plainText = t.replace(/<\/?b>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-  const r2 = await send({ chat_id: chatId, text: plainText, disable_web_page_preview: true });
-  if (r2 === 'ok') return;
-  const e = new Error('telegram send ' + r2); e.definite = (r2 === 'rejected'); throw e;
+  return await send({ chat_id: chatId, text: plainText, disable_web_page_preview: true });
 }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function fmt(n) { return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
