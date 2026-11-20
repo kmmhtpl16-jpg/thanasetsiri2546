@@ -4514,9 +4514,13 @@ function importFile(evt) {
     var wb;
     try {
       if(isCsv){
-        var txt;
-        try { txt=new TextDecoder('utf-8',{fatal:true}).decode(new Uint8Array(e.target.result)); }
-        catch(de){ setMsg('s1','❌ ภาษาไทยในไฟล์ CSV อ่านไม่ออก — ตอน Export ใน THEO ให้ตั้ง Encoding เป็น UTF-8','err'); return; }
+        var txt, _u8=new Uint8Array(e.target.result);
+        /* รับได้ทั้ง UTF-8 และค่าเริ่มต้นของ THEO (windows-874) — พนักงานไม่ต้องเปลี่ยนค่าตอน Export (20 พ.ย. 69) */
+        try { txt=new TextDecoder('utf-8',{fatal:true}).decode(_u8); }
+        catch(de){
+          try { txt=new TextDecoder('windows-874',{fatal:true}).decode(_u8); }
+          catch(de2){ setMsg('s1','❌ ภาษาไทยในไฟล์ CSV อ่านไม่ออก — ลอง Export จาก THEO ใหม่','err'); return; }
+        }
         txt=txt.replace(/^\uFEFF/,'');
         wb=XLSX.read(txt,{type:'string',raw:true});
       } else {
@@ -4678,6 +4682,7 @@ function escHtml(s) {
 }
 
 function parseAndSave(rows, fname) {
+  var isTheoCsv=/\.csv$/i.test(String(fname||''));   // CSV จาก THEO — กฎใหม่ใช้เฉพาะไฟล์ CSV ไฟล์ .xls/.xlsx เดิมทำงานแบบเดิมทุกอย่าง
   // ── แปลงค่าในช่องเป็น ISO date ──
   // allowSerial=true เฉพาะตอนหาวันที่แถวสุดท้าย (กัน seq/น้ำหนักถูกตีความเป็นวันที่)
   function cellToISO(val, allowSerial){
@@ -4685,8 +4690,17 @@ function parseAndSave(rows, fname) {
     if(!s) return '';
     // 1) ข้อความรูปแบบ DD/MM/YYYY หรือ DD-MM-YYYY (ปีอาจเป็น พ.ศ.)
     var dm=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/); // THEO ใส่เวลาต่อท้าย "14/11/2569 00:00:00"
+    if(!dm && isTheoCsv){   // THEO Text mode: "20/11/69" หรือ "20/11/69 12:00" (ปี พ.ศ. 2 หลัก)
+      var dm2=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
+      // ปี พ.ศ. 2 หลัก ยอมรับเฉพาะ 63–78 (= ค.ศ. 2020–2035) กันปีเพี้ยน
+      if(dm2 && +dm2[3]>=63 && +dm2[3]<=78) dm=[dm2[0],dm2[1],dm2[2],String(2500+parseInt(dm2[3],10))];
+    }
     if(dm){
       var y=parseInt(dm[3]); if(y>2400) y-=543;
+      if(isTheoCsv){   // CSV: ปฏิเสธวันที่ที่ไม่มีจริง เช่น 31/02
+        var _dv=new Date(Date.UTC(y,+dm[2]-1,+dm[1]));
+        if(_dv.getUTCFullYear()!==y || _dv.getUTCMonth()!==+dm[2]-1 || _dv.getUTCDate()!==+dm[1]) return '';
+      }
       return y+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
     }
     // 2) Excel serial number — เฉพาะเมื่อ allowSerial (กัน seq/น้ำหนักผิด)
@@ -4704,7 +4718,6 @@ function parseAndSave(rows, fname) {
 
   // หา header row
   var hr=-1;
-  var isTheoCsv=/\.csv$/i.test(String(fname||''));   // CSV จาก THEO — กฎใหม่ใช้เฉพาะไฟล์ CSV ไฟล์ .xls/.xlsx เดิมทำงานแบบเดิมทุกอย่าง
   /* THEO มีแถวตัวกรอง "ทะเบียนรถ … ถึง" อยู่เหนือหัวตาราง — หาแถวที่มีทั้ง เลขที่ + ทะเบียน ก่อน (20 พ.ย. 69) */
   if(isTheoCsv) for(var i=0;i<rows.length;i++){
     var rs0=rows[i].map(function(c){return String(c).trim();});
@@ -4722,6 +4735,15 @@ function parseAndSave(rows, fname) {
       iTime=ci('เวลา'),  iCust=ci('ลูกค้า'),   iProd=ci('สินค้า');
   if(isTheoCsv && iCust<0) iCust=ci('คู่ค้า');            // THEO เรียกลูกค้าว่า "คู่ค้า"
   var iTimeOut=isTheoCsv?ci('เวลาออก'):-1;               // THEO: "14/11/2569 18:11:25" → ใช้เวลาชั่งออก
+  /* CSV ของ THEO รองรับเฉพาะรายงาน WR2101 (รูปแบบอื่นคอลัมน์ข้อมูลเลื่อนไม่ตรงหัวตาราง)
+     ต้องเจอทั้งชื่อรายงาน WR2101 ในหัวรายงาน + คอลัมน์ "เวลาออก" — ถ้าภาษาไทยถอดรหัสผิด จะไม่เจอชื่อรายงานและถูกปฏิเสธด้วย */
+  var _isWR2101=false;
+  if(isTheoCsv) for(var _ri=0;_ri<=hr;_ri++){
+    if(rows[_ri].some(function(c){return String(c).indexOf('จัดกลุ่มตามน้ำหนักเข้า-ออก')>=0;})){ _isWR2101=true; break; }
+  }
+  if(isTheoCsv && (iTimeOut<0 || !_isWR2101)){
+    setMsg('s1','❌ ไฟล์ CSV นี้ไม่ใช่รายงาน WR2101 — ใน THEO เลือกรูปแบบรายงาน WR2101 แล้ว Export CSV ใหม่','err'); return;
+  }
   var iNet=ci('สุทธิ')>=0?ci('สุทธิ'):ci('นน.สุทธิ');
 
   // ── ตรวจว่าเป็น xls single-sheet (วันที่อยู่แถวสุดท้าย) ──
