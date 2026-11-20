@@ -38,17 +38,34 @@ async function handle(context) {
     const token = env.TELEGRAM_BOT_TOKEN;
     if (!token && !debug) return json({ ok: false, error: 'no token' }, 500);
     const today = dateQ || bkkDate();
+    // รอบปกติ = ไม่มี force/debug/date เท่านั้น · ?date= (แอดมิน) ส่งแบบไม่แตะตัวจดรายวัน เหมือน force
+    const plain = !force && !debug && !url.searchParams.has('date');
+    // 20 พ.ย. 69: เรียกแบบไม่มีรหัส (ตัวตั้งเวลา / แอปเปิดหลัง 18:00) ส่งได้เฉพาะเวลาไทย ≥ 18:00
+    // กันคนนอกเรียกก่อนเวลาแล้วสรุปออกก่อน + รอบเย็นถูกข้าม
+    if (plain && bkkHM() < OPEN_AT) return json({ ok: true, skipped: 'too early' });
     const idToken = await login();
-    if (!force && !debug) {
-      const meta = await getDoc(idToken, 'app_meta', 'notify_daily').catch(function () { return null; });
-      if (meta && fval(meta, 'lastSent') === today) return json({ ok: true, skipped: 'already sent ' + today });
+    // จองสิทธิ์ส่งของวันนี้ (มีเงื่อนไข) → เรียกพร้อมกันหลายทาง ส่งได้ทางเดียว · วันละไม่เกิน 1 ครั้ง (ไม่มีจองซ้ำ)
+    // force (แอดมิน) ไม่แตะตัวจดนี้เลย → ไม่รบกวนรอบปกติ
+    let claimUT = null;
+    if (plain) {
+      claimUT = await claimDay(idToken, today);
+      if (!claimUT) return json({ ok: true, skipped: 'already sent ' + today });
     }
-    const out = await buildSummary(idToken, today);
-    if (debug) return json({ ok: true, date: today, errors: ERRS, counts: out.counts, text: out.text });
-    await tgSend(token, GROUP_CHAT_ID, out.text);
-    await setDoc(idToken, 'app_meta', 'notify_daily', {
-      lastSent: { stringValue: today }, sentAt: { stringValue: new Date().toISOString() }
-    }).catch(function () {});
+    let sendStarted = false;
+    try {
+      const out = await buildSummary(idToken, today);
+      if (debug) return json({ ok: true, date: today, errors: ERRS, counts: out.counts, text: out.text });
+      sendStarted = true;
+      await tgSend(token, GROUP_CHAT_ID, out.text);
+    } catch (e) {
+      // คืนสิทธิ์เฉพาะเมื่อแน่ใจว่าไม่มีข้อความออกไป (ยังไม่เริ่มส่ง หรือ Telegram ปฏิเสธชัดเจนทั้งสองแบบ)
+      // ผลไม่แน่นอน (เน็ตหลุดระหว่างส่ง) = ไม่คืน → วันนั้นอาจไม่มีสรุป ดีกว่าส่งซ้ำ
+      if (claimUT && (!sendStarted || (e && e.definite))) {
+        await patchMeta(idToken, { lastSent: { stringValue: '' } }, claimUT).catch(function () {});
+      }
+      throw e;
+    }
+    if (claimUT) await patchMeta(idToken, { sentAt: { stringValue: new Date().toISOString() } }, claimUT).catch(function () {});
     return json({ ok: true, sent: today, errors: ERRS.length });   // 28 ก.ย.: ไม่คืนตัวเลขให้คนนอกเห็น
   } catch (e) {
     return json({ ok: false, error: String((e && e.message) || e), errors: ERRS }, 500);
@@ -56,6 +73,41 @@ async function handle(context) {
 }
 
 function bkkDate() { return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10); }
+function bkkHM() { return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(11, 16); }
+const OPEN_AT = '18:00';
+
+// จองสิทธิ์ส่งของวัน: คืน updateTime ของการจอง (ใช้เป็นเงื่อนไขตอนคืนสิทธิ์/จดส่งเสร็จ) · null = ส่งไปแล้ว/มีคนจองก่อน
+// lastSent === วันนี้ = ข้ามเสมอ (รวมข้อมูลจากเวอร์ชันเก่าที่ไม่มี claimedAt)
+async function claimDay(idToken, today) {
+  const meta = await getDoc(idToken, 'app_meta', 'notify_daily');   // อ่านไม่ได้ = throw (ไม่เดาว่ายังไม่ส่ง)
+  const last = meta ? (fval(meta, 'lastSent') || '') : '';
+  if (last >= today) return null;   // ส่ง/จองวันนี้แล้ว หรือมีวันที่ใหม่กว่า (คำขอที่ค้างข้ามเที่ยงคืน) → ห้ามถอยตัวจด
+  const pre = meta && meta.updateTime
+    ? 'currentDocument.updateTime=' + encodeURIComponent(meta.updateTime)
+    : 'currentDocument.exists=false';
+  const r = await fetch(`${FS}/app_meta/notify_daily?updateMask.fieldPaths=lastSent&updateMask.fieldPaths=claimedAt&${pre}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+    body: JSON.stringify({ fields: { lastSent: { stringValue: today }, claimedAt: { stringValue: new Date().toISOString() } } })
+  });
+  let j = null;
+  try { j = await r.json(); } catch (e) { /* ignore */ }
+  if (r.ok) {
+    if (!j || !j.updateTime) throw new Error('claim: no updateTime');
+    return j.updateTime;
+  }
+  const st = (j && j.error && j.error.status) || '';
+  if (r.status === 409 || st === 'FAILED_PRECONDITION' || st === 'ALREADY_EXISTS' || st === 'ABORTED') return null;   // มีคนจองก่อน
+  throw new Error('claim fail ' + r.status + ' ' + st);
+}
+// เขียนตัวจดแบบมีเงื่อนไข: แก้ได้เฉพาะเมื่อยังเป็นการจองของเราเอง (updateTime ตรง)
+async function patchMeta(idToken, fields, updateTime) {
+  const mask = Object.keys(fields).map(function (k) { return 'updateMask.fieldPaths=' + encodeURIComponent(k); }).join('&');
+  const r = await fetch(`${FS}/app_meta/notify_daily?${mask}&currentDocument.updateTime=${encodeURIComponent(updateTime)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+    body: JSON.stringify({ fields })
+  });
+  if (!r.ok) throw new Error('write fail ' + r.status);
+}
 
 async function login() {
   const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB_API_KEY}`, {
@@ -328,15 +380,19 @@ async function setDoc(idToken, coll, id, fields) {
 async function tgSend(token, chatId, text) {
   let t = text;
   if (t.length > 4000) { t = t.slice(0, 3990); t = t.slice(0, Math.max(0, t.lastIndexOf('\n'))) + '\n…'; }
+  // ผล: 'ok' | 'rejected' (Telegram ตอบปฏิเสธชัดเจน = ไม่มีข้อความออก) | 'unknown' (เน็ตหลุด/ไม่รู้ผล)
   const send = function (payload) {
     return fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-    }).then(function (r) { return r.ok; }).catch(function () { return false; });
+    }).then(function (r) { return r.ok ? 'ok' : (r.status >= 500 ? 'unknown' : 'rejected'); }).catch(function () { return 'unknown'; });
   };
-  if (await send({ chat_id: chatId, text: t, parse_mode: 'HTML', disable_web_page_preview: true })) return;
-  const plain = t.replace(/<\/?b>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-  if (await send({ chat_id: chatId, text: plain, disable_web_page_preview: true })) return;
-  throw new Error('telegram send fail');
+  const r1 = await send({ chat_id: chatId, text: t, parse_mode: 'HTML', disable_web_page_preview: true });
+  if (r1 === 'ok') return;
+  if (r1 === 'unknown') { const e = new Error('telegram send unknown'); e.definite = false; throw e; }   // ไม่ลองซ้ำ กันส่งซ้ำ
+  const plainText = t.replace(/<\/?b>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const r2 = await send({ chat_id: chatId, text: plainText, disable_web_page_preview: true });
+  if (r2 === 'ok') return;
+  const e = new Error('telegram send ' + r2); e.definite = (r2 === 'rejected'); throw e;
 }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function fmt(n) { return Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }

@@ -2284,29 +2284,14 @@ function tgNotify(text){
   }catch(e){ console.warn('tgNotify', e); }
 }
 
+/* 20 พ.ย. 69: เปิดแอปหลัง 18:00 → ขอให้เซิร์ฟเวอร์ส่งสรุป (/api/daily-summary แบบสั้นตัวเดียวกับรอบตั้งเวลา)
+   เซิร์ฟเวอร์ตรวจเวลาไทย ≥ 17:55 + จองสิทธิ์ส่งวันละครั้งเอง — เดิมแอปประกอบข้อความแบบยาวส่งผ่าน /api/notify
+   (tgBuildDailySummary ยังเก็บไว้ ไม่ได้เรียกแล้ว) */
 async function tgCheckDailySummary(){
   try{
-    if(typeof prDb!=='function') return;
     if(new Date().getHours() < TG_DAILY_HOUR) return;
-    var today = todayYMD();
-    var ref = prDb().collection('app_meta').doc('notify_daily');
-    var go = await prDb().runTransaction(async function(tx){
-      var doc = await tx.get(ref);
-      if(doc.exists && doc.data().lastSent === today) return false;
-      tx.set(ref, { lastSent: today, sentAt: new Date().toISOString() }, {merge:true});
-      return true;
-    });
-    if(!go) return;
-    var text = await tgBuildDailySummary(today);
-    var resp = await tgNotify(text);
-    // ส่งไม่สำเร็จ (ยังไม่ตั้งค่า token ฯลฯ) → คืนสถานะให้ลองใหม่รอบเปิดถัดไป
-    if(!resp || resp.ok === false || (resp.status && resp.status >= 400)){
-      await ref.set({ lastSent:'' }, {merge:true}).catch(function(){});
-    }
-  }catch(e){
-    console.warn('tgCheckDailySummary', e);
-    try{ await prDb().collection('app_meta').doc('notify_daily').set({lastSent:''},{merge:true}); }catch(_){}
-  }
+    await fetch('/api/daily-summary', { method:'POST' }).catch(function(){});
+  }catch(e){ console.warn('tgCheckDailySummary', e); }
 }
 
 async function tgBuildDailySummary(today){
