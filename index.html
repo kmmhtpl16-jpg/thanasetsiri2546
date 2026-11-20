@@ -617,10 +617,10 @@ select{color-scheme:light;}
       <div class="card">
         <div class="card-title">📥 นำเข้าไฟล์ตาชั่ง</div>
         <div class="drop-zone">
-          <input type="file" accept=".xls,.xlsx" onchange="importFile(event)">
+          <input type="file" accept=".xls,.xlsx,.csv" onchange="importFile(event)">
           <div class="dico">📂</div>
           <p><strong>แตะหรือลากไฟล์มาวางที่นี่</strong></p>
-          <p>รองรับ .xls / .xlsx จากตาชั่ง หจก.ธนเศรษฐ์ศิริ</p>
+          <p>รองรับ .xls / .xlsx จากตาชั่ง หจก.ธนเศรษฐ์ศิริ · .csv จากโปรแกรม THEO (Encoding UTF-8)</p>
         </div>
         <div id="s1" class="smsg" style="margin-top:10px"></div>
       </div>
@@ -4507,9 +4507,22 @@ function importFile(evt) {
   var file=evt.target.files[0]; if(!file) return;
   setMsg('s1','⏳ กำลังอ่าน '+file.name+'…','info');
   var reader=new FileReader();
+  /* CSV จากโปรแกรม THEO TruckWeight (20 พ.ย. 69): อ่านเป็นข้อความ UTF-8 + raw:true
+     กันภาษาไทยเพี้ยน / เลขที่ 0000001 ถูกตัดเลข 0 / วันที่ DD/MM ถูกสลับเป็น M/D */
+  var isCsv=/\.csv$/i.test(file.name);
   reader.onload=function(e){
     var wb;
-    try { wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}); }
+    try {
+      if(isCsv){
+        var txt;
+        try { txt=new TextDecoder('utf-8',{fatal:true}).decode(new Uint8Array(e.target.result)); }
+        catch(de){ setMsg('s1','❌ ภาษาไทยในไฟล์ CSV อ่านไม่ออก — ตอน Export ใน THEO ให้ตั้ง Encoding เป็น UTF-8','err'); return; }
+        txt=txt.replace(/^\uFEFF/,'');
+        wb=XLSX.read(txt,{type:'string',raw:true});
+      } else {
+        wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      }
+    }
     catch(ex){ setMsg('s1','❌ อ่านไฟล์ไม่ได้','err'); return; }
     var sheet=wb.Sheets[wb.SheetNames[0]];
     var rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
@@ -4671,7 +4684,7 @@ function parseAndSave(rows, fname) {
     var s=String(val||'').trim();
     if(!s) return '';
     // 1) ข้อความรูปแบบ DD/MM/YYYY หรือ DD-MM-YYYY (ปีอาจเป็น พ.ศ.)
-    var dm=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    var dm=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/); // THEO ใส่เวลาต่อท้าย "14/11/2569 00:00:00"
     if(dm){
       var y=parseInt(dm[3]); if(y>2400) y-=543;
       return y+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
@@ -4691,7 +4704,13 @@ function parseAndSave(rows, fname) {
 
   // หา header row
   var hr=-1;
-  for(var i=0;i<rows.length;i++){
+  var isTheoCsv=/\.csv$/i.test(String(fname||''));   // CSV จาก THEO — กฎใหม่ใช้เฉพาะไฟล์ CSV ไฟล์ .xls/.xlsx เดิมทำงานแบบเดิมทุกอย่าง
+  /* THEO มีแถวตัวกรอง "ทะเบียนรถ … ถึง" อยู่เหนือหัวตาราง — หาแถวที่มีทั้ง เลขที่ + ทะเบียน ก่อน (20 พ.ย. 69) */
+  if(isTheoCsv) for(var i=0;i<rows.length;i++){
+    var rs0=rows[i].map(function(c){return String(c).trim();});
+    if(rs0.some(function(c){return c.includes('เลขที่');}) && rs0.some(function(c){return c.includes('ทะเบียน');})){hr=i;break;}
+  }
+  if(hr<0) for(var i=0;i<rows.length;i++){
     var rs=rows[i].map(function(c){return String(c).trim();});
     if(rs.some(function(c){return c.includes('ทะเบียน')||c.includes('เลขที่');})){hr=i;break;}
   }
@@ -4701,6 +4720,8 @@ function parseAndSave(rows, fname) {
   function ci(kw){ return H.findIndex(function(x){return x.includes(kw);}); }
   var iSeq=ci('เลขที่'), iPlate=ci('ทะเบียน'), iDate=ci('วันที่'),
       iTime=ci('เวลา'),  iCust=ci('ลูกค้า'),   iProd=ci('สินค้า');
+  if(isTheoCsv && iCust<0) iCust=ci('คู่ค้า');            // THEO เรียกลูกค้าว่า "คู่ค้า"
+  var iTimeOut=isTheoCsv?ci('เวลาออก'):-1;               // THEO: "14/11/2569 18:11:25" → ใช้เวลาชั่งออก
   var iNet=ci('สุทธิ')>=0?ci('สุทธิ'):ci('นน.สุทธิ');
 
   // ── ตรวจว่าเป็น xls single-sheet (วันที่อยู่แถวสุดท้าย) ──
@@ -4752,7 +4773,12 @@ function parseAndSave(rows, fname) {
     if(!dateStr) continue;
 
     var rt=String(r[iTime]||'').trim();
-    var timeStr=/^\d{1,2}:\d{2}(:\d{2})?$/.test(rt)?rt:'';
+    var timeStr='';
+    if(iTimeOut>=0){   // THEO: ใช้เวลาชั่งออกก่อนเสมอ
+      var _tm=String(r[iTimeOut]||'').trim().match(/(\d{1,2}:\d{2}(?::\d{2})?)$/);
+      if(_tm) timeStr=_tm[1];
+    }
+    if(!timeStr) timeStr=/^\d{1,2}:\d{2}(:\d{2})?$/.test(rt)?rt:'';
     var kg=parseFloat(String(r[iNet]||'0').replace(/,/g,''))||0;
     if(kg<=0) continue;
 
