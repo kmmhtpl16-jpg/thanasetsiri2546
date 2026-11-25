@@ -555,13 +555,15 @@ select{color-scheme:light;}
       <p>ระบบบริหารจัดการ v2.0 Cloud</p>
     </div>
 
-    <div class="pin-hint">กรอกรหัส 4 หลัก</div>
+    <div class="pin-hint">กรอกรหัส 6 หลัก</div>
 
     <div class="pin-dots">
       <span class="pin-dot" id="d0"></span>
       <span class="pin-dot" id="d1"></span>
       <span class="pin-dot" id="d2"></span>
       <span class="pin-dot" id="d3"></span>
+      <span class="pin-dot" id="d4"></span>
+      <span class="pin-dot" id="d5"></span>
     </div>
 
     <div id="pinErr"></div>
@@ -593,6 +595,8 @@ select{color-scheme:light;}
     <span class="topbar-ico">⛏️</span>
     <div class="topbar-title">ท่าทราย ธนเศรษฐ์ศิริ</div>
     <span id="topbarRole"></span>
+    <button class="out-btn ta-adm" onclick="thaPinOpen()" style="display:none" title="เปลี่ยน PIN เข้าแอป">🔑 PIN</button>
+    <button class="out-btn ta-adm" onclick="thaSecOpen()" style="display:none" title="ความปลอดภัย PIN: ตัดบัตรเก่า / ล้างเครื่อง / Telegram">🛡️</button>
     <button class="out-btn" onclick="doLogout()">🔒 ออก</button>
   </header>
 
@@ -2082,15 +2086,11 @@ var FB_CFG = {
 };
 
 /* ================================================================
-   🔧 STEP 2 — PIN ↔ Firebase Account
-   สร้าง email/password คู่นี้ใน Firebase Authentication Console
+   🔐 PIN ตรวจที่เซิร์ฟเวอร์ (/api/login) — ไม่มีรหัสผ่านในหน้าเว็บแล้ว (23 พ.ย. 69)
+   PIN 6 หลัก → เซิร์ฟเวอร์ออกบัตรผ่านเข้าบัญชีเดิม + ป้ายบทบาท tha_role
 ================================================================ */
-var PINS = {
-  "1111": { email:"staff@sand.local",  pw:"StaffSand2025!",  role:"staff", label:"👷 พนักงาน" },
-  "8881": { email:"admin@sand.local",  pw:"AdminSand2025!",  role:"admin", label:"👑 เจ้าของ/CFO" }
-  // เพิ่มพนักงานคนอื่น:
-  // "2222": { email:"staff2@sand.local", pw:"Staff2Sand2025!", role:"staff", label:"👷 พนักงาน 2" }
-};
+var PIN_LEN = 6;
+var ROLE_LABEL = { admin: '👑 เจ้าของ/CFO', staff: '👷 พนักงาน' };
 
 /* ================================================================
    CONSTANTS
@@ -2134,12 +2134,19 @@ try {
 }
 
 firebase.auth().onAuthStateChanged(function(user) {
-  if (user) {
-    curEmail = user.email;
+  if (!user) { curRole=''; showPin(); return; }
+  // บทบาทมาจากบัตรที่ /api/login ออกให้เท่านั้น — เครื่องที่ยังล็อกอินแบบเก่า (ไม่มีป้าย) ต้องกด PIN ใหม่
+  user.getIdTokenResult().then(function(t) {
+    var r = t && t.claims && t.claims.tha_role;
+    if (r !== 'admin' && r !== 'staff') {
+      firebase.auth().signOut();
+      showPin(); setErr('ระบบเปลี่ยนวิธีเข้าใช้ กรุณากด PIN ใหม่ (ถ้ายังไม่ได้ PIN 6 หลัก ถามคุณหลิง)');
+      return;
+    }
+    curEmail = user.email; curRole = r;
+    document.getElementById('topbarRole').textContent = ROLE_LABEL[r];
     showApp();
-  } else {
-    showPin();
-  }
+  }).catch(function(){ showPin(); setErr('ตรวจสิทธิ์ไม่ได้ (เน็ต?) ลองใหม่'); });
 });
 
 window.addEventListener('online',  function(){ document.getElementById('offlineBanner').style.display='none'; });
@@ -2162,15 +2169,15 @@ function showPin() {
 }
 
 function np(d) {   // numpad press
-  if (pinBuf.length>=4) return;
+  if (pinBuf.length>=PIN_LEN || pinBusy) return;
   pinBuf+=d; updDots();
-  if (pinBuf.length===4) setTimeout(tryPin, 150);
+  if (pinBuf.length===PIN_LEN) setTimeout(tryPin, 150);
 }
 function nd() { pinBuf=pinBuf.slice(0,-1); updDots(); setErr(''); }  // del
 function nc() { pinBuf=''; updDots(); setErr(''); }                  // clear
 
 function updDots() {
-  for (var i=0;i<4;i++) {
+  for (var i=0;i<PIN_LEN;i++) {
     var el=document.getElementById('d'+i);
     el.className='pin-dot';
     if (i<pinBuf.length) el.classList.add('on');
@@ -2178,25 +2185,34 @@ function updDots() {
 }
 function setErr(m) { document.getElementById('pinErr').textContent=m; }
 
+var pinBusy = false;
+function pinFail(msg) {
+  for (var i=0;i<PIN_LEN;i++) { var el=document.getElementById('d'+i); el.className='pin-dot err'; }
+  setErr(msg);
+  var box=document.getElementById('pinBox');
+  box.classList.remove('ok'); box.classList.add('shake');
+  setTimeout(function(){ pinBuf=''; updDots(); box.classList.remove('shake'); }, 600);
+}
+// ข้อความเมื่อโดนล็อกการกด PIN (แบบ r27: ผิด 5 ครั้งล็อก 15 นาที ล็อกซ้ำนานขึ้น)
+function thaLockMsg(j) {
+  var u = j && j.until ? new Date(j.until) : null;
+  return '🔒 กด PIN ผิดหลายครั้ง ล็อกไว้' + (u ? ' ถึง ' + ('0' + u.getHours()).slice(-2) + ':' + ('0' + u.getMinutes()).slice(-2) + ' น.' : '') + ' — ถ้าเป็นพนักงานกดผิดเอง แจ้งเจ้าของให้กดปลดล็อกใน Telegram';
+}
 function tryPin() {
-  var acc=PINS[pinBuf];
-  if (!acc) {
-    for (var i=0;i<4;i++) { var el=document.getElementById('d'+i); el.className='pin-dot err'; }
-    setErr('รหัสไม่ถูกต้อง');
-    var box=document.getElementById('pinBox');
-    box.classList.add('shake');
-    setTimeout(function(){ pinBuf=''; updDots(); box.classList.remove('shake'); }, 600);
-    return;
-  }
-  curRole = acc.role;
-  document.getElementById('pinBox').classList.add('ok');
-  setErr('');
-  firebase.auth().signInWithEmailAndPassword(acc.email, acc.pw)
-    .catch(function(e) {
-      document.getElementById('pinBox').classList.remove('ok');
-      setErr('Firebase Error: ' + e.code);
-      pinBuf=''; updDots();
-    });
+  if (pinBusy) return;
+  var pin = pinBuf; pinBusy = true; pinBuf = ''; setErr('⏳ กำลังตรวจรหัส…');
+  fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ pin: pin }) })
+    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { st: r.status, j: j }; }); })
+    .then(function(x) {
+      if (x.st === 429) { pinBusy=false; return pinFail(thaLockMsg(x.j)); }
+      if (!x.j || !x.j.ok || !x.j.token) { pinBusy=false; return pinFail(x.st === 401 ? (x.j && x.j.locked ? thaLockMsg({}) : 'รหัสไม่ถูกต้อง') : 'เข้าระบบไม่ได้ ลองใหม่อีกครั้ง'); }
+      document.getElementById('pinBox').classList.add('ok');
+      setErr('');
+      window._thaDevice = x.j.device || '';   // 'none' = เครื่องนี้ไม่ถูกจำ (โควตาเครื่องใหม่วันนี้เต็ม) → เปลี่ยน PIN ไม่ได้จากเครื่องนี้
+      return firebase.auth().signInWithCustomToken(x.j.token).then(function(){ pinBusy=false; });
+    })
+    .catch(function(e) { pinBusy=false; pinFail('เข้าระบบไม่ได้ (เน็ต?) ลองใหม่อีกครั้ง'); })
+    .then(function(){ pin = ''; });
 }
 
 /* ================================================================
@@ -2205,14 +2221,11 @@ function tryPin() {
 function showApp() {
   document.getElementById('pinScreen').style.display='none';
   document.getElementById('appScreen').style.display='flex';
-  // ค้นหา role จาก PINS ตาม email
-  Object.values(PINS).forEach(function(a){
-    if (a.email===curEmail) { curRole=a.role; document.getElementById('topbarRole').textContent=a.label; }
-  });
   applyRole();
   goTab(1);
   listenFS();
   setTimeout(function(){ try{ tgCheckDailySummary(); }catch(e){} }, 8000);
+  setTimeout(function(){ try{ thaRevokeWatch(); }catch(e){} }, 5000);   // admin: เฝ้าตัดบัตรเก่าที่ค้างหลังเปลี่ยน PIN (แบบ r27)
   setTimeout(function(){ try{ if(typeof prSlipListen==='function') prSlipListen(); }catch(e){} }, 3000);
 }
 
@@ -2276,10 +2289,14 @@ function prWdEdit(id){
 }
 function tgNotify(text){
   try{
-    return fetch('/api/notify', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ text: text })
+    var u = firebase.auth().currentUser;
+    if (!u) return Promise.resolve();
+    return u.getIdToken().then(function(tok){
+      return fetch('/api/notify', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+        body: JSON.stringify({ text: text })
+      });
     }).catch(function(e){ console.warn('tgNotify', e); });
   }catch(e){ console.warn('tgNotify', e); }
 }
@@ -2387,7 +2404,157 @@ function applyRole() {
   document.querySelectorAll('.ta-adm').forEach(function(el){ el.style.display = curRole==='admin' ? '' : 'none'; });
 }
 
+/* ================================================================
+   🔑 เปลี่ยน PIN (admin เท่านั้น) — เซิร์ฟเวอร์สุ่ม PIN ใหม่ให้ โชว์ครั้งเดียว (23 พ.ย. 69)
+================================================================ */
+function thaPinOpen() {
+  if (curRole !== 'admin') return;
+  var old = document.getElementById('thaPinDlg'); if (old) old.remove();
+  var d = document.createElement('div');
+  d.id = 'thaPinDlg';
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:360px;width:100%;padding:18px;font-size:15px">'
+    + '<div style="font-weight:700;font-size:17px;margin-bottom:8px">🔑 เปลี่ยน PIN เข้าแอป</div>'
+    + '<label style="display:block;margin:8px 0 4px">เปลี่ยนของ</label>'
+    + '<select id="thaPinRole" class="form-input" style="width:100%"><option value="staff">👷 พนักงาน (staff)</option><option value="admin">👑 เจ้าของ (admin)</option></select>'
+    + '<label style="display:block;margin:10px 0 4px">PIN เจ้าของปัจจุบัน (ยืนยันตัวตน)</label>'
+    + '<input id="thaPinCur" type="password" inputmode="numeric" maxlength="6" autocomplete="off" class="form-input" style="width:100%;letter-spacing:4px;text-align:center">'
+    + '<div id="thaPinMsg" style="min-height:22px;margin-top:8px;color:#b91c1c"></div>'
+    + '<div style="font-size:13px;color:#555;margin:6px 0 10px">ระบบจะสุ่ม PIN ใหม่ 6 หลักให้ และโชว์ครั้งเดียว · เครื่องทุกเครื่องของบทบาทนั้นต้องกด PIN ใหม่</div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-ghost" id="thaPinCancel" onclick="thaPinClose()">ยกเลิก</button>'
+    + '<button class="btn btn-green" id="thaPinGo" onclick="thaPinGo()">เปลี่ยน PIN</button></div></div>';
+  document.body.appendChild(d);
+  document.getElementById('thaPinCur').focus();
+}
+function thaPinClose() { var d = document.getElementById('thaPinDlg'); if (d) d.remove(); }
+function thaPinGo() {
+  var inp = document.getElementById('thaPinCur'), msg = document.getElementById('thaPinMsg'), btn = document.getElementById('thaPinGo');
+  var cur = (inp.value || '').trim(); inp.value = '';
+  var role = document.getElementById('thaPinRole').value;
+  if (!/^\d{6}$/.test(cur)) { msg.textContent = 'กรอก PIN เจ้าของ 6 หลัก'; return; }
+  if (!confirm('ยืนยันเปลี่ยน PIN ของ' + (role === 'admin' ? 'เจ้าของ (admin)' : 'พนักงาน (staff)') + '?\nเครื่องทุกเครื่องของบทบาทนี้ต้องกด PIN ใหม่')) return;
+  var cancel = document.getElementById('thaPinCancel');
+  btn.disabled = true; cancel.disabled = true; msg.style.color = '#555'; msg.textContent = '⏳ กำลังเปลี่ยน… อย่าปิดหน้านี้';
+  // ไม่รู้ผล (เน็ตหลุดหลังส่ง) — เซิร์ฟเวอร์อาจเปลี่ยนไปแล้ว: บอกทางกู้ให้ชัด
+  var unknown = role === 'staff'
+    ? 'ไม่รู้ผล (เน็ต?) — ถ้าพนักงานกด PIN เดิมไม่ได้ รอ 1 นาทีแล้วกดเปลี่ยน PIN พนักงานใหม่อีกครั้ง'
+    : 'ไม่รู้ผล (เน็ต?) — ลองออกแล้วกด PIN เจ้าของเดิม · ถ้าเข้าไม่ได้ ให้ห้อง Code ช่วยตั้ง PIN ใหม่ (ทางกู้ใน Firebase)';
+  var u = firebase.auth().currentUser;
+  (u ? u.getIdToken() : Promise.reject())
+    .then(function (tok) {
+      return fetch('/api/pin-change', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }, body: JSON.stringify({ currentPin: cur, role: role }) });
+    })
+    .then(function (r) { return r.json().catch(function () { return { _bad: true }; }).then(function (j) { return { st: r.status, j: j }; }); })
+    .then(function (x) {
+      cur = '';
+      btn.disabled = false; cancel.disabled = false; msg.style.color = '#b91c1c';
+      if (x.st === 200 && (!x.j || x.j._bad || !/^\d{6}$/.test(x.j.pin))) { msg.textContent = unknown; return; }
+      if (x.st === 200 && x.j && /^\d{6}$/.test(x.j.pin)) {
+        var box = document.querySelector('#thaPinDlg > div');
+        box.textContent = '';
+        var h = document.createElement('div'); h.style.cssText = 'font-weight:700;font-size:17px;margin-bottom:8px';
+        h.textContent = '✅ PIN ใหม่ของ' + (role === 'admin' ? 'เจ้าของ' : 'พนักงาน');
+        var pv = document.createElement('div'); pv.style.cssText = 'font-size:34px;letter-spacing:8px;text-align:center;font-weight:800;margin:14px 0';
+        pv.textContent = x.j.pin;
+        var note = document.createElement('div'); note.style.cssText = 'font-size:13px;color:#555;margin-bottom:12px';
+        note.textContent = 'จดไว้แล้วกดปิด — ปิดแล้วดูซ้ำไม่ได้ (ห้ามส่ง PIN ทางแชตกลุ่ม)' + (x.j.revoked === false ? ' · ⚠️ ตัดเครื่องเดิมไม่สำเร็จ แต่บัตรเก่าใช้ไม่ได้แล้ว' : '');
+        var b = document.createElement('button'); b.className = 'btn btn-green'; b.textContent = 'จดแล้ว ปิด';
+        b.onclick = function () { pv.textContent = ''; thaPinClose(); if (role === 'admin') { doLogout(); } else { thaRevokeWatch(); } };
+        box.appendChild(h); box.appendChild(pv); box.appendChild(note); box.appendChild(b);
+        return;
+      }
+      msg.textContent = x.st === 401 ? 'PIN เจ้าของไม่ถูกต้อง' : x.st === 429 ? thaLockMsg(x.j)
+        : x.st === 409 ? 'เพิ่งมีการเปลี่ยน PIN ไปเมื่อสักครู่ รอ 1 นาทีแล้วลองใหม่'
+        : x.st === 403 && x.j && x.j.error === 'device' ? (window._thaDevice === 'none'
+            ? 'เครื่องนี้ยังไม่ถูกจำเป็นเครื่องเจ้าของ (โควตาเครื่องใหม่วันนี้เต็ม) — กด 🛡️ → "ล้างเครื่องที่จำไว้ทั้งหมด" แล้วออกและกด PIN เจ้าของเข้าใหม่'
+            : 'เปลี่ยน PIN ได้เฉพาะเครื่องที่เคยเข้าด้วย PIN เจ้าของ — ออกแล้วกด PIN เจ้าของเข้าใหม่ที่เครื่องนี้ก่อน (ถ้ายังไม่ได้ กด 🛡️ → ล้างเครื่องทั้งหมด แล้วเข้าใหม่)')
+        : x.st === 403 ? 'สิทธิ์หมดอายุ กรุณาออกแล้วเข้าใหม่'
+        : x.st >= 500 || x.j._bad ? unknown : 'เปลี่ยนไม่สำเร็จ ลองใหม่';
+    })
+    .catch(function () { btn.disabled = false; cancel.disabled = false; msg.style.color = '#b91c1c'; msg.textContent = unknown; });
+}
+
+/* ================================================================
+   🛡️ ความปลอดภัย PIN (admin) — แบบ r27 ข้อ 2.5 (24 พ.ย. 69)
+   หลังเปลี่ยน PIN / ทางกู้: ครบ 6 นาทีระบบสั่ง "ตัดบัตรเก่าซ้ำ" (revoke ซ้ำ) ของทั้งสองบทบาท
+   หน้าจอ admin ที่เปิดค้างจะนับถอยหลังแล้วเรียกให้เอง · รอบดึงข้อมูลรุ่งชัยทุก 30 นาทีก็เรียกให้ด้วย
+================================================================ */
+function thaAdminOp(action) {
+  var u = firebase.auth().currentUser;
+  return (u ? u.getIdToken() : Promise.reject(new Error('no user'))).then(function (tok) {
+    return fetch('/api/admin-ops', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }, body: JSON.stringify({ action: action }) });
+  }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { st: r.status, j: j }; }); });
+}
+function thaHM(ms) { var d = new Date(ms); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+function thaRevText(rv) {
+  if (!rv) return 'อ่านสถานะไม่ได้';
+  return ['admin', 'staff'].map(function (r) {
+    var s = rv[r] || {}, name = r === 'admin' ? 'เจ้าของ (admin)' : 'พนักงาน (staff)';
+    if (s.state === 'done' && s.verified !== true) return '☑️ ' + name + ': สั่งตัดแล้ว (ยังไม่ได้ตรวจกับ Firebase ในรอบนี้ — เปิดหน้านี้ใหม่เพื่อตรวจ)';
+    if (s.state === 'done') return '✅ ' + name + ': สั่งตัดบัตรเก่าสำเร็จ (ตรวจกับ Firebase แล้ว)' + (s.doneAt || s.at ? ' ' + thaHM(s.doneAt || s.at) + ' น. — บัตรที่ออกไปแล้วยังดูรายได้คนขับฝั่งรุ่งชัยได้อีกไม่เกิน 1 ชม. หลังเวลานี้' : '');
+    if (s.state === 'wait') return '⏳ ' + name + ': รอครบเวลา ' + thaHM(s.dueAt) + ' น. แล้วระบบจะตัดบัตรเก่าเอง';
+    if (s.state === 'unknown') return '❔ ' + name + ': ไม่มีข้อมูลการเปลี่ยน PIN (ยังไม่เคยตั้งผ่านระบบใหม่) — แจ้งห้อง Code';
+    if (s.state === 'failed') return '⚠️ ' + name + ': อ่านสถานะไม่ได้ — ลองเปิดใหม่ / แจ้งห้อง Code';
+    if (s.state === 'unverified') return '⚠️ ' + name + ': สั่งตัดแล้ว แต่ตรวจกับ Firebase ไม่ได้ — กด "ตัดบัตรเก่าซ้ำ" อีกครั้ง / แจ้งห้อง Code';
+    return '⚠️ ' + name + ': ยังค้าง — กดปุ่ม "ตัดบัตรเก่าซ้ำ"' + (s.failed ? ' (ครั้งล่าสุดไม่สำเร็จ)' : '');
+  }).join('\n');
+}
+var _thaWatchT = null;
+// เฝ้าสถานะ: ถึงเวลาแล้วเรียก revoke-again เอง · หยุดเมื่อสองบทบาทเสร็จ (หรือออกจากระบบ)
+function thaRevokeWatch() {
+  if (curRole !== 'admin') return;
+  if (_thaWatchT) { clearTimeout(_thaWatchT); _thaWatchT = null; }
+  thaAdminOp('status').then(function (x) {
+    var rv = x.j && x.j.revoke; if (!rv) return;
+    var el = document.getElementById('thaSecRev'); if (el) el.textContent = thaRevText(rv);
+    var pend = ['admin', 'staff'].filter(function (r) { return rv[r] && (rv[r].state === 'wait' || rv[r].state === 'pending' || rv[r].state === 'unverified'); });
+    if (!pend.length) return;
+    var due = Math.max.apply(null, pend.map(function (r) { return rv[r].dueAt || 0; })) || 0;
+    var wait = Math.max(5000, due - Date.now() + 3000);
+    _thaWatchT = setTimeout(function () {
+      thaAdminOp('revoke-again').then(function (y) {
+        var el2 = document.getElementById('thaSecRev'); if (el2 && y.j && y.j.revoke) el2.textContent = thaRevText(y.j.revoke);
+        if (y.st === 401 || y.st === 403) return;   // ตัดบัตรของตัวเอง (admin) แล้ว → ต้องกด PIN ใหม่
+        _thaWatchT = setTimeout(function () { thaRevokeWatch(); }, 60000);
+      }).catch(function () { _thaWatchT = setTimeout(function () { thaRevokeWatch(); }, 60000); });
+    }, Math.min(wait, 7 * 60000));
+  }).catch(function () {});
+}
+function thaSecOpen() {
+  if (curRole !== 'admin') return;
+  var old = document.getElementById('thaSecDlg'); if (old) old.remove();
+  var d = document.createElement('div');
+  d.id = 'thaSecDlg';
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:18px;font-size:15px">'
+    + '<div style="font-weight:700;font-size:17px;margin-bottom:8px">🛡️ ความปลอดภัย PIN</div>'
+    + '<div style="font-weight:600;margin-top:6px">ตัดบัตรเก่าหลังเปลี่ยน PIN</div>'
+    + '<div id="thaSecRev" style="white-space:pre-line;font-size:14px;margin:6px 0 8px;color:#333">⏳ กำลังอ่านสถานะ…</div>'
+    + '<button class="btn btn-green" style="width:100%;margin-bottom:8px" onclick="thaSecDo(\'revoke-again\')">ตัดบัตรเก่าซ้ำ (revoke ซ้ำ)</button>'
+    + '<button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="thaSecDo(\'clear-devices\')">ล้างเครื่องที่จำไว้ทั้งหมด</button>'
+    + '<button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="thaSecDo(\'set-webhook\')">ตั้ง Telegram webhook ใหม่</button>'
+    + '<div id="thaSecMsg" style="min-height:22px;font-size:14px;color:#b91c1c;white-space:pre-line"></div>'
+    + '<div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-ghost" onclick="document.getElementById(\'thaSecDlg\').remove()">ปิด</button></div></div>';
+  document.body.appendChild(d);
+  thaRevokeWatch();
+}
+function thaSecDo(action) {
+  var msg = document.getElementById('thaSecMsg');
+  if (action === 'clear-devices' && !confirm('ล้างเครื่องที่จำไว้ทั้งหมด?\nทุกเครื่องจะกลายเป็นเครื่องแปลก (กด PIN ผิดรวม 5 ครั้งจะล็อกเครื่องแปลกทั้งหมด) จนกว่าจะกด PIN เข้าใหม่')) return;
+  msg.style.color = '#555'; msg.textContent = '⏳ กำลังทำ…';
+  thaAdminOp(action).then(function (x) {
+    msg.style.color = x.j && x.j.ok ? '#15803d' : '#b91c1c';
+    if (action === 'revoke-again') { var el = document.getElementById('thaSecRev'); if (el && x.j.revoke) el.textContent = thaRevText(x.j.revoke); msg.textContent = x.st === 200 ? 'เรียบร้อย (ถ้าตัดบัตรของเจ้าของ เครื่องนี้ต้องกด PIN ใหม่)' : 'ทำไม่สำเร็จ ลองใหม่'; return; }
+    if (action === 'clear-devices') { msg.textContent = x.j.ok ? '✅ ล้างแล้ว' : 'ทำไม่สำเร็จ ลองใหม่'; return; }
+    if (action === 'set-webhook') {
+      var i = (x.j && x.j.info) || {};
+      msg.textContent = (x.j.ok ? '✅ ตั้งแล้ว' : '⚠️ ยังไม่สำเร็จ') + '\nurl: ' + (i.url || '-') + '\nรับ: ' + (i.allowed_updates || []).join(', ') + (i.last_error_message ? '\nerror ล่าสุด: ' + i.last_error_message : '') + '\nทดสอบ: พิมพ์ "เมนู" ในกลุ่ม Telegram ต้องได้คำตอบ';
+    }
+  }).catch(function () { msg.style.color = '#b91c1c'; msg.textContent = 'ทำไม่สำเร็จ (เน็ต?)'; });
+}
+
 function doLogout() {
+  if (_thaWatchT) { clearTimeout(_thaWatchT); _thaWatchT = null; }
   if(unW){ unW(); unW=null; }
   if(unD){ unD(); unD=null; }
   wData=[]; dData={};
@@ -9806,11 +9973,20 @@ function exLoadAll(cb){
 }
 
 var exUnlocked=false;
-function exOwnerPin(){ try{ for(var k in PINS){ if(PINS[k].role==='admin') return k; } }catch(e){} return '8881'; }
 function exTryUnlock(){
-  var v=(document.getElementById('exPin').value||'').trim();
-  if(v===exOwnerPin()){ exUnlocked=true; document.getElementById('exPin').value=''; document.getElementById('exPinErr').textContent=''; initExpenseTab(); }
-  else { document.getElementById('exPinErr').textContent='รหัสไม่ถูกต้อง'; document.getElementById('exPin').value=''; var p=document.getElementById('exPin'); if(p)p.focus(); }
+  var inp=document.getElementById('exPin'), err=document.getElementById('exPinErr');
+  var v=(inp.value||'').trim(); inp.value='';
+  if(!/^\d{6}$/.test(v)){ err.textContent='กรอกรหัส 6 หลัก'; inp.focus(); return; }
+  err.textContent='⏳ กำลังตรวจรหัส…';
+  fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:v,check:true})})
+    .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {st:r.status,j:j}; }); })
+    .then(function(x){
+      if(x.j&&x.j.ok&&x.j.role==='admin'&&curRole==='admin'){ exUnlocked=true; inp.value=''; err.textContent=''; initExpenseTab(); return; }
+      err.textContent = x.st===429 ? thaLockMsg(x.j) : x.st===503 ? 'ตรวจรหัสไม่ได้ ลองใหม่' : 'รหัสไม่ถูกต้อง';
+      inp.value=''; inp.focus();
+    })
+    .catch(function(){ err.textContent='ตรวจรหัสไม่ได้ (เน็ต?)'; })
+    .then(function(){ v=''; });
 }
 function initExpenseTab(){
   var lock=document.getElementById('exLock'), content=document.getElementById('exContent');
@@ -10803,6 +10979,8 @@ html.mb #editCustModal .modal-actions .btn-gold{background:var(--m-green);color:
     var role=clean(($('topbarRole')||{}).textContent)||'–';
     $('mbShAcct').innerHTML='<div class="mb-grab"></div><div class="mb-sht">บัญชีผู้ใช้</div>'
       +'<div class="mb-acct"><div class="mb-acct-l">เข้าสู่ระบบในฐานะ</div><div class="mb-acct-v">'+role+'</div></div>'
+      +(curRole==='admin' ? '<div class="mb-mrow" onclick="mbClose();thaPinOpen()"><div class="mb-mc">🔑</div><div class="mb-mt">เปลี่ยน PIN เข้าแอป</div></div>' : '')
+      +(curRole==='admin' ? '<div class="mb-mrow" onclick="mbClose();thaSecOpen()"><div class="mb-mc">🛡️</div><div class="mb-mt">ความปลอดภัย PIN (ตัดบัตรเก่า)</div></div>' : '')
       +'<div class="mb-mrow red" onclick="mbClose();doLogout()"><div class="mb-mc">'+S(I.out,20)+'</div><div class="mb-mt">ออกจากระบบ</div></div>'
       +'<button class="mb-shbtn" onclick="mbClose()">ปิด</button>';
   }

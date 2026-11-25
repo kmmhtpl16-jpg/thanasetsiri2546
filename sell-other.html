@@ -136,7 +136,7 @@ dialog img{max-width:88vw;max-height:80vh;display:block;}
   <div class="pinbox">
     <h1>🧱 ขายสินค้าอื่น</h1>
     <p>ท่าทราย ธนเศรษฐ์ศิริ</p>
-    <div class="pin-dots"><span class="pin-dot" id="pd0"></span><span class="pin-dot" id="pd1"></span><span class="pin-dot" id="pd2"></span><span class="pin-dot" id="pd3"></span></div>
+    <div class="pin-dots"><span class="pin-dot" id="pd0"></span><span class="pin-dot" id="pd1"></span><span class="pin-dot" id="pd2"></span><span class="pin-dot" id="pd3"></span><span class="pin-dot" id="pd4"></span><span class="pin-dot" id="pd5"></span></div>
     <div class="pinerr" id="pinerr"></div>
     <div class="pad">
       <button onclick="pinPress('1')">1</button><button onclick="pinPress('2')">2</button><button onclick="pinPress('3')">3</button>
@@ -532,16 +532,24 @@ function bahtText(num){
 }
 
 /* ================= PIN ================= */
-function pinPress(d){ if(pinBuf.length>=4)return; pinBuf+=d; pinDots(); if(pinBuf.length===4) setTimeout(pinTry,120); }
+function pinPress(d){ if(pinBuf.length>=6||pinBusy)return; pinBuf+=d; pinDots(); if(pinBuf.length===6) setTimeout(pinTry,120); }
 function pinDel(){ pinBuf=pinBuf.slice(0,-1); pinDots(); $('pinerr').textContent=''; }
 function pinClear(){ pinBuf=''; pinDots(); $('pinerr').textContent=''; }
-function pinDots(){ for(var i=0;i<4;i++){ var e=$('pd'+i); e.className='pin-dot'+(i<pinBuf.length?' on':''); } }
-var PINS={ '1111':{email:'staff@sand.local',pw:'StaffSand2025!',role:'staff'}, '8881':{email:'admin@sand.local',pw:'AdminSand2025!',role:'owner'} };
+function pinDots(){ for(var i=0;i<6;i++){ var e=$('pd'+i); e.className='pin-dot'+(i<pinBuf.length?' on':''); } }
+/* PIN ตรวจที่เซิร์ฟเวอร์ /api/login (23 พ.ย. 69) — ไม่มีรหัสผ่านในหน้าเว็บแล้ว · บทบาทจากป้าย tha_role ในบัตร */
+var pinBusy=false;
 function pinTry(){
-  var acc=PINS[pinBuf];
-  if(!acc){ for(var i=0;i<4;i++)$('pd'+i).className='pin-dot err'; $('pinerr').textContent='รหัสไม่ถูกต้อง'; setTimeout(function(){pinBuf='';pinDots();},700); return; }
+  if(pinBusy) return; var pin=pinBuf; pinBusy=true; pinBuf='';
   $('pinerr').textContent='⏳ กำลังเข้าสู่ระบบ...';
-  auth.signInWithEmailAndPassword(acc.email,acc.pw).catch(function(e){ $('pinerr').textContent='เข้าระบบไม่ได้: '+e.code; pinBuf=''; pinDots(); });
+  function fail(m){ pinBusy=false; for(var i=0;i<6;i++)$('pd'+i).className='pin-dot err'; $('pinerr').textContent=m; setTimeout(function(){pinBuf='';pinDots();},700); }
+  fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:pin})})
+    .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {st:r.status,j:j}; }); })
+    .then(function(x){
+      if(x.st===429){ var u=x.j&&x.j.until?new Date(x.j.until):null; return fail('🔒 กด PIN ผิดหลายครั้ง ล็อกไว้'+(u?' ถึง '+('0'+u.getHours()).slice(-2)+':'+('0'+u.getMinutes()).slice(-2)+' น.':'')); }
+      if(!x.j||!x.j.ok||!x.j.token) return fail(x.st===401?'รหัสไม่ถูกต้อง':'เข้าระบบไม่ได้ ลองใหม่');
+      return auth.signInWithCustomToken(x.j.token).then(function(){ pinBusy=false; });
+    })
+    .catch(function(){ fail('เข้าระบบไม่ได้ (เน็ต?)'); });
 }
 function showPin(){ if($('app'))$('app').style.display='none'; if($('pin'))$('pin').style.display='flex'; pinBuf=''; pinDots(); }
 function logout(){ if(auth) auth.signOut(); role=''; pinBuf=''; pinDots(); $('pinerr').textContent=''; showPin(); }
@@ -1001,7 +1009,7 @@ function diffBill(old,nw){
 /* ================= NOTIFY (stub) ================= */
 function notify(text){
   try{ db.collection('os_logs').add({at:new Date().toISOString(),by:role,text:text}); }catch(e){}
-  try{ fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})}); }catch(e){}
+  try{ var u=auth&&auth.currentUser; if(u) u.getIdToken().then(function(tok){ return fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({text:text})}); }).catch(function(){}); }catch(e){}
 }
 
 /* ================= DAY SUMMARY / HISTORY ================= */
@@ -1317,8 +1325,12 @@ document.addEventListener('keydown',function(e){
 /* ================= BOOT ================= */
 if(auth){
   auth.onAuthStateChanged(function(user){
-    if(user){ role=(user.email===PINS['8881'].email)?'owner':'staff'; startApp(); attachListeners(); }
-    else { showPin(); }
+    if(!user){ role=''; showPin(); return; }
+    user.getIdTokenResult().then(function(t){
+      var r=t&&t.claims&&t.claims.tha_role;
+      if(r!=='admin'&&r!=='staff'){ auth.signOut(); showPin(); $('pinerr').textContent='กรุณากด PIN ใหม่ (6 หลัก)'; return; }
+      role = r==='admin'?'owner':'staff'; startApp(); attachListeners();
+    }).catch(function(){ showPin(); $('pinerr').textContent='ตรวจสิทธิ์ไม่ได้ (เน็ต?)'; });
   });
 } else { showPin(); }
 </script>
