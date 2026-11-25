@@ -15,15 +15,20 @@ const FS = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases
 // ล้าง "ปุ่มค้าง" ใต้ช่องพิมพ์ (reply keyboard เก่าที่ยังโผล่อยู่ในแชท)
 const HIDE_KB = { reply_markup: { remove_keyboard: true } };
 
-export async function onRequestPost(context) {
+import { safeEq } from '../_lib/tha-auth.js';
+import { unlockById } from '../_lib/tha-guard.js';
+
+import { withRunLog } from '../_lib/fn-run.js';   // บันทึกผลรัน app_meta/fn_run_<ชื่อ> (แบบ r27)
+export async function onRequestPost(context) { return withRunLog(context, 'tg-webhook', postMain); }
+async function postMain(context) {
   const { request, env } = context;
-  // กันคนอื่นยิง webhook ปลอม: ตรวจ secret token ที่ตั้งตอน setWebhook
-  if (env.TG_WEBHOOK_SECRET) {
-    const got = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
-    if (got !== env.TG_WEBHOOK_SECRET) return json({ ok: false }, 401);
-  }
+  // กันคนอื่นยิง webhook ปลอม: ตรวจ secret token ที่ตั้งตอน setWebhook — บังคับ (แบบ r27): ไม่ได้ตั้ง/ว่าง/สั้น = ปฏิเสธทุกคำขอ
+  const sec = env.TG_WEBHOOK_SECRET || '';
+  const got = request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
+  if (sec.length < 16 || !safeEq(got, sec)) return json({ ok: false }, 401);
   let update = {};
   try { update = await request.json(); } catch (e) {}
+  if (update.callback_query) return handleCallback(env, update.callback_query);
   const msg = update.message || update.edited_message;
   if (!msg || !msg.text) return json({ ok: true });   // ไม่ใช่ข้อความ ข้ามไป
 
@@ -91,20 +96,32 @@ export async function onRequestPost(context) {
   return json({ ok: true });
 }
 
-export async function onRequestGet(context) {
-  const { request, env } = context;
-  const url = new URL(request.url);
-  const setup = url.searchParams.get('setup');
-  // ตั้ง webhook ให้ตัวเองครั้งเดียว: เรียก /api/tg-webhook?setup=<TG_WEBHOOK_SECRET>
-  if (setup && env.TG_WEBHOOK_SECRET && setup === env.TG_WEBHOOK_SECRET) {
-    const hook = url.origin + '/api/tg-webhook';
-    const r = await fetch('https://api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/setWebhook', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: hook, secret_token: env.TG_WEBHOOK_SECRET, allowed_updates: ['message'] })
-    });
-    return json({ ok: true, setWebhook: await r.json() });
+// ทาง GET ?setup=<secret> เดิมถูกตัดออก (ค่าลับเคยอยู่ใน URL) → ตั้ง webhook จากแท็บตั้งค่า admin (/api/admin-ops set-webhook)
+export async function onRequestGet() {
+  return json({ ok: false, error: 'not found' }, 404);
+}
+
+// ปุ่ม inline ใน Telegram · ปลดล็อกการกด PIN (แบบ r27 ข้อ 2.1)
+// เปิดใช้เมื่อ TG_UNLOCK_ENABLED = '1' (ตั้งหลังหมุน TG_WEBHOOK_SECRET แล้วเท่านั้น) · กดได้เฉพาะคุณหลิง (OWNER_ID)
+async function handleCallback(env, cq) {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  const data = String(cq.data || '');
+  const answer = function (text) {
+    return fetch('https://api.telegram.org/bot' + token + '/answerCallbackQuery', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: cq.id, text: text, show_alert: false }) }).catch(function () {});
+  };
+  if (data.indexOf('thaul:') !== 0) { await answer(''); return json({ ok: true }); }
+  if (env.TG_UNLOCK_ENABLED !== '1') { await answer('ปุ่มปลดล็อกยังไม่เปิดใช้'); return json({ ok: true }); }
+  if (!cq.from || cq.from.id !== OWNER_ID) { await answer('⛔ เฉพาะคุณหลิงเท่านั้น'); return json({ ok: true }); }
+  let res = 'stale';
+  try { res = await unlockById(env, data.slice(6)); } catch (e) { await answer('⚠️ ปลดล็อกไม่สำเร็จ ลองใหม่'); return json({ ok: true }); }
+  await answer(res === 'ok' ? '🔓 ปลดล็อกแล้ว' : 'ปลดไปแล้ว / หมดเวลาแล้ว / เป็นล็อกรอบเก่า');
+  if (res === 'ok' && cq.message) {
+    const hm = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(11, 16);
+    await fetch('https://api.telegram.org/bot' + token + '/editMessageText', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: cq.message.chat.id, message_id: cq.message.message_id, text: String(cq.message.text || '').slice(0, 3000) + '\n✅ ปลดแล้ว ' + hm + ' น.' }) }).catch(function () {});
   }
-  return json({ ok: true, info: 'telegram webhook' });
+  return json({ ok: true });
 }
 
 // ---------- Firestore (อ่าน/เขียนด้วยบัญชี admin) ----------

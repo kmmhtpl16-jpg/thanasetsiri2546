@@ -21,8 +21,9 @@ const TH_MONTH = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ
 let GLOBAL_ENV = {};
 let ERRS = [];
 
-export async function onRequestGet(context) { return handle(context); }
-export async function onRequestPost(context) { return handle(context); }
+import { withRunLog } from '../_lib/fn-run.js';   // บันทึกผลรัน app_meta/fn_run_<ชื่อ> (แบบ r27)
+export async function onRequestGet(context) { return withRunLog(context, 'payday-reminder', handle); }
+export async function onRequestPost(context) { return withRunLog(context, 'payday-reminder', handle); }
 
 async function handle(context) {
   const { request, env } = context;

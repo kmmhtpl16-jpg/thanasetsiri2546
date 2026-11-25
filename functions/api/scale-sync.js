@@ -16,7 +16,11 @@ const MAX_TICKETS = 200;
 const MAX_BODY = 512 * 1024;
 const GENERAL = 'ลูกค้า (ทั่วไป)';
 
+import { withRunLog } from '../_lib/fn-run.js';   // บันทึกผลรัน app_meta/fn_run_<ชื่อ> (แบบ r27)
 export async function onRequestPost(context) {
+  return withRunLog(context, 'scale-sync', postMain, { created: 'num', updated: 'num', unchanged: 'num', skipped: 'num', accepted: 'ids' });
+}
+async function postMain(context) {
   const { request, env } = context;
   if (!(await keyOk(request))) return json({ ok: false, error: 'unauthorized' }, 401);
   const cl = +(request.headers.get('content-length') || 0);

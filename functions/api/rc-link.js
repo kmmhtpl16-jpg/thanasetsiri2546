@@ -8,7 +8,9 @@
 // ไฟล์นี้อยู่ใน repo สาธารณะ จึงเก็บแค่ sha256 ของรหัส — ตัวรหัสจริงอยู่ใน Supabase Vault ของรุ่งชัยที่เดียว
 // (ชื่อ secret: thasai_link_key) ถ้าจะเปลี่ยนรหัส: สร้างใหม่ใน Vault แล้วเอา sha256 มาแทนบรรทัดข้างล่าง
 //
-// อ่านอย่างเดียว — ไม่เขียน Firestore เลย
+// อ่านอย่างเดียว — ไม่เขียน Firestore ข้อมูลร้าน
+// (เพิ่ม 24 พ.ย. 69 แบบ r27 ข้อ 2.5: ทุกรอบ GET ที่รุ่งชัยเรียกทุก 30 นาที = ตัวกระตุ้น revoke ซ้ำหลังเปลี่ยน PIN ผ่าน service account
+//  + เตือน Telegram ถ้าค้างเกิน 1 ชม. · ทำหลังงานหลัก ล้มไม่กระทบการส่งข้อมูลน้ำมัน)
 // ============================================================
 
 const KEY_SHA256 = '720726353aaa879b4fead42e27e8229c887c0f2c7a622640e8f0dccf9d8538fd';
@@ -18,9 +20,14 @@ const FB_PROJECT = 'thanasetsiri2546-20cb6';
 const FS = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents`;
 const MAX_DAYS = 45;
 
-export async function onRequestGet(context) {
+import { revokeAgainRun, bg } from '../_lib/tha-guard.js';
+
+import { withRunLog } from '../_lib/fn-run.js';   // บันทึกผลรัน app_meta/fn_run_<ชื่อ> (แบบ r27)
+export async function onRequestGet(context) { return withRunLog(context, 'rc-link', getMain, { count: 'num', from: 'date', to: 'date' }); }
+async function getMain(context) {
   const { request, env } = context;
   if (!(await authOk(request))) return json({ ok: false, error: 'unauthorized' }, 401);
+  await bg(context, revokeAgainRun(env, { alert: true }));
   try {
     const url = new URL(request.url);
     const from = url.searchParams.get('from') || '';
@@ -59,7 +66,8 @@ export async function onRequestGet(context) {
   }
 }
 
-export async function onRequestPost(context) {
+export async function onRequestPost(context) { return withRunLog(context, 'rc-link-post', postMain); }
+async function postMain(context) {
   const { request, env } = context;
   if (!(await authOk(request))) return json({ ok: false, error: 'unauthorized' }, 401);
   try {
