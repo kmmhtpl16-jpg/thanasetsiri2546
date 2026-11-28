@@ -567,6 +567,7 @@ select{color-scheme:light;}
     </div>
 
     <div id="pinErr"></div>
+    <label id="pinTrustRow" style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;margin:-6px 0 12px;cursor:pointer;user-select:none"><input type="checkbox" id="pinTrust" style="width:18px;height:18px"> จำเครื่องนี้ 30 วัน <span style="opacity:.6;font-size:11px">(เฉพาะเจ้าของ · มือถือส่วนตัว)</span></label>
 
     <div class="numpad">
       <button class="nk" onclick="np('1')">1</button>
@@ -15104,6 +15105,13 @@ html.mb #tp4.own-full #mbOwn{margin-bottom:14px;}
 (function(){
   // เจ้าของ 30 นาที · แอดมิน/พนักงาน 1 ชั่วโมง (เคาะ 26 ก.ย.69)
   var KEY='thn_lastActive', last=Date.now(), locked=false;
+  /* จำเครื่องนี้ 30 วัน (คุณหลิงเลือก 28 พ.ย.69) — เฉพาะบทบาทเจ้าของ (tha_role=admin) ที่ติ๊กตอนกด PIN · ออกจากระบบ = เลิกจำ */
+  var TKEY='thn_trustUntil', TRUST_MS=30*24*60*60*1000;
+  function trustRd(){ try{ var v=+localStorage.getItem(TKEY); return v>0?v:0; }catch(e){ return 0; } }
+  function trustClear(){ try{ localStorage.removeItem(TKEY); }catch(e){} }
+  function trusted(){ return (typeof curRole!=='undefined' && curRole==='admin') && trustRd()>Date.now(); }
+  var _lo=window.doLogout;
+  if(typeof _lo==='function') window.doLogout=function(){ trustClear(); return _lo.apply(this,arguments); };
   function idleMs(){ var e=(typeof curEmail!=='undefined'&&curEmail)||''; return e==='admin@sand.local' ? 30*60*1000 : 60*60*1000; }
   function rd(){ try{ var v=+localStorage.getItem(KEY); return v>0?v:0; }catch(e){ return 0; } }
   function wr(t){ try{ localStorage.setItem(KEY,String(t)); }catch(e){} }
@@ -15124,17 +15132,25 @@ html.mb #tp4.own-full #mbOwn{margin-bottom:14px;}
   // เปิดแอปมาแล้วเจอว่าล็อกอินค้างไว้ แต่ห่างจากการใช้ครั้งล่าสุดเกิน 30 นาที → ไม่เข้าแอป ให้ใส่รหัสใหม่
   var _sa=window.showApp;
   if(typeof _sa==='function') window.showApp=function(){
-    var prev=rd();
-    if(prev && Date.now()-prev>idleMs() && !window.__justPinned){ lock(); return; }
+    var prev=rd(), tu=trustRd();
+    if(window.__justPinned){
+      if(window.__wantTrust && typeof curRole!=='undefined' && curRole==='admin'){ try{ localStorage.setItem(TKEY,String(Date.now()+TRUST_MS)); }catch(e){} }
+      else trustClear();
+    } else {
+      if(tu && !trusted()){ trustClear(); lock(); return; }   // ครบ 30 วัน (หรือไม่ใช่เจ้าของ) → ถาม PIN ใหม่
+      if(!trusted() && prev && Date.now()-prev>idleMs()){ lock(); return; }
+    }
+    window.__wantTrust=false;
     window.__justPinned=false; last=Date.now(); wr(last); try{ sessionStorage.removeItem('thn_lockReload'); }catch(e){}
     return _sa.apply(this,arguments);
   };
   // ใส่รหัสถูก → ไม่ต้องเช็กเวลาเก่า
   var _tp=window.tryPin;
-  if(typeof _tp==='function') window.tryPin=function(){ window.__justPinned=true; wr(Date.now()); return _tp.apply(this,arguments); };
+  if(typeof _tp==='function') window.tryPin=function(){ var c=document.getElementById('pinTrust'); window.__wantTrust=!!(c&&c.checked); window.__justPinned=true; wr(Date.now()); return _tp.apply(this,arguments); };
   // กลับมาดูแอปหลังสลับไปแอปอื่น / เปิดค้างไว้
-  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && appOn() && Date.now()-Math.max(last,rd())>idleMs()) lock(); });
-  setInterval(function(){ if(appOn() && Date.now()-Math.max(last,rd())>idleMs()) lock(); }, 60000);
+  function due(){ if(trusted()) return false; return Date.now()-Math.max(last,rd())>idleMs() || (trustRd()>0 && curRole==='admin'); }
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && appOn() && due()) lock(); });
+  setInterval(function(){ if(appOn() && due()) lock(); }, 60000);
 })();
 </script>
 <style id="ap-css">
